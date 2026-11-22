@@ -1,0 +1,12 @@
+node_modules
+.next
+.next-check
+data/*.db
+data/*.db-*
+.env*
+!.env.example
+data/voix-essais/
+data/essais-sons/
+data/voix-bibliotheque/
+tsconfig.tsbuildinfo
+.DS_Store

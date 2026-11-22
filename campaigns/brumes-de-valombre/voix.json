@@ -1,0 +1,33 @@
+{
+	"model": "eleven_v4",
+	"designModel": "eleven_ttv_v3",
+	"outputFormat": "mp3_44100_128",
+	"settings": {
+		"stability": 0.5,
+		"similarity_boost": 0.75,
+		"style": 0.25,
+		"use_speaker_boost": true,
+		"speed": 1
+	},
+	"perNpc": {
+		"narrateur": {
+			"stability": 0.7,
+			"style": 0.05,
+			"speed": 0.95
+		}
+	},
+	"voices": {
+		"narrateur": "jUHQdLfy668sllNiNTSW",
+		"berthe": "sANWqF1bCMzR6eyZbCGw",
+		"tilo": "IHngRooVccHyPqB4uQkG",
+		"ossian": "GFj5Qf6cNQ3Lgp8VKBwc",
+		"aubin": "AfbuxQ9DVtS4azaxN1W7",
+		"gaspard": "papd083UqIoSWdSkh3fG",
+		"brac": "a5n9pJUnAhX4fn7lx3uo",
+		"pff": "U0W3edavfdI8ibPeeteQ",
+		"corvine": "EMuO6fFLrXKOryHzij6K",
+		"heron": "hFgOzpmS0CMtL2to8sAl",
+		"dame-grise": "hndZlkpVm5i9lXBY9CKj",
+		"lisette": "E0OS48T5F0KU7O2NInWS"
+	}
+}

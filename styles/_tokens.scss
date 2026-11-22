@@ -1,0 +1,33 @@
+// Palette Valombre : nuit, brume, parchemin, braise.
+:root {
+	--night-900: #0d111b;
+	--night-800: #131a28;
+	--night-700: #1b2436;
+	--night-600: #253049;
+	--mist-400: #8e99ae;
+	--mist-300: #b4bdcd;
+	--mist-200: #d5dbe6;
+	--parchment-100: #f3ead6;
+	--parchment-200: #e6d8b8;
+	--parchment-300: #cdb88b;
+	--ink-900: #221d18;
+	--ember-500: #e08a3c;
+	--ember-400: #f0a457;
+	--ember-300: #f6c27f;
+	--wisp-400: #7fb6e6;
+	--moss-400: #7fb38a;
+	--blood-400: #d46a5f;
+
+	--font-title: var(--font-cinzel), 'Cinzel', serif;
+	--font-body: var(--font-alegreya), 'Alegreya', Georgia, serif;
+
+	--radius-s: 8px;
+	--radius-m: 14px;
+	--radius-l: 22px;
+	--shadow-l: 0 20px 60px rgb(0 0 0 / 45%);
+	--focus: 0 0 0 3px var(--night-900), 0 0 0 6px var(--ember-300);
+	--gutter: clamp(16px, 4vw, 40px);
+}
+
+$bp-m: 760px;
+$bp-l: 1100px;
