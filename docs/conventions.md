@@ -109,6 +109,21 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 - Le récit des trois derniers coups reste affiché (dé + caractéristique = total, touché ou raté, riposte).
 - Un combat a toujours une autre issue possible que la force (parlementer, fuir, un objet…), et on ne meurt jamais.
 
+### Les classes et le combat
+
+| Classe | Profil | En combat |
+|---|---|---|
+| Guerrier·ère | +2 Force, +3 PV | Frapper · Coup puissant (2 ♥, 1×/combat) · Intervention (se rue devant le groupe : la prochaine attaque est pour lui, −1 dégât) |
+| Rôdeur·se | +1 Agilité, +1 Force, +1 PV | Tir à l’arc (Agilité) · Corps à corps (Force) · Seconde chance (relancer un dé, rechargée au repos) |
+| Mage | +2 Esprit | Deux sorts : Trait de lumière (Esprit) · Étincelle d’aube (touche à coup sûr, 2 ♥ contre la brume, 1×/combat) |
+| Barde | +1 Charme, +1 Esprit | Magie et contrôle : Note perçante (Charme) · Berceuse (le monstre passe son tour, 1×/combat) · Chant de courage (+2 PV au groupe, 1×/combat) |
+
+- **Initiative** : au début du combat, chacun lance un dé + Agilité (le monstre : dé + 2/4/5 selon la difficulté).
+  On joue dans cet ordre ; le monstre agit à sa place dans la file. La frise des tours reste affichée.
+- Durée visée (simulation avec des héros moyens) : 2 tours de table pour un petit combat, 4 pour un boss ;
+  quelques PV perdus, jamais de mort. Le règlage se fait par les cœurs du monstre (`enemy.hearts`).
+- Le code des classes et des actions est dans `engine/rules.ts` (`CLASSES`, `ABILITIES`).
+
 ### Les jonctions entre scènes
 
 - La nouvelle image arrive en fondu, puis **une respiration de 1,2 s** avant la première réplique (`SETTLE_MS`).

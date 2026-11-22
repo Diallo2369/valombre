@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { createAdventureAction } from '@/app/actions/game';
-import { CLASSES, CLASS_LIST, STATS, classPortrait, className, makeCharacter, statFromDie } from '@/engine/rules';
+import { ABILITIES, CLASSES, CLASS_LIST, STATS, classPortrait, className, makeCharacter, statFromDie } from '@/engine/rules';
 import type { Character, ClassId, StatKey, Stats, Gender } from '@/engine/types';
 import { newId } from '@/lib/ids';
 import type { MediaMap } from '@/lib/media-types';
@@ -232,9 +232,14 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 										/>
 										<span className="class-card__name">{className({ classId: c.id, gender: draft.gender ?? undefined })}</span>
 										<span className="class-card__tag">{c.tagline}</span>
-										<span className="class-card__stat">+1 en {STATS.find((s) => s.key === c.stat)?.label}</span>
+										<span className="class-card__stat">
+											{Object.entries(c.bonus)
+												.map(([k, v]) => `+${v} ${STATS.find((s) => s.key === k)?.label}`)
+												.join(' · ')}
+											{c.pvBonus ? ` · +${c.pvBonus} PV` : ''}
+										</span>
 										<span className="class-card__power">
-											<strong>{c.power.name} :</strong> {c.power.text}
+											<strong>En combat :</strong> {c.abilities.map((id) => `${ABILITIES[id].icon} ${ABILITIES[id].name}`).join(' · ')}
 										</span>
 									</button>
 								))}

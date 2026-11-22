@@ -369,7 +369,7 @@ export const CH2_CH3: Scene[] = [
 		media: { image: 'img-brumelins', music: 'mus-combat', ambience: 'amb-clairiere', sfx: ['sfx-ricanement'] },
 		lines: [{ who: 'narrateur', text: 'Les brumelins vous encerclent en ricanant. Ils sont nombreux, rapides, et ils mordillent les chevilles !' }],
 		combat: {
-			enemy: { name: 'la bande de brumelins', hearts: 4, difficulty: 'moyen', damage: 1, brume: true, image: 'img-brumelins', attack: 'La ronde des brumelins se resserre : ça pince, ça chatouille, ça mordille de partout !' },
+			enemy: { name: 'la bande de brumelins', hearts: 6, difficulty: 'moyen', damage: 1, brume: true, image: 'img-brumelins', attack: 'La ronde des brumelins se resserre : ça pince, ça chatouille, ça mordille de partout !' },
 			victory: { to: 'clairiere-libre', effects: [{ xp: 2 }] },
 			defeat: { to: 'defaite-foret' },
 			talk: {
@@ -515,7 +515,7 @@ export const CH2_CH3: Scene[] = [
 		media: { image: 'img-loup', music: 'mus-boss', ambience: 'amb-sanctuaire', sfx: ['sfx-grondement'] },
 		lines: [{ who: 'narrateur', text: 'Le Loup de Cendre est puissant ! Chaque coup de patte soulève des étincelles. Il faudra rester unis.' }],
 		combat: {
-			enemy: { name: 'le Loup de Cendre', hearts: 6, difficulty: 'moyen', damage: 2, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !' },
+			enemy: { name: 'le Loup de Cendre', hearts: 9, difficulty: 'moyen', damage: 2, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !' },
 			victory: { to: 'loup-vaincu', effects: [{ xp: 3 }] },
 			defeat: { to: 'defaite-foret' },
 			talk: {

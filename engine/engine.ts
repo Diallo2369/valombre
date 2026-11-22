@@ -1,10 +1,12 @@
-import { CLASSES, STAT_LABEL, computePvMax, evaluateRoll, levelFromXp, type RollResult } from './rules';
+import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
 import { voiceHash } from './voices';
 import type {
 	Campaign,
 	Character,
 	CheckDef,
 	Choice,
+	CombatDef,
+	CombatState,
 	Cond,
 	Effect,
 	Game,
@@ -159,7 +161,7 @@ function applyXp(c: Character, amount: number, events: GameEvent[]) {
 	const before = levelFromXp(c.xp);
 	c.xp += amount;
 	const after = levelFromXp(c.xp);
-	const newMax = computePvMax(c.stats, c.xp);
+	const newMax = computePvMax(c.stats, c.xp, c.classId);
 	c.pv += newMax - c.pvMax;
 	c.pvMax = newMax;
 	if (after > before) {
@@ -318,9 +320,12 @@ export function enterScene(campaign: Campaign, game: Game, targetId: string, eve
 	for (const id of scene.media?.sfx ?? []) events.push({ kind: 'sfx', id });
 	applyEffects(campaign, next, scene.onEnter, events);
 
-	state.combat = scene.combat
-		? { hearts: scene.combat.enemy.hearts, maxHearts: scene.combat.enemy.hearts, actor: firstActor(next.party, 0), round: 1 }
-		: null;
+	state.combat = null;
+	if (scene.combat) {
+		startCombat(next, scene.combat, events);
+		// Le monstre peut avoir l'initiative : il agit avant le premier héros.
+		advanceCombat(next, scene.combat, events);
+	}
 
 	if (scene.ending) state.ended = true;
 
@@ -481,16 +486,95 @@ function firstActor(party: Character[], from: number): number {
 	return 0;
 }
 
+/**
+ * Début du combat : chacun lance l'initiative (dé + Agilité ; le monstre : dé + bonus de difficulté).
+ * On joue ensuite dans cet ordre, le monstre à sa place dans la file.
+ */
+function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
+	const rolls = [
+		...game.party.map((c) => ({ id: c.id, name: c.name, bonus: c.stats.agilite })),
+		{ id: 'enemy', name: def.enemy.name, bonus: ENEMY_INITIATIVE[def.enemy.difficulty] },
+	].map((r) => {
+		const die = rollD6();
+		return { ...r, die, total: die + r.bonus };
+	});
+	// À égalité, les héros passent avant le monstre.
+	rolls.sort((a, b) => b.total - a.total || (a.id === 'enemy' ? 1 : b.id === 'enemy' ? -1 : 0));
+	game.state.combat = {
+		hearts: def.enemy.hearts,
+		maxHearts: def.enemy.hearts,
+		actor: firstActor(game.party, 0),
+		round: 1,
+		order: rolls.map((r) => r.id),
+		turn: -1,
+		initiative: Object.fromEntries(rolls.map((r) => [r.id, { die: r.die, bonus: r.bonus, total: r.total }])),
+		used: {},
+		guard: null,
+		asleep: false,
+	};
+	events.push({ kind: 'initiative', order: rolls });
+	log(game.state, 'combat', `Initiative : ${rolls.map((r) => `${r.name} ${r.total}`).join(', ')}.`);
+}
+
+/** Le monstre agit : il attaque un héros (celui qui s'est interposé s'il y en a un), sauf s'il dort. */
+function enemyAct(game: Game, def: CombatDef, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	const name = def.enemy.name;
+	if (combat.asleep) {
+		combat.asleep = false;
+		events.push({ kind: 'enemy-turn', name, attack: `${capitalize(name)} dort à poings fermés et passe son tour !`, heroId: '', amount: 0, asleep: true });
+		log(game.state, 'combat', `${capitalize(name)} dort et passe son tour.`);
+		return;
+	}
+	const active = activeHeroes(game.party);
+	const guard = combat.guard ? active.find((c) => c.id === combat.guard) : undefined;
+	const victim = guard ?? active[Math.floor(Math.random() * active.length)];
+	combat.guard = null;
+	if (!victim) return;
+	const amount = Math.max(0, def.enemy.damage - (guard ? 1 : 0));
+	const attack = def.enemy.attack ?? `${capitalize(name)} attaque !`;
+	events.push({ kind: 'enemy-turn', name, attack, heroId: victim.id, amount, guarded: Boolean(guard) });
+	log(game.state, 'combat', guard ? `${attack} ${victim.name} s’est interposé·e : −${amount} PV seulement.` : `${attack} ${victim.name} perd ${amount} PV.`);
+	if (amount > 0) hurt(game, victim, amount, events, false);
+}
+
+/** Passe au suivant dans l'ordre de jeu ; le monstre agit quand vient sa place. Renvoie 'defeat' si le groupe tombe. */
+function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' | 'defeat' {
+	const combat = game.state.combat!;
+	const order = combat.order ?? [...game.party.map((c) => c.id), 'enemy'];
+	combat.order = order;
+	for (let step = 0; step < order.length * 2; step += 1) {
+		const turn = ((combat.turn ?? -1) + 1) % order.length;
+		if (turn === 0 && (combat.turn ?? -1) >= 0) combat.round += 1;
+		combat.turn = turn;
+		const id = order[turn];
+		if (id === 'enemy') {
+			enemyAct(game, def, events);
+			if (activeHeroes(game.party).length === 0) return 'defeat';
+			continue;
+		}
+		const idx = game.party.findIndex((c) => c.id === id);
+		if (idx >= 0 && game.party[idx].pv > 0) {
+			combat.actor = idx;
+			events.push({ kind: 'turn', heroId: id });
+			return 'hero';
+		}
+	}
+	return activeHeroes(game.party).length ? 'hero' : 'defeat';
+}
+
 export type CombatAction =
-	| { kind: 'attack'; stat: StatKey; roll: RollResult | null; usePower: boolean; rerollBy?: string }
+	| { kind: 'ability'; ability: AbilityId; roll: RollResult | null; rerollBy?: string }
 	| { kind: 'talk'; roll: RollResult; rerollBy?: string }
 	| { kind: 'flee'; roll: RollResult; rerollBy?: string };
 
-/**
- * Un tour de combat pour le héros actif.
- * - attaque réussie : l'ennemi perd 1 cœur (2 avec un pouvoir adapté) ;
- * - attaque ratée : le héros encaisse les dégâts de l'ennemi.
- */
+/** Actions possibles pour un héros en combat (celles « une fois par combat » disparaissent une fois utilisées). */
+export function availableAbilities(state: CombatState, hero: Character): Ability[] {
+	const used = state.used?.[hero.id] ?? [];
+	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => !(a.perCombat && used.includes(a.id)));
+}
+
+/** Le tour d'un héros, puis la suite de la file (le monstre peut agir avant le héros suivant). */
 export function combatTurn(campaign: Campaign, game: Game, action: CombatAction): StepResult {
 	const scene = getScene(campaign, game.state.sceneId);
 	const def = scene.combat;
@@ -501,9 +585,10 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	const combat = work.state.combat!;
 	const hero = work.party[combat.actor];
 	if (action.rerollBy) spendPower(work, action.rerollBy);
+	const rollText = (r: RollResult) => `${r.die} + ${r.stat} = ${r.total}`;
 
 	if (action.kind === 'talk' && def.talk) {
-		log(work.state, 'combat', `${hero.name} tente de parlementer (${action.roll.die} + ${action.roll.stat} = ${action.roll.total}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
+		log(work.state, 'combat', `${hero.name} tente de parlementer (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
 			events.push({ kind: 'sfx', id: 'sfx-succes' });
 			if (def.talk.outcome.text) events.push({ kind: 'narration', text: def.talk.outcome.text });
@@ -514,7 +599,7 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		events.push({ kind: 'sfx', id: 'sfx-echec' });
 		events.push({ kind: 'miss', heroId: hero.id });
 	} else if (action.kind === 'flee' && def.flee) {
-		log(work.state, 'combat', `${hero.name} tente de fuir (${action.roll.die} + ${action.roll.stat} = ${action.roll.total}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
+		log(work.state, 'combat', `${hero.name} tente de fuir (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
 			if (def.flee.outcome.text) events.push({ kind: 'narration', text: def.flee.outcome.text });
 			applyEffects(campaign, work, def.flee.outcome.effects, events);
@@ -523,34 +608,44 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		}
 		events.push({ kind: 'sfx', id: 'sfx-echec' });
 		events.push({ kind: 'miss', heroId: hero.id });
-	} else if (action.kind === 'attack') {
-		const isMagePower = action.usePower && hero.classId === 'mage';
-		const isWarriorPower = action.usePower && hero.classId === 'guerrier';
-		const spell = isMagePower || action.stat === 'esprit';
-		const success = isMagePower || Boolean(action.roll?.success);
-		if (action.usePower && hero.powerReady) {
-			hero.powerReady = false;
+	} else if (action.kind === 'ability') {
+		const ab = ABILITIES[action.ability];
+		if (!ab || !availableAbilities(combat, hero).some((a) => a.id === ab.id)) throw new Error('Action impossible');
+		if (ab.perCombat) {
+			combat.used = { ...(combat.used ?? {}), [hero.id]: [...(combat.used?.[hero.id] ?? []), ab.id] };
 			events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
 		}
-		if (spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
-		const how = isMagePower
-			? `${CLASSES.mage.power.name}, sans dé`
-			: action.roll
-				? `${STAT_LABEL[action.stat]} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}`
-				: STAT_LABEL[action.stat];
-		if (success) {
-			let dmg = 1;
-			if (isWarriorPower) dmg = 2;
-			if (isMagePower && def.enemy.brume) dmg = 2;
-			dmg = Math.min(dmg, combat.hearts);
-			combat.hearts = Math.max(0, combat.hearts - dmg);
-			events.push({ kind: 'sfx', id: spell ? 'sfx-coeur-brise' : 'sfx-coup' });
-			events.push({ kind: 'hit', target: 'enemy', heroId: hero.id, amount: dmg, spell });
-			log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} ! −${dmg} ♥`);
-		} else {
-			events.push({ kind: 'sfx', id: 'sfx-rate' });
-			events.push({ kind: 'miss', heroId: hero.id });
-			log(work.state, 'combat', `${hero.name} (${how}) rate son coup.`);
+		if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
+		const how = action.roll ? `${ab.name} : ${rollText(action.roll)}` : ab.name;
+
+		if (ab.effect === 'hit' || ab.effect === 'hit2' || ab.effect === 'sure') {
+			const success = ab.effect === 'sure' || Boolean(action.roll?.success);
+			if (success) {
+				const base = ab.effect === 'hit2' ? 2 : ab.effect === 'sure' && def.enemy.brume ? 2 : 1;
+				const dmg = Math.min(base, combat.hearts);
+				combat.hearts -= dmg;
+				events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
+				events.push({ kind: 'hit', target: 'enemy', heroId: hero.id, amount: dmg, spell: ab.spell });
+				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} ! −${dmg} ♥`);
+			} else {
+				events.push({ kind: 'sfx', id: 'sfx-rate' });
+				events.push({ kind: 'miss', heroId: hero.id });
+				log(work.state, 'combat', `${hero.name} (${how}) rate son coup.`);
+			}
+		} else if (ab.effect === 'guard') {
+			combat.guard = hero.id;
+			events.push({ kind: 'support', heroId: hero.id, what: 'guard' });
+			log(work.state, 'combat', `${hero.name} se rue devant ses amis et provoque ${def.enemy.name} !`);
+		} else if (ab.effect === 'sleep') {
+			const ok = Boolean(action.roll?.success);
+			if (ok) combat.asleep = true;
+			events.push({ kind: 'support', heroId: hero.id, what: ok ? 'sleep' : 'sleep-fail' });
+			log(work.state, 'combat', ok ? `${hero.name} (${how}) endort ${def.enemy.name} !` : `${hero.name} (${how}) chante, mais ${def.enemy.name} reste bien éveillé.`);
+		} else if (ab.effect === 'heal') {
+			for (const c of work.party) c.pv = Math.min(c.pvMax, c.pv + 2);
+			events.push({ kind: 'sfx', id: 'sfx-soin' });
+			events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: 2 });
+			log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +2 PV pour tout le groupe.`);
 		}
 	}
 
@@ -561,29 +656,13 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		nextSpokes(work);
 		return enterScene(campaign, work, def.victory.to, events);
 	}
-	// Tour de table terminé : c'est au tour du monstre. Il attaque un héros encore debout.
-	const next = firstActor(work.party, combat.actor + 1);
-	if (next <= combat.actor) {
-		const targets = activeHeroes(work.party);
-		const victim = targets[Math.floor(Math.random() * targets.length)];
-		if (victim) {
-			const attack = def.enemy.attack ?? `${capitalize(def.enemy.name)} attaque !`;
-			events.push({ kind: 'enemy-turn', name: def.enemy.name, attack, heroId: victim.id, amount: def.enemy.damage });
-			log(work.state, 'combat', `${attack} ${victim.name} perd ${def.enemy.damage} PV.`);
-			hurt(work, victim, def.enemy.damage, events, false);
-		}
-		combat.round += 1;
-	}
 
-	if (activeHeroes(work.party).length === 0) {
+	if (advanceCombat(work, def, events) === 'defeat') {
 		log(work.state, 'combat', `Le groupe est épuisé…`);
 		if (def.defeat.text) events.push({ kind: 'narration', text: def.defeat.text });
 		applyEffects(campaign, work, def.defeat.effects, events);
 		return enterScene(campaign, work, def.defeat.to, events);
 	}
-
-	combat.actor = firstActor(work.party, combat.actor + 1);
-	events.push({ kind: 'turn', heroId: work.party[combat.actor].id });
 	return { ...work, events };
 }
 

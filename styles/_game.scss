@@ -1355,3 +1355,97 @@
 		animation-duration: 1ms;
 	}
 }
+
+/* ---- Combat : ordre d'initiative, états ---- */
+.fight__order {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	counter-reset: tour;
+}
+
+.order-chip {
+	counter-increment: tour;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	border-radius: 999px;
+	border: 1px solid rgb(213 219 230 / 18%);
+	background: var(--night-800);
+	font-size: 0.9rem;
+	transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+	&::before {
+		content: counter(tour) '.';
+		color: var(--parchment-300);
+	}
+
+	&__score {
+		font-variant-numeric: tabular-nums;
+		color: var(--parchment-300);
+	}
+
+	&--foe {
+		border-color: rgb(232 87 74 / 55%);
+		color: #ffb3a6;
+	}
+
+	&.is-current {
+		transform: scale(1.08);
+		border-color: var(--ember-400);
+		box-shadow: 0 0 0 2px rgb(246 194 127 / 35%);
+	}
+
+	&.is-out {
+		opacity: 0.45;
+		text-decoration: line-through;
+	}
+}
+
+.foe-card.is-asleep {
+	filter: saturate(0.6) brightness(0.85);
+}
+
+.foe-card__state {
+	font-size: 0.9rem;
+	color: #b8c7ff;
+}
+
+.foe-card__burst--sleep {
+	color: #cfd8ff;
+	text-shadow: 0 0 12px rgb(150 170 255 / 80%);
+}
+
+.fighter.is-healed {
+	animation: healed 1.2s ease-out;
+}
+
+.fighter__dmg--heal {
+	color: #8fe0a0;
+}
+
+.choice__desc {
+	display: block;
+	font-size: 0.85rem;
+	color: var(--parchment-300);
+}
+
+.fight-banner__lines {
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 4px;
+	font-size: 1.05rem;
+	color: var(--parchment-100);
+	text-align: left;
+}
+
+@keyframes healed {
+	0%, 100% { background: var(--night-800); }
+	30% { background: rgb(120 200 140 / 35%); }
+}

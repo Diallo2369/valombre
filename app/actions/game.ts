@@ -32,7 +32,7 @@ function sanitizeCharacter(c: Character): Character {
 		charme: clampStat(c.stats.charme),
 	};
 	const xp = Math.max(0, Math.round(Number(c.xp) || 0));
-	const pvMax = computePvMax(stats, xp);
+	const pvMax = computePvMax(stats, xp, c.classId);
 	return {
 		id: String(c.id).slice(0, 40),
 		name: String(c.name ?? '').slice(0, 40) || 'Héros',

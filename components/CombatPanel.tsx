@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { DIFFICULTY, STAT_LABEL, className, classWithArticle } from '@/engine/rules';
-import type { Character, CombatDef, CombatState, GameEvent, StatKey } from '@/engine/types';
+import { availableAbilities } from '@/engine/engine';
+import { DIFFICULTY, STAT_LABEL, classWithArticle, className, type AbilityId } from '@/engine/rules';
+import type { Character, CombatDef, CombatState, GameEvent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { MediaView } from './MediaView';
 
 type Hit = Extract<GameEvent, { kind: 'hit' }>;
 type EnemyTurn = Extract<GameEvent, { kind: 'enemy-turn' }>;
+type Initiative = Extract<GameEvent, { kind: 'initiative' }>;
+type Support = Extract<GameEvent, { kind: 'support' }>;
 
 interface Props {
 	def: CombatDef;
@@ -24,22 +27,15 @@ interface Props {
 	/** URL de l'enregistrement d'une phrase du conteur (l'attaque du monstre), s'il existe. */
 	voiceFor: (text: string) => string | undefined;
 	voiceVolume: number;
-	onAttack: (stat: StatKey, usePower?: boolean) => void;
-	onMageSpark: () => void;
+	onAbility: (id: AbilityId) => void;
 	onTalk: () => void;
 	onFlee: () => void;
 }
 
 type Beat =
 	| { kind: 'wait'; ms: number }
-	| { kind: 'banner'; title: string; subtitle?: string; tone: 'start' | 'hero' | 'foe'; ms: number }
-	| { kind: 'claw'; turn: EnemyTurn; ms: number };
-
-const ATTACKS: { stat: StatKey; label: string; icon: string }[] = [
-	{ stat: 'force', label: 'Frapper', icon: '⚔️' },
-	{ stat: 'agilite', label: 'Tirer ou esquiver', icon: '🏹' },
-	{ stat: 'esprit', label: 'Lancer un sort', icon: '✨' },
-];
+	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe'; ms: number }
+	| { kind: 'enemy'; turn: EnemyTurn; ms: number };
 
 /** « Au tour de la boule de brume », « des brumelins », « du Loup de Cendre ». */
 function turnOf(name: string) {
@@ -57,10 +53,9 @@ function need(stat: number, target: number) {
 }
 
 /**
- * Le combat au tour par tour, mis en scène :
- * la carte du monstre en haut (elle tremble quand on la touche, un cœur se barre), les héros en dessous,
- * un bandeau qui surgit au début de chaque tour (« Au tour des brumelins ! », fond flouté),
- * et la griffe du monstre qui traverse l'écran pendant son tour.
+ * Le combat au tour par tour, dans l'ordre de l'initiative :
+ * la frise des tours en haut, la carte du monstre, les héros en dessous ;
+ * un bandeau surgit à chaque tour (fond flouté), le monstre agit à sa place dans la file.
  */
 export function CombatPanel(props: Props) {
 	const { def, combat, party, actor, media, events, seq, log, onSfx, voiceFor, voiceVolume } = props;
@@ -72,35 +67,43 @@ export function CombatPanel(props: Props) {
 
 	const enemyHit = events.find((e): e is Hit => e.kind === 'hit' && e.target === 'enemy');
 	const missed = events.some((e) => e.kind === 'miss');
+	const support = events.find((e): e is Support => e.kind === 'support');
+	const nameOf = (id: string) => (id === 'enemy' ? def.enemy.name : party.find((c) => c.id === id)?.name ?? '');
 
-	// À chaque étape : on compose la séquence (coup du héros → tour du monstre → tour suivant) et on la joue.
+	// À chaque étape : on compose la séquence (ouverture, coup du héros, tour du monstre, tour suivant) et on la joue.
 	useEffect(() => {
 		timers.current.forEach(clearTimeout);
 		timers.current = [];
+		const initiative = events.find((e): e is Initiative => e.kind === 'initiative');
 		const enemyTurn = events.find((e): e is EnemyTurn => e.kind === 'enemy-turn');
 		const nextTurn = events.find((e) => e.kind === 'turn');
-		const acted = events.some((e) => e.kind === 'miss' || (e.kind === 'hit' && e.target === 'enemy'));
+		const acted = events.some((e) => e.kind === 'miss' || e.kind === 'support' || (e.kind === 'hit' && e.target === 'enemy'));
 		const nextHero = party[combat.actor];
 		const heroBanner = (): Beat => ({
 			kind: 'banner',
 			title: `Au tour de ${nextHero.name} !`,
-			subtitle: nextHero.player ? `${nextHero.player} joue · ${className(nextHero)}` : className(nextHero),
+			subtitle: `${nextHero.player ? `${nextHero.player} joue · ` : ''}${className(nextHero)}`,
 			tone: 'hero',
 			ms: 2200,
 		});
 
 		const beats: Beat[] = [];
-		if (!acted && !enemyTurn && !nextTurn) {
-			// Entrée en combat.
-			beats.push({ kind: 'banner', title: 'Combat !', subtitle: def.enemy.name, tone: 'start', ms: 2600 }, heroBanner());
-		} else {
-			if (acted) beats.push({ kind: 'wait', ms: 1800 });
-			if (enemyTurn) {
-				beats.push({ kind: 'banner', title: turnOf(enemyTurn.name), subtitle: 'Attention…', tone: 'foe', ms: 2200 });
-				beats.push({ kind: 'claw', turn: enemyTurn, ms: 3200 });
-			}
-			if (nextTurn && nextHero) beats.push(heroBanner());
+		if (initiative) {
+			beats.push({ kind: 'banner', title: 'Combat !', subtitle: def.enemy.name, tone: 'start', ms: 2400 });
+			beats.push({
+				kind: 'banner',
+				title: 'Initiative',
+				subtitle: 'Chacun lance un dé et ajoute son Agilité : le plus rapide commence.',
+				lines: initiative.order.map((o, i) => `${i + 1}. ${o.name} : ${o.die} + ${o.bonus} = ${o.total}`),
+				tone: 'start',
+				ms: 4200,
+			});
+		} else if (acted) beats.push({ kind: 'wait', ms: 1800 });
+		if (enemyTurn) {
+			beats.push({ kind: 'banner', title: turnOf(enemyTurn.name), subtitle: enemyTurn.asleep ? 'Chut…' : 'Attention…', tone: 'foe', ms: 2200 });
+			beats.push({ kind: 'enemy', turn: enemyTurn, ms: 3200 });
 		}
+		if ((nextTurn || initiative) && nextHero) beats.push(heroBanner());
 		if (!enemyTurn) setShownParty(party);
 
 		let t = 0;
@@ -108,7 +111,7 @@ export function CombatPanel(props: Props) {
 			timers.current.push(
 				window.setTimeout(() => {
 					setBeat(b.kind === 'wait' ? null : b);
-					if (b.kind === 'claw') {
+					if (b.kind === 'enemy' && !b.turn.asleep) {
 						onSfx('sfx-griffe');
 						const url = voiceFor(b.turn.attack);
 						if (url) {
@@ -116,12 +119,12 @@ export function CombatPanel(props: Props) {
 							a.volume = voiceVolume;
 							void a.play().catch(() => {});
 						}
-						// Les PV baissent au moment où la griffe frappe.
+						// Les PV baissent au moment où l'attaque tombe.
 						timers.current.push(
 							window.setTimeout(() => {
 								setShownParty(party);
 								setHurtId(b.turn.heroId);
-								onSfx('sfx-blessure');
+								if (b.turn.amount > 0) onSfx('sfx-blessure');
 							}, 700),
 						);
 					}
@@ -143,18 +146,44 @@ export function CombatPanel(props: Props) {
 
 	const busy = beat !== null;
 	const justLost = enemyHit ? enemyHit.amount : 0;
-	const clawTarget = beat?.kind === 'claw' ? shownParty.find((c) => c.id === beat.turn.heroId) : undefined;
+	const enemyBeat = beat?.kind === 'enemy' ? beat.turn : null;
+	const order = combat.order ?? [];
+	const abilities = availableAbilities(combat, actor);
 
 	return (
-		<section className={`fight card${beat?.kind === 'claw' ? ' is-shaking' : ''}`} aria-labelledby="fight-title" aria-busy={busy}>
+		<section className={`fight card${enemyBeat && !enemyBeat.asleep ? ' is-shaking' : ''}`} aria-labelledby="fight-title" aria-busy={busy}>
 			<h2 id="fight-title" className="fight__title">
 				Combat
 			</h2>
 
-			<figure key={`foe-${seq}`} className={`foe-card${enemyHit ? ' is-hit' : ''}${enemyHit?.spell ? ' is-spell' : ''}${beat?.kind === 'claw' ? ' is-attacking' : ''}`}>
+			{order.length ? (
+				<ol className="fight__order" aria-label="Ordre de jeu (initiative)">
+					{order.map((id, i) => {
+						const down = id !== 'enemy' && (party.find((c) => c.id === id)?.pv ?? 0) === 0;
+						return (
+							<li
+								key={id}
+								className={`order-chip${id === 'enemy' ? ' order-chip--foe' : ''}${i === combat.turn && !busy ? ' is-current' : ''}${down ? ' is-out' : ''}`}
+								aria-current={i === combat.turn ? 'step' : undefined}
+							>
+								<span className="order-chip__name">{nameOf(id)}</span>
+								<span className="order-chip__score">{combat.initiative?.[id]?.total ?? ''}</span>
+							</li>
+						);
+					})}
+				</ol>
+			) : null}
+
+			<figure
+				key={`foe-${seq}`}
+				className={`foe-card${enemyHit ? ' is-hit' : ''}${enemyHit?.spell ? ' is-spell' : ''}${enemyBeat && !enemyBeat.asleep ? ' is-attacking' : ''}${combat.asleep ? ' is-asleep' : ''}`}
+			>
 				<MediaView className="foe-card__img" media={media} image={def.enemy.image} alt={def.enemy.name} placeholder={def.enemy.name} />
 				<figcaption className="foe-card__body">
-					<span className="foe-card__name">{def.enemy.name}</span>
+					<span className="foe-card__name">
+						{def.enemy.name}
+						{combat.asleep ? <span className="foe-card__state"> 💤 endormi</span> : null}
+					</span>
 					<span className="foe-card__hearts" aria-label={`Encore ${combat.hearts} cœur${combat.hearts > 1 ? 's' : ''} sur ${combat.maxHearts}`}>
 						{Array.from({ length: combat.maxHearts }, (_, i) => {
 							const alive = i < combat.hearts;
@@ -178,26 +207,44 @@ export function CombatPanel(props: Props) {
 					<span className="foe-card__burst foe-card__burst--miss" aria-hidden="true">
 						Raté !
 					</span>
+				) : support?.what === 'sleep' ? (
+					<span className="foe-card__burst foe-card__burst--sleep" aria-hidden="true">
+						💤 Il s’endort…
+					</span>
 				) : null}
 			</figure>
 
 			<ul className="fight__party" aria-label="Le groupe">
-				{shownParty.map((c) => (
-					<li key={c.id} className={`fighter${c.id === actor.id && !busy ? ' is-turn' : ''}${hurtId === c.id ? ' is-hurt' : ''}${c.pv === 0 ? ' is-out' : ''}`}>
-						<span className="fighter__name">{c.name}</span>
-						<span className="fighter__meta">
-							{c.pv}/{c.pvMax} PV{c.pv === 0 ? ` · ${c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e'}` : ''}
-						</span>
-						<span className="fighter__pv" aria-label={`${c.pv} PV sur ${c.pvMax}`}>
-							<span className="fighter__bar" style={{ width: `${(c.pv / c.pvMax) * 100}%` }} />
-						</span>
-						{hurtId === c.id && beat?.kind === 'claw' ? (
-							<span className="fighter__dmg" aria-hidden="true">
-								−{beat.turn.amount} PV
+				{shownParty.map((c) => {
+					const healed = support?.what === 'heal';
+					return (
+						<li
+							key={`${c.id}-${healed ? seq : 0}`}
+							className={`fighter${c.id === actor.id && !busy ? ' is-turn' : ''}${hurtId === c.id ? ' is-hurt' : ''}${c.pv === 0 ? ' is-out' : ''}${healed ? ' is-healed' : ''}`}
+						>
+							<span className="fighter__name">
+								{combat.guard === c.id ? <span title="Protège le groupe">🛡️ </span> : null}
+								{c.name}
 							</span>
-						) : null}
-					</li>
-				))}
+							<span className="fighter__meta">
+								{c.pv}/{c.pvMax} PV{c.pv === 0 ? ` · ${c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e'}` : ''}
+							</span>
+							<span className="fighter__pv" aria-label={`${c.pv} PV sur ${c.pvMax}`}>
+								<span className="fighter__bar" style={{ width: `${(c.pv / c.pvMax) * 100}%` }} />
+							</span>
+							{hurtId === c.id && enemyBeat && enemyBeat.amount > 0 ? (
+								<span className="fighter__dmg" aria-hidden="true">
+									−{enemyBeat.amount} PV
+								</span>
+							) : null}
+							{healed ? (
+								<span className="fighter__dmg fighter__dmg--heal" aria-hidden="true">
+									+2 PV
+								</span>
+							) : null}
+						</li>
+					);
+				})}
 			</ul>
 
 			{log.length ? (
@@ -208,12 +255,7 @@ export function CombatPanel(props: Props) {
 						</li>
 					))}
 				</ol>
-			) : (
-				<p className="fight__help">
-					Chacun son tour : on choisit une action, on lance le dé et on ajoute la caractéristique. Si on touche, le monstre perd un
-					cœur. Quand tout le monde a joué, c’est au tour du monstre d’attaquer. Quand il n’a plus de cœur, c’est gagné !
-				</p>
-			)}
+			) : null}
 
 			<p className="fight__turn" role="status">
 				{busy ? '…' : (
@@ -225,30 +267,24 @@ export function CombatPanel(props: Props) {
 			</p>
 
 			<div className="choices">
-				{ATTACKS.map((a) => (
-					<button key={a.stat} type="button" className="choice" disabled={busy} onClick={() => props.onAttack(a.stat)}>
+				{abilities.map((a) => (
+					<button
+						key={a.id}
+						type="button"
+						className={`choice${a.perCombat ? ' choice--power' : ''}${!a.stat && a.effect !== 'sure' ? ' choice--alt' : ''}`}
+						disabled={busy}
+						onClick={() => props.onAbility(a.id)}
+					>
 						<span className="choice__label">
-							{a.icon} {a.label}
+							{a.icon} {a.name}
 						</span>
+						<span className="choice__desc">{a.text}</span>
 						<span className="choice__tag">
-							{STAT_LABEL[a.stat]} {actor.stats[a.stat]} : {need(actor.stats[a.stat], target)}
+							{a.stat ? `${STAT_LABEL[a.stat]} ${actor.stats[a.stat]} : ${need(actor.stats[a.stat], target)}` : 'Sans dé'}
+							{a.perCombat ? ' · une fois par combat' : ''}
 						</span>
 					</button>
 				))}
-				{actor.classId === 'guerrier' && actor.powerReady ? (
-					<button type="button" className="choice choice--power" disabled={busy} onClick={() => props.onAttack('force', true)}>
-						<span className="choice__label">✦ Coup puissant : 2 cœurs d’un coup si ça touche</span>
-						<span className="choice__tag">
-							Force {actor.stats.force} : {need(actor.stats.force, target)}
-						</span>
-					</button>
-				) : null}
-				{actor.classId === 'mage' && actor.powerReady ? (
-					<button type="button" className="choice choice--power" disabled={busy} onClick={props.onMageSpark}>
-						<span className="choice__label">✦ Étincelle d’aube : touche à coup sûr{def.enemy.brume ? ', 2 cœurs contre la brume' : ''}</span>
-						<span className="choice__tag">Sans dé · une fois par repos</span>
-					</button>
-				) : null}
 				{def.talk ? (
 					<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onTalk}>
 						<span className="choice__label">💬 {def.talk.label}</span>
@@ -278,18 +314,26 @@ export function CombatPanel(props: Props) {
 					<div className="fight-banner__card">
 						<p className="fight-banner__title">{beat.title}</p>
 						{beat.subtitle ? <p className="fight-banner__sub">{beat.subtitle}</p> : null}
+						{beat.lines ? (
+							<ol className="fight-banner__lines">
+								{beat.lines.map((l) => (
+									<li key={l}>{l}</li>
+								))}
+							</ol>
+						) : null}
 					</div>
 				</div>
 			) : null}
 
-			{beat?.kind === 'claw' ? (
-				<div className="claw" style={{ '--beat': `${beat.ms}ms` } as React.CSSProperties} role="status" aria-live="assertive">
+			{enemyBeat ? (
+				<div className="claw" style={{ '--beat': `${beat?.ms ?? 3200}ms` } as React.CSSProperties} role="status" aria-live="assertive">
 					<p className="claw__text">
-						{beat.turn.attack}
-						{clawTarget ? (
+						{enemyBeat.attack}
+						{!enemyBeat.asleep ? (
 							<strong>
 								{' '}
-								{clawTarget.name} perd {beat.turn.amount} PV !
+								{enemyBeat.guarded ? `${nameOf(enemyBeat.heroId)} s’interpose : ` : `${nameOf(enemyBeat.heroId)} `}
+								{enemyBeat.amount > 0 ? `perd ${enemyBeat.amount} PV !` : 'ne perd rien !'}
 							</strong>
 						) : null}
 					</p>

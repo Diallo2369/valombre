@@ -14,9 +14,8 @@ import {
 	sceneChoices,
 	visibleChoices,
 	visibleLines,
-	type CombatAction,
 } from '@/engine/engine';
-import { CLASSES, DIFFICULTY, STAT_LABEL, type RollResult } from '@/engine/rules';
+import { ABILITIES, DIFFICULTY, STAT_LABEL, type AbilityId, type RollResult } from '@/engine/rules';
 import type { Campaign, Game, GameEvent, StatKey, StepResult } from '@/engine/types';
 import { AudioDirector } from '@/lib/audio';
 import { mediaVariants, type MediaMap } from '@/lib/media-types';
@@ -53,17 +52,12 @@ interface Toast {
 
 type PendingRoll =
 	| { kind: 'check'; choiceIndex: number; request: RollRequest }
-	| { kind: 'attack'; stat: StatKey; usePower: boolean; request: RollRequest }
+	| { kind: 'ability'; ability: AbilityId; request: RollRequest }
 	| { kind: 'talk'; request: RollRequest }
 	| { kind: 'flee'; request: RollRequest };
 
 type Panel = null | 'journal' | 'sac' | 'reglages' | { sheet: string };
 
-const ATTACKS: { stat: StatKey; label: string }[] = [
-	{ stat: 'force', label: 'Frapper' },
-	{ stat: 'agilite', label: 'Tirer / esquiver' },
-	{ stat: 'esprit', label: 'Lancer un sort' },
-];
 
 let toastSeq = 0;
 /** Respiration entre l'arrivée dans une scène et la première réplique. */
@@ -273,31 +267,25 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		setPending(null);
 		if (!p) return;
 		if (p.kind === 'check') apply(resolveCheck(campaign, game, p.choiceIndex, heroId, roll, rerollBy));
-		else if (p.kind === 'attack') apply(combatTurn(campaign, game, { kind: 'attack', stat: p.stat, roll, usePower: p.usePower, rerollBy }));
+		else if (p.kind === 'ability') apply(combatTurn(campaign, game, { kind: 'ability', ability: p.ability, roll, rerollBy }));
 		else if (p.kind === 'talk') apply(combatTurn(campaign, game, { kind: 'talk', roll, rerollBy }));
 		else if (p.kind === 'flee') apply(combatTurn(campaign, game, { kind: 'flee', roll, rerollBy }));
 	};
 
 	/* ---------------- Combat ---------------- */
-	const attack = (stat: StatKey, usePower = false) => {
+	/** Une action de combat : avec dé (fenêtre de lancer) ou sans (Intervention, Étincelle, Chant). */
+	const useAbility = (id: AbilityId) => {
 		if (!actor || !combatDef) return;
+		const ab = ABILITIES[id];
+		if (!ab.stat) {
+			apply(combatTurn(campaign, game, { kind: 'ability', ability: id, roll: null }));
+			return;
+		}
 		setPending({
-			kind: 'attack',
-			stat,
-			usePower,
-			request: {
-				title: `${actor.name} : ${usePower ? CLASSES[actor.classId].power.name : ATTACKS.find((a) => a.stat === stat)?.label}`,
-				stat,
-				difficulty: combatDef.enemy.difficulty,
-				heroId: actor.id,
-				cancellable: true,
-			},
+			kind: 'ability',
+			ability: id,
+			request: { title: `${actor.name} : ${ab.name}`, stat: ab.stat, difficulty: combatDef.enemy.difficulty, heroId: actor.id, cancellable: true },
 		});
-	};
-
-	const mageSpark = () => {
-		const action: CombatAction = { kind: 'attack', stat: 'esprit', roll: null, usePower: true };
-		apply(combatTurn(campaign, game, action));
 	};
 
 	/* ---------------- Raccourcis clavier (1 à 9) ---------------- */
@@ -454,8 +442,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							}}
 							voiceVolume={prefs.voice.npc || prefs.voice.narrator ? prefs.voice.volume : 0}
 							log={state.log.filter((l) => l.kind === 'combat' && l.turn === state.turn).slice(-3).map((l) => l.text)}
-							onAttack={attack}
-							onMageSpark={mageSpark}
+							onAbility={useAbility}
 							onTalk={() =>
 								setPending({
 									kind: 'talk',

@@ -311,6 +311,18 @@ export interface CombatState {
 	/** Index du héros dont c'est le tour dans le groupe. */
 	actor: number;
 	round: number;
+	/** Ordre de jeu tiré à l'initiative : identifiants des héros, et 'enemy' pour le monstre. */
+	order?: string[];
+	/** Position actuelle dans l'ordre de jeu. */
+	turn?: number;
+	/** Jets d'initiative (dé + bonus), pour les afficher. */
+	initiative?: Record<string, { die: number; bonus: number; total: number }>;
+	/** Actions « une fois par combat » déjà utilisées, par héros. */
+	used?: Record<string, string[]>;
+	/** Héros qui s'est interposé (Intervention) : la prochaine attaque est pour lui. */
+	guard?: string | null;
+	/** Le monstre dort (Berceuse) : il passe son prochain tour. */
+	asleep?: boolean;
 }
 
 export interface LogEntry {
@@ -358,8 +370,12 @@ export type GameEvent =
 	| { kind: 'hit'; target: 'enemy' | 'hero'; heroId: string; amount: number; spell?: boolean }
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
-	/** Tour du monstre : il attaque un héros. */
-	| { kind: 'enemy-turn'; name: string; attack: string; heroId: string; amount: number }
+	/** Tour du monstre : il attaque un héros (ou il dort, ou un héros s'interpose). */
+	| { kind: 'enemy-turn'; name: string; attack: string; heroId: string; amount: number; asleep?: boolean; guarded?: boolean }
+	/** Ordre de jeu tiré au début du combat. */
+	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
+	/** Actions de soutien : s'interposer, endormir le monstre, soigner le groupe. */
+	| { kind: 'support'; heroId: string; what: 'guard' | 'sleep' | 'sleep-fail' | 'heal'; amount?: number }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

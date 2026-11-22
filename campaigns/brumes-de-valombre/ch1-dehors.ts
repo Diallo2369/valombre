@@ -858,7 +858,7 @@ export const CH1_DEHORS: Scene[] = [
 		media: { image: 'img-brumelins', music: 'mus-combat', ambience: 'amb-lisiere', sfx: ['sfx-ricanement'] },
 		lines: [{ who: 'narrateur', text: 'Les brumelins sautent dans tous les sens en essayant de vous tirer les cheveux et de vous chiper vos affaires !' }],
 		combat: {
-			enemy: { name: 'les brumelins', hearts: 3, difficulty: 'facile', damage: 1, brume: true, image: 'img-brumelins', attack: 'Les brumelins vous sautent dessus : ils tirent les cheveux et mordillent les chevilles !' },
+			enemy: { name: 'les brumelins', hearts: 4, difficulty: 'facile', damage: 1, brume: true, image: 'img-brumelins', attack: 'Les brumelins vous sautent dessus : ils tirent les cheveux et mordillent les chevilles !' },
 			victory: {
 				to: 'rappel-loups-fin',
 			},

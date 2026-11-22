@@ -1,4 +1,4 @@
-import { CLASSES, STATS, levelFromXp, classPortrait, className } from '@/engine/rules';
+import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, classPortrait, levelFromXp } from '@/engine/rules';
 import type { Character } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { MediaView } from './MediaView';
@@ -55,11 +55,31 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 			</div>
 
 			<div className="sheet__box">
+				<h4>En combat</h4>
+				<ul className="sheet__abilities">
+					{cls.abilities.map((id) => {
+						const a = ABILITIES[id];
+						return (
+							<li key={id}>
+								<strong>
+									{a.icon} {a.name}
+								</strong>{' '}
+								<span className="sheet__small">
+									{a.stat ? `(${STAT_LABEL[a.stat]})` : '(sans dé)'} {a.perCombat ? '· une fois par combat' : ''}
+								</span>
+								<br />
+								{a.text}
+							</li>
+						);
+					})}
+				</ul>
+			</div>
+
+			<div className="sheet__box">
 				<h4>
-					Pouvoir : {cls.power.name} {c.powerReady ? <span className="badge badge--moss">prêt</span> : <span className="badge">utilisé</span>}
+					{cls.power.name} {c.classId === 'rodeur' || c.classId === 'barde' ? c.powerReady ? <span className="badge badge--moss">prêt</span> : <span className="badge">utilisé</span> : null}
 				</h4>
 				<p>{cls.power.text}</p>
-				<p className="sheet__small">Le pouvoir se recharge à chaque repos.</p>
 			</div>
 
 			<div className="sheet__box">

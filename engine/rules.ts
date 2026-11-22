@@ -29,13 +29,116 @@ export const DIFFICULTY: Record<Difficulty, { label: string; target: number }> =
 	difficile: { label: 'Difficile', target: 9 },
 };
 
+/** Actions de combat. Chaque classe a les siennes (voir ClassDef.abilities). */
+export type AbilityId =
+	| 'frapper'
+	| 'coup-puissant'
+	| 'intervention'
+	| 'tir'
+	| 'corps-a-corps'
+	| 'trait-lumiere'
+	| 'etincelle'
+	| 'note-percante'
+	| 'berceuse'
+	| 'chant';
+
+export interface Ability {
+	id: AbilityId;
+	name: string;
+	icon: string;
+	text: string;
+	/** Caractéristique du jet ; sans `stat`, pas de dé. */
+	stat?: StatKey;
+	/** Effet : toucher (1 cœur, 2 pour `hit2`), toucher à coup sûr, protéger, endormir, soigner. */
+	effect: 'hit' | 'hit2' | 'sure' | 'guard' | 'sleep' | 'heal';
+	spell?: boolean;
+	/** Une seule fois par combat. */
+	perCombat?: boolean;
+}
+
+export const ABILITIES: Record<AbilityId, Ability> = {
+	frapper: { id: 'frapper', name: 'Frapper', icon: '⚔️', stat: 'force', effect: 'hit', text: 'Un bon coup d’épée.' },
+	'coup-puissant': {
+		id: 'coup-puissant',
+		name: 'Coup puissant',
+		icon: '💥',
+		stat: 'force',
+		effect: 'hit2',
+		perCombat: true,
+		text: 'Un coup de toutes ses forces : 2 cœurs d’un coup si ça touche. Une fois par combat.',
+	},
+	intervention: {
+		id: 'intervention',
+		name: 'Intervention',
+		icon: '🛡️',
+		effect: 'guard',
+		text: 'Se ruer devant ses amis et provoquer le monstre : sa prochaine attaque est pour lui, et le bouclier en absorbe 1 dégât.',
+	},
+	tir: { id: 'tir', name: 'Tir à l’arc', icon: '🏹', stat: 'agilite', effect: 'hit', text: 'Une flèche bien ajustée, de loin.' },
+	'corps-a-corps': { id: 'corps-a-corps', name: 'Corps à corps', icon: '🗡️', stat: 'force', effect: 'hit', text: 'Au contact, avec le couteau de chasse.' },
+	'trait-lumiere': {
+		id: 'trait-lumiere',
+		name: 'Trait de lumière',
+		icon: '✨',
+		stat: 'esprit',
+		effect: 'hit',
+		spell: true,
+		text: 'Un rayon de lumière jaillit du bâton.',
+	},
+	etincelle: {
+		id: 'etincelle',
+		name: 'Étincelle d’aube',
+		icon: '☀️',
+		effect: 'sure',
+		spell: true,
+		perCombat: true,
+		text: 'Touche à coup sûr, sans dé ; 2 cœurs contre une créature de brume. Une fois par combat.',
+	},
+	'note-percante': {
+		id: 'note-percante',
+		name: 'Note perçante',
+		icon: '🎵',
+		stat: 'charme',
+		effect: 'hit',
+		spell: true,
+		text: 'Une note magique si aiguë qu’elle fait mal aux oreilles du monstre.',
+	},
+	berceuse: {
+		id: 'berceuse',
+		name: 'Berceuse',
+		icon: '🌙',
+		stat: 'charme',
+		effect: 'sleep',
+		spell: true,
+		perCombat: true,
+		text: 'Le monstre s’endort et passe son prochain tour. Une fois par combat.',
+	},
+	chant: {
+		id: 'chant',
+		name: 'Chant de courage',
+		icon: '🎶',
+		effect: 'heal',
+		spell: true,
+		perCombat: true,
+		text: 'Tout le groupe récupère 2 PV. Une fois par combat.',
+	},
+};
+
 export interface ClassDef {
 	id: ClassId;
 	name: string;
 	/** Nom accordé : héroïne (f) ou héros (m). */
 	names: Record<Gender, string>;
 	tagline: string;
+	/** Caractéristique principale (affichage). */
 	stat: StatKey;
+	/** Bonus de classe ajoutés aux dés de création. */
+	bonus: Partial<Stats>;
+	/** PV en plus (endurance). */
+	pvBonus: number;
+	/** Actions en combat. */
+	abilities: AbilityId[];
+	/** Pouvoir hors combat, rechargé au repos. */
 	power: { name: string; text: string };
 	kit: string[];
 }
@@ -47,7 +150,10 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Guerrière', m: 'Guerrier' },
 		tagline: 'Un bouclier cabossé, un cœur solide.',
 		stat: 'force',
-		power: { name: 'Coup puissant', text: 'En combat, une attaque réussie retire 2 cœurs à l’ennemi au lieu d’un.' },
+		bonus: { force: 2 },
+		pvBonus: 3,
+		abilities: ['frapper', 'coup-puissant', 'intervention'],
+		power: { name: 'Endurance', text: '+3 PV : le plus solide du groupe. En combat, il peut s’interposer pour protéger ses amis.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},
 	rodeur: {
@@ -56,7 +162,10 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Rôdeuse', m: 'Rôdeur' },
 		tagline: 'Les sentiers n’ont pas de secret pour toi.',
 		stat: 'agilite',
-		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer.' },
+		bonus: { agilite: 1, force: 1 },
+		pvBonus: 1,
+		abilities: ['tir', 'corps-a-corps'],
+		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
 		kit: ['Arc et flèches', 'Cape de laine', 'Silex'],
 	},
 	mage: {
@@ -65,10 +174,10 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Mage', m: 'Mage' },
 		tagline: 'Une étincelle d’aube au creux de la main.',
 		stat: 'esprit',
-		power: {
-			name: 'Étincelle d’aube',
-			text: 'En combat, ton attaque réussit sans lancer le dé. Contre une créature de brume, elle retire 2 cœurs.',
-		},
+		bonus: { esprit: 2 },
+		pvBonus: 0,
+		abilities: ['trait-lumiere', 'etincelle'],
+		power: { name: 'Deux sorts', text: 'Trait de lumière à volonté, et l’Étincelle d’aube qui touche à coup sûr, une fois par combat.' },
 		kit: ['Bâton noueux', 'Grimoire écorné', 'Bougie'],
 	},
 	barde: {
@@ -77,7 +186,10 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Barde', m: 'Barde' },
 		tagline: 'Ta musique réchauffe les cœurs gelés.',
 		stat: 'charme',
-		power: { name: 'Chant de courage', text: 'Tout le groupe récupère 2 PV. Utilisable à tout moment.' },
+		bonus: { charme: 1, esprit: 1 },
+		pvBonus: 0,
+		abilities: ['note-percante', 'berceuse', 'chant'],
+		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
 	},
 };
@@ -98,15 +210,18 @@ export function levelFromXp(xp: number): number {
 	return 1 + Math.floor(xp / 10);
 }
 
-export function computePvMax(stats: Stats, xp: number): number {
-	return 6 + stats.force + 2 * (levelFromXp(xp) - 1);
+export function computePvMax(stats: Stats, xp: number, classId?: ClassId): number {
+	return 6 + stats.force + 2 * (levelFromXp(xp) - 1) + (classId ? CLASSES[classId].pvBonus : 0);
 }
 
 export function finalStats(classId: ClassId, base: Stats): Stats {
 	const stats = { ...base };
-	stats[CLASSES[classId].stat] += 1;
+	for (const [k, v] of Object.entries(CLASSES[classId].bonus) as [StatKey, number][]) stats[k] += v;
 	return stats;
 }
+
+/** Bonus d'initiative du monstre selon sa difficulté (les héros ajoutent leur Agilité). */
+export const ENEMY_INITIATIVE: Record<Difficulty, number> = { facile: 2, moyen: 4, difficile: 5 };
 
 export function makeCharacter(input: {
 	id: string;
@@ -118,7 +233,7 @@ export function makeCharacter(input: {
 	rolls: number[];
 }): Character {
 	const stats = finalStats(input.classId, input.base);
-	const pvMax = computePvMax(stats, 0);
+	const pvMax = computePvMax(stats, 0, input.classId);
 	return {
 		id: input.id,
 		name: input.name.trim() || 'Héros sans nom',
