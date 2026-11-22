@@ -89,7 +89,10 @@ export async function saveGameAction(adventureId: string, state: GameState, part
 	// Partie recommencée depuis : cet écran est périmé, on ne l'écoute plus.
 	if (adventure.state.run && state.run !== adventure.state.run) return { ok: false, stale: true };
 	const allowed = new Set(adventure.partyIds);
-	for (const c of party) if (allowed.has(c.id)) saveCharacter(user.id, sanitizeCharacter(c));
+	// Un écran ouvert avant un réglage fait ailleurs (le genre, au portail) ne doit pas l'effacer.
+	const stored = new Map(getCharacters(user.id, adventure.partyIds).map((c) => [c.id, c]));
+	for (const c of party)
+		if (allowed.has(c.id)) saveCharacter(user.id, sanitizeCharacter({ ...c, gender: c.gender ?? stored.get(c.id)?.gender }));
 	updateAdventureState(user.id, adventureId, { ...state, campaignId: adventure.campaignId });
 
 	// Fin de campagne : déblocage de la suivante.
