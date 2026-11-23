@@ -3,7 +3,7 @@
  * réglées par compétence. Chaque effet renvoie le moment (ms) où il touche sa cible : c'est là que les
  * cœurs tombent et que le jeton tremble.
  */
-import { ease, inkFill, inkStroke, INK, lerp, starPath, type FxEngine, type P } from './fx-engine';
+import { ease, glowFill, glowStroke, INK, lerp, starPath, type FxEngine, type P } from './fx-engine';
 
 export interface FxCall {
 	from: P;
@@ -28,7 +28,7 @@ const beside = (from: P, to: P): P => {
 
 /* ---------------- Les briques ---------------- */
 
-/** Une explosion en étoile, plate et cernée de noir, qui surgit puis se replie (case de BD). */
+/** Une explosion de lumière en étoile, qui surgit puis se replie. */
 function burstStar(eng: FxEngine, at: P, fill: string, inner: string, r: number, delay = 0, life = 300) {
 	const spikes = Array.from({ length: 12 }, (_, i) => (i % 2 ? 0.5 : 1) * (0.85 + Math.random() * 0.3));
 	const rot = Math.random() * Math.PI;
@@ -36,7 +36,7 @@ function burstStar(eng: FxEngine, at: P, fill: string, inner: string, r: number,
 		life,
 		delay,
 		draw(ctx, t) {
-			// Surgit en dépassant, puis se replie : en BD, on rétrécit au lieu de s'effacer.
+			// Surgit en dépassant, puis se replie (on rétrécit au lieu de s'effacer).
 			const k = t < 0.35 ? ease.out(t / 0.35) * 1.15 : 1.15 * (1 - ease.in((t - 0.35) / 0.65));
 			if (k <= 0.02) return;
 			ctx.globalCompositeOperation = 'source-over';
@@ -50,28 +50,34 @@ function burstStar(eng: FxEngine, at: P, fill: string, inner: string, r: number,
 					ctx.lineTo(at.x + Math.cos(a) * r * k * m * sp, at.y + Math.sin(a) * r * k * m * sp);
 				});
 				ctx.closePath();
-				inkFill(ctx, col, line);
+				glowFill(ctx, col, line);
 			}
 		},
 	});
 }
 
-/** L'impact : un éclair bref, une explosion en étoile cernée, une onde épaisse et des éclats qui volent. */
+/** L'impact : un éclair bref, une explosion de lumière en étoile, une onde, des éclats et des reflets à 4 branches. */
 export function impact(eng: FxEngine, at: P, colors: string[], power = 1, delay = 0) {
 	const main = colors[1] ?? colors[0];
 	const light = colors[0];
 	// Un éclair de lumière très bref, sous le dessin.
 	eng.add({ x: at.x, y: at.y, life: 180, delay, size: 50 * power, sizeEnd: 85 * power, color: '#ffffff', alpha: 0.8 });
 	burstStar(eng, at, main, light === main ? '#ffffff' : light, 58 * power, delay, 320);
-	// Une onde blanche épaisse, cernée.
-	eng.add({ x: at.x, y: at.y, life: 380, delay: delay + 30, size: 22, sizeEnd: 105 * power, color: '#ffffff', shape: 'ring', ink: true });
+	// Une onde blanche lumineuse.
+	eng.add({ x: at.x, y: at.y, life: 380, delay: delay + 30, size: 22, sizeEnd: 105 * power, color: '#ffffff', shape: 'ring', neon: true });
 	// Des éclats pleins qui partent et retombent, quelques étoiles.
-	eng.burst(at, Math.round(10 * power), { speed: 420 * power, life: 620, delay, size: 6, sizeEnd: 2, color: colors, ay: 900, drag: 1.2, ink: true });
-	eng.burst(at, Math.round(8 * power), { speed: 520 * power, life: 380, delay, size: 6, color: colors, shape: 'spark', drag: 2.4, ink: true });
-	eng.burst(at, Math.round(3 * power), { speed: 260 * power, life: 700, delay: delay + 40, size: 9, sizeEnd: 4, color: ['#ffe28a', '#ffffff'], shape: 'star', vr: 8, ay: 500, drag: 1, ink: true });
+	eng.burst(at, Math.round(10 * power), { speed: 420 * power, life: 620, delay, size: 6, sizeEnd: 2, color: colors, ay: 900, drag: 1.2, neon: true });
+	eng.burst(at, Math.round(8 * power), { speed: 520 * power, life: 380, delay, size: 6, color: colors, shape: 'spark', drag: 2.4, neon: true });
+	eng.burst(at, Math.round(3 * power), { speed: 260 * power, life: 700, delay: delay + 40, size: 9, sizeEnd: 4, color: ['#ffe28a', '#ffffff'], shape: 'star', vr: 8, ay: 500, drag: 1, neon: true });
+	// Les reflets : des étincelles à 4 branches qui scintillent autour du point d'impact.
+	for (let i = 0; i < Math.round(3 + 2 * power); i += 1) {
+		const a = Math.random() * Math.PI * 2;
+		const d = 18 + Math.random() * 46 * power;
+		eng.add({ x: at.x + Math.cos(a) * d, y: at.y + Math.sin(a) * d, life: 420 + Math.random() * 260, delay: delay + 40 + i * 45, size: 12 + Math.random() * 12 * power, sizeEnd: 2, rot: Math.random(), vr: 2, color: main, shape: 'twinkle' });
+	}
 }
 
-/** Le coup tombe à côté : un petit nuage de poussière de dessin animé. */
+/** Le coup tombe à côté : un petit nuage de fumée. */
 function puff(eng: FxEngine, at: P, delay = 0) {
 	const blobs = Array.from({ length: 6 }, (_, i) => {
 		const a = (i / 6) * Math.PI * 2 + Math.random() * 0.4;
@@ -85,26 +91,23 @@ function puff(eng: FxEngine, at: P, delay = 0) {
 			if (k <= 0.02) return;
 			ctx.globalCompositeOperation = 'source-over';
 			const rise = -18 * t;
-			// D'abord tous les contours, puis tous les aplats : un seul nuage, sans traits à l'intérieur.
-			for (const pass of [0, 1]) {
-				for (const b of blobs) {
-					ctx.beginPath();
-					ctx.arc(at.x + b.dx * (0.6 + t), at.y + b.dy * (0.6 + t) + rise, b.r * k, 0, Math.PI * 2);
-					if (pass === 0) {
-						ctx.lineWidth = 7;
-						ctx.strokeStyle = INK;
-						ctx.stroke();
-					} else {
-						ctx.fillStyle = '#d7dbe4';
-						ctx.fill();
-					}
-				}
+			// Une fumée douce : des boules grises qui se fondent.
+			for (const b of blobs) {
+				const x = at.x + b.dx * (0.6 + t);
+				const y = at.y + b.dy * (0.6 + t) + rise;
+				const g = ctx.createRadialGradient(x, y, 0, x, y, b.r * k * 1.3);
+				g.addColorStop(0, 'rgba(215,219,228,0.7)');
+				g.addColorStop(1, 'rgba(215,219,228,0)');
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.arc(x, y, b.r * k * 1.3, 0, Math.PI * 2);
+				ctx.fill();
 			}
 		},
 	});
 }
 
-/** Une entaille en arc de cercle : un croissant plein, cerné de noir, avec un filet blanc au milieu. */
+/** Une entaille en arc de cercle : un croissant de lumière, avec un filet blanc au milieu. */
 export function slash(eng: FxEngine, at: P, color: string, angle: number, delay = 0, k = 1, life = 340) {
 	const R = 70 * k;
 	const c = { x: at.x - Math.cos(angle) * R * 0.45, y: at.y - Math.sin(angle) * R * 0.45 };
@@ -132,7 +135,7 @@ export function slash(eng: FxEngine, at: P, color: string, angle: number, delay 
 				ctx.lineTo(...pt(tail + (head - tail) * u, R - thick * Math.sin(Math.PI * u)));
 			}
 			ctx.closePath();
-			inkFill(ctx, color, 4);
+			glowFill(ctx, color, 4);
 			ctx.beginPath();
 			for (let i = 2; i <= N - 2; i += 1) ctx.lineTo(...pt(tail + ((head - tail) * i) / N, R - thick * 0.3 * Math.sin((Math.PI * i) / N)));
 			ctx.lineCap = 'round';
@@ -143,7 +146,7 @@ export function slash(eng: FxEngine, at: P, color: string, angle: number, delay 
 	});
 }
 
-/** Un trait droit, épais et cerné, qui se dessine puis s'efface (griffes, rayons). */
+/** Un trait droit lumineux qui se dessine puis s'efface (griffes, rayons). */
 function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay = 0, life = 280) {
 	eng.draw({
 		life,
@@ -157,7 +160,7 @@ function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay =
 			ctx.beginPath();
 			ctx.moveTo(p.x, p.y);
 			ctx.lineTo(q.x, q.y);
-			inkStroke(ctx, color, width, 3.5);
+			glowStroke(ctx, color, width, 3.5);
 			ctx.strokeStyle = '#fff';
 			ctx.lineWidth = width * 0.3;
 			ctx.stroke();
@@ -177,7 +180,7 @@ interface ProjectileOpts {
 	trail?: string;
 }
 
-/** Un projectile qui vole d'un point à un autre (flèche, orbe, note…), dessiné en BD. Renvoie sa durée de vol. */
+/** Un projectile qui vole d'un point à un autre (flèche, orbe, note…), en néon. Renvoie sa durée de vol. */
 export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 	const { color, head = 'orb', speed = 900, arc = 0, size = 8, delay = 0, wobble = 0, trail = color } = o;
 	const life = Math.max(160, (dist(from, to) / speed) * 1000);
@@ -196,20 +199,20 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 			last = p;
 			// La traînée : des pastilles pleines qui rétrécissent, une sur deux.
 			n += 1;
-			if (n % 2) e.add({ x: p.x, y: p.y, life: 300, size: size * 1.1, sizeEnd: 0.5, color: trail, ink: true, outline: false });
+			if (n % 2) e.add({ x: p.x, y: p.y, life: 300, size: size * 1.1, sizeEnd: 0.5, color: trail, neon: true, core: false });
 			ctx.globalCompositeOperation = 'source-over';
 			if (head === 'arrow') {
 				ctx.translate(p.x, p.y);
 				ctx.rotate(dir);
-				// Le trait de vitesse derrière, la hampe, l'empennage et la pointe, tout cerné.
+				// Le trait de vitesse derrière, la hampe, l'empennage et la pointe, tout en lumière.
 				ctx.beginPath();
 				ctx.moveTo(-70, 0);
 				ctx.lineTo(-38, 0);
-				inkStroke(ctx, '#ffffff', 3, 2);
+				glowStroke(ctx, '#ffffff', 3, 2);
 				ctx.beginPath();
 				ctx.moveTo(-32, 0);
 				ctx.lineTo(6, 0);
-				inkStroke(ctx, '#c89a5a', 5, 2.5);
+				glowStroke(ctx, '#c89a5a', 5, 2.5);
 				for (const sgn of [-1, 1]) {
 					ctx.beginPath();
 					ctx.moveTo(-34, 0);
@@ -217,7 +220,7 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 					ctx.lineTo(-30, sgn * 9);
 					ctx.lineTo(-40, sgn * 9);
 					ctx.closePath();
-					inkFill(ctx, color, 2.5);
+					glowFill(ctx, color, 2.5);
 				}
 				ctx.beginPath();
 				ctx.moveTo(18, 0);
@@ -225,24 +228,27 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 				ctx.lineTo(6, 0);
 				ctx.lineTo(2, 9);
 				ctx.closePath();
-				inkFill(ctx, '#eef2f8', 3);
+				glowFill(ctx, '#eef2f8', 3);
 			} else if (head === 'glyph') {
 				ctx.font = `900 ${size * 3.6}px "Arial Black", Impact, serif`;
 				ctx.textAlign = 'center';
 				ctx.textBaseline = 'middle';
-				ctx.lineJoin = 'round';
-				ctx.lineWidth = 6;
-				ctx.strokeStyle = INK;
-				ctx.strokeText(o.glyph ?? '♪', p.x, p.y);
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.shadowColor = color;
+				ctx.shadowBlur = 18;
 				ctx.fillStyle = color;
 				ctx.fillText(o.glyph ?? '♪', p.x, p.y);
+				ctx.shadowBlur = 0;
+				ctx.lineWidth = 1.5;
+				ctx.strokeStyle = '#ffffff';
+				ctx.strokeText(o.glyph ?? '♪', p.x, p.y);
 			} else if (head === 'net') {
 				// Le filet roulé en boule, qui tourne en vol.
 				ctx.translate(p.x, p.y);
 				ctx.rotate(t * 9);
 				ctx.beginPath();
 				ctx.arc(0, 0, 15, 0, Math.PI * 2);
-				inkFill(ctx, '#d8b57a', 3.5);
+				glowFill(ctx, '#d8b57a', 3.5);
 				ctx.strokeStyle = '#7a5428';
 				ctx.lineWidth = 2.5;
 				for (const r of [6, 11]) {
@@ -255,7 +261,7 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 				ctx.lineTo(0, 15);
 				ctx.stroke();
 			} else {
-				// L'orbe : un halo lumineux derrière, une boule pleine cernée et un reflet.
+				// L'orbe : un halo lumineux derrière, une boule brillante et un reflet.
 				const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
 				g.addColorStop(0, color);
 				g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -269,7 +275,7 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 				ctx.globalCompositeOperation = 'source-over';
 				ctx.beginPath();
 				ctx.arc(p.x, p.y, size * 1.5, 0, Math.PI * 2);
-				inkFill(ctx, color, 3.5);
+				glowFill(ctx, color, 3.5);
 				ctx.beginPath();
 				ctx.arc(p.x - size * 0.5, p.y - size * 0.5, size * 0.45, 0, Math.PI * 2);
 				ctx.fillStyle = '#ffffff';
@@ -291,13 +297,13 @@ function dizzy(eng: FxEngine, at: P, delay: number, color = '#ffe28a') {
 			for (let i = 0; i < 3; i += 1) {
 				const a = t * Math.PI * 4 + (i * Math.PI * 2) / 3;
 				starPath(ctx, at.x + Math.cos(a) * 32, at.y - 48 + Math.sin(a) * 10, 10, a);
-				inkFill(ctx, color, 3);
+				glowFill(ctx, color, 3);
 			}
 		},
 	});
 }
 
-/** Une bulle protectrice qui se gonfle autour d'un jeton, cernée comme un dessin. */
+/** Une bulle protectrice lumineuse qui se gonfle autour d'un jeton. */
 function bubble(eng: FxEngine, at: P, color: string, delay = 0) {
 	eng.draw({
 		life: 950,
@@ -312,7 +318,7 @@ function bubble(eng: FxEngine, at: P, color: string, delay = 0) {
 			ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
 			ctx.fillStyle = color.replace(')', ' / 22%)');
 			ctx.fill();
-			inkStroke(ctx, color, 5, 2.5);
+			glowStroke(ctx, color, 5, 2.5);
 			// Le reflet de la bulle.
 			ctx.beginPath();
 			ctx.arc(at.x, at.y, r * 0.78, -2.5, -1.6);
@@ -324,7 +330,7 @@ function bubble(eng: FxEngine, at: P, color: string, delay = 0) {
 	});
 }
 
-/** Des symboles qui montent et s'envolent (notes, « z », « + »), en lettres de BD. */
+/** Des symboles lumineux qui montent et s'envolent (notes, « z », « + »). */
 function rising(eng: FxEngine, at: P, glyphs: string[], color: string, n: number, delay = 0, size = 18) {
 	for (let i = 0; i < n; i += 1)
 		eng.add({
@@ -339,11 +345,11 @@ function rising(eng: FxEngine, at: P, glyphs: string[], color: string, n: number
 			shape: 'glyph',
 			glyph: glyphs[i % glyphs.length],
 			vr: (Math.random() - 0.5) * 2,
-			ink: true,
+			neon: true,
 		});
 }
 
-/** Les griffes d'une créature : trois balafres épaisses et cernées. */
+/** Les griffes d'une créature : trois balafres de lumière. */
 function claws(eng: FxEngine, from: P, at: P, color: string) {
 	const a = angleTo(from, at) + Math.PI / 2.6;
 	const dx = Math.cos(a) * 38;
@@ -375,13 +381,13 @@ function bite(eng: FxEngine, at: P, color: string) {
 					ctx.lineTo(x, yy - sgn * 15);
 					ctx.lineTo(x + 6, yy);
 					ctx.closePath();
-					inkFill(ctx, '#ffffff', 2.5);
+					glowFill(ctx, '#ffffff', 2.5);
 				}
 				// La mâchoire.
 				ctx.beginPath();
 				ctx.moveTo(at.x - 36, y + sgn * 10);
 				ctx.quadraticCurveTo(at.x, y + sgn * 2 - sgn * 8, at.x + 36, y + sgn * 10);
-				inkStroke(ctx, color, 7, 3);
+				glowStroke(ctx, color, 7, 3);
 			}
 		},
 	});
@@ -425,7 +431,7 @@ function net(eng: FxEngine, at: P, delay: number) {
 					const q = along(u, j / 12);
 					ctx.lineTo(q.x, q.y);
 				}
-				inkStroke(ctx, ROPE, 4, 2);
+				glowStroke(ctx, ROPE, 4, 2);
 			}
 			// Les mailles : des cordes en travers, en arc.
 			for (const v of [0.35, 0.6, 0.85, 1]) {
@@ -434,7 +440,7 @@ function net(eng: FxEngine, at: P, delay: number) {
 					const q = along(j / 18, v);
 					ctx.lineTo(q.x, q.y + Math.sin((j / 18) * Math.PI) * 6 * v);
 				}
-				inkStroke(ctx, ROPE, 4, 2);
+				glowStroke(ctx, ROPE, 4, 2);
 			}
 			// Les nœuds aux croisements, le gros nœud du haut et les plombs.
 			for (let i = 0; i < legs; i += 1)
@@ -443,23 +449,23 @@ function net(eng: FxEngine, at: P, delay: number) {
 					const q = along(u, v);
 					ctx.beginPath();
 					ctx.arc(q.x, q.y + Math.sin(u * Math.PI) * 6 * v, 3.2, 0, Math.PI * 2);
-					inkFill(ctx, '#a87a3e', 1.8);
+					glowFill(ctx, '#a87a3e', 1.8);
 				}
 			ctx.beginPath();
 			ctx.arc(top.x, top.y, 8, 0, Math.PI * 2);
-			inkFill(ctx, '#a87a3e', 3);
+			glowFill(ctx, '#a87a3e', 3);
 			for (let i = 0; i < legs; i += 1) {
 				const q = along(i / (legs - 1), 1);
 				ctx.beginPath();
 				ctx.arc(q.x, q.y + 6, 5, 0, Math.PI * 2);
-				inkFill(ctx, '#6d7480', 2.5);
+				glowFill(ctx, '#6d7480', 2.5);
 			}
 		},
 	});
 }
 
 /**
- * Un nuage de poison de dessin animé : des boules vertes cernées qui gonflent, ondulent et montent,
+ * Un nuage de poison lumineux : des boules vertes qui gonflent, ondulent et montent,
  * des bulles qui éclatent et une petite tête de mort qui s'échappe.
  */
 function poisonCloud(eng: FxEngine, at: P, delay = 0, k = 1) {
@@ -481,26 +487,19 @@ function poisonCloud(eng: FxEngine, at: P, delay = 0, k = 1) {
 				y: at.y + b.dy + rise + Math.cos(t * 7 + b.ph) * 2,
 				r: b.r * g * (1 + 0.06 * Math.sin(t * 12 + b.ph)),
 			});
-			// Contours, aplat vert, puis l'ombre plus foncée en bas : un seul nuage bien cerné.
+			// Un nuage toxique lumineux : des boules vertes qui brillent, plus claires au cœur.
+			ctx.globalCompositeOperation = 'lighter';
 			for (const b of blobs) {
 				const q = pos(b);
+				const gr = ctx.createRadialGradient(q.x, q.y - q.r * 0.25, 0, q.x, q.y, q.r * 1.25);
+				gr.addColorStop(0, 'rgba(190,255,150,0.55)');
+				gr.addColorStop(0.5, 'rgba(80,210,60,0.35)');
+				gr.addColorStop(1, 'rgba(40,140,30,0)');
+				ctx.fillStyle = gr;
 				ctx.beginPath();
-				ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
-				ctx.lineWidth = 8;
-				ctx.strokeStyle = INK;
-				ctx.stroke();
+				ctx.arc(q.x, q.y, q.r * 1.25, 0, Math.PI * 2);
+				ctx.fill();
 			}
-			for (const [col, oy, m] of [
-				['#5fc24a', 0, 1],
-				['#9cf07a', -0.25, 0.6],
-			] as const)
-				for (const b of blobs) {
-					const q = pos(b);
-					ctx.beginPath();
-					ctx.arc(q.x, q.y + q.r * oy, q.r * m, 0, Math.PI * 2);
-					ctx.fillStyle = col;
-					ctx.fill();
-				}
 		},
 	});
 	// Les bulles qui montent et éclatent.
@@ -515,10 +514,10 @@ function poisonCloud(eng: FxEngine, at: P, delay = 0, k = 1) {
 			size: 4 + Math.random() * 4,
 			sizeEnd: 9,
 			color: '#b6f59a',
-			ink: true,
+			neon: true,
 		});
 	// La petite tête de mort qui s'échappe du nuage.
-	eng.add({ x: at.x, y: at.y - 20, vy: -55, life: 1100, delay: delay + 250, size: 26 * k, color: '#e9ffe0', shape: 'glyph', glyph: '☠', vr: 0.6, ink: true });
+	eng.add({ x: at.x, y: at.y - 20, vy: -55, life: 1100, delay: delay + 250, size: 26 * k, color: '#e9ffe0', shape: 'glyph', glyph: '☠', vr: 0.6, neon: true });
 	return delay + 330;
 }
 
@@ -579,14 +578,14 @@ export function zap(eng: FxEngine, from: P, to: P, color: string, delay = 0, lif
 			ctx.stroke();
 			ctx.shadowBlur = 0;
 			ctx.globalAlpha = 1;
-			// Le trait : cerné, couleur, cœur blanc ; les fourches plus fines.
+			// Le trait : couleur et cœur blanc ; les fourches plus fines.
 			ctx.globalCompositeOperation = 'source-over';
 			for (const f of forks) {
 				line(ctx, f);
-				inkStroke(ctx, color, w * 0.45, 1.6);
+				glowStroke(ctx, color, w * 0.45, 1.6);
 			}
 			line(ctx, path);
-			inkStroke(ctx, color, w, 2.5);
+			glowStroke(ctx, color, w, 2.5);
 			ctx.strokeStyle = '#ffffff';
 			ctx.lineWidth = w * 0.35;
 			ctx.stroke();
@@ -664,7 +663,7 @@ const ABILITY_FX: Record<string, Fx> = {
 	},
 	moquerie: (e, c) => {
 		const to = c.foes[0] ?? c.from;
-		for (let i = 0; i < 3; i += 1) e.add({ x: c.from.x, y: c.from.y, life: 600, delay: i * 120, size: 10, sizeEnd: 70, color: '#ff9a4a', shape: 'ring', ink: true });
+		for (let i = 0; i < 3; i += 1) e.add({ x: c.from.x, y: c.from.y, life: 600, delay: i * 120, size: 10, sizeEnd: 70, color: '#ff9a4a', shape: 'ring', neon: true });
 		const t = projectile(e, c.from, to, { color: '#ff7a3c', head: 'glyph', glyph: '!', speed: 800, arc: 40, size: 9 });
 		if (c.success) rising(e, to, ['!'], '#ff6a3c', 4, t, 24);
 		else puff(e, to, t);
@@ -754,7 +753,7 @@ const ABILITY_FX: Record<string, Fx> = {
 				ctx.lineTo(to.x - r + 8, to.y);
 				ctx.moveTo(to.x + r - 8, to.y);
 				ctx.lineTo(to.x + r + 8, to.y);
-				inkStroke(ctx, '#ffe28a', 4, 2.5);
+				glowStroke(ctx, '#ffe28a', 4, 2.5);
 			},
 		});
 		const end = c.success ? to : beside(c.from, to);
@@ -801,7 +800,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = projectile(e, c.from, to, { color: '#ffb347', speed: 1300, size: 10, wobble: 6 });
 		if (c.success) {
 			impact(e, to, ['#fff2c4', '#ffb347', '#ff6a3c'], 1.5, t);
-			e.burst(to, 24, { speed: 380, life: 650, delay: t, size: 4.5, color: ['#ffe28a', '#ff8a3c'], shape: 'spark', ay: 300, drag: 1, ink: true });
+			e.burst(to, 24, { speed: 380, life: 650, delay: t, size: 4.5, color: ['#ffe28a', '#ff8a3c'], shape: 'spark', ay: 300, drag: 1, neon: true });
 		} else puff(e, to, t);
 		return t;
 	},
@@ -811,8 +810,8 @@ const ABILITY_FX: Record<string, Fx> = {
 			for (let i = 0; i < 6; i += 1) {
 				const delay = j * 80 + i * 70;
 				const x = f.x + (Math.random() - 0.5) * 60;
-				e.add({ x, y: f.y - 170, vy: 560, life: 300, delay, size: 13, color: i % 2 ? '#ffe28a' : '#cfe0ff', shape: 'star', vr: 6, ink: true });
-				if (c.success) e.burst({ x, y: f.y }, 5, { speed: 160, life: 320, delay: delay + 300, size: 4, color: '#ffe28a', shape: 'spark', ink: true });
+				e.add({ x, y: f.y - 170, vy: 560, life: 300, delay, size: 13, color: i % 2 ? '#ffe28a' : '#cfe0ff', shape: 'star', vr: 6, neon: true });
+				if (c.success) e.burst({ x, y: f.y }, 5, { speed: 160, life: 320, delay: delay + 300, size: 4, color: '#ffe28a', shape: 'spark', neon: true });
 				last = Math.max(last, delay + 300);
 			}
 			if (c.success) impact(e, f, ['#ffffff', '#ffe28a', '#cfe0ff'], 0.9, j * 80 + 300);
@@ -842,7 +841,7 @@ const ABILITY_FX: Record<string, Fx> = {
 					ctx.beginPath();
 					ctx.moveTo(to.x + Math.cos(a) * 22, to.y + Math.sin(a) * 22);
 					ctx.lineTo(to.x + Math.cos(a) * (42 + 60 * k), to.y + Math.sin(a) * (42 + 60 * k));
-					inkStroke(ctx, '#fff7d6', 6, 2.5);
+					glowStroke(ctx, '#fff7d6', 6, 2.5);
 				}
 			},
 		});
@@ -855,7 +854,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = projectile(e, c.from, to, { color: '#d9a8ff', head: 'glyph', glyph: '♫', speed: 800, size: 8, wobble: 14 });
 		if (c.success) {
 			impact(e, to, ['#f3e0ff', '#c58cff'], 1, t);
-			for (let i = 0; i < 3; i += 1) e.add({ x: to.x, y: to.y, life: 500, delay: t + i * 90, size: 14, sizeEnd: 70, color: '#c58cff', shape: 'ring', ink: true });
+			for (let i = 0; i < 3; i += 1) e.add({ x: to.x, y: to.y, life: 500, delay: t + i * 90, size: 14, sizeEnd: 70, color: '#c58cff', shape: 'ring', neon: true });
 		} else puff(e, to, t);
 		return t;
 	},
@@ -869,7 +868,7 @@ const ABILITY_FX: Record<string, Fx> = {
 	chant: (e, c) => {
 		rising(e, c.from, ['♪', '♫'], '#c58cff', 6, 0, 20);
 		c.allies.forEach((a, i) => {
-			e.burst(a, 8, { speed: 40, life: 900, delay: 300 + i * 80, size: 5, color: '#8fe0a0', ay: -160, ink: true });
+			e.burst(a, 8, { speed: 40, life: 900, delay: 300 + i * 80, size: 5, color: '#8fe0a0', ay: -160, neon: true });
 			rising(e, a, ['+'], '#8fe0a0', 3, 300 + i * 80, 22);
 		});
 		return 300;
@@ -878,8 +877,8 @@ const ABILITY_FX: Record<string, Fx> = {
 		rising(e, c.from, ['♪', '♫'], '#ffe28a', 5, 0, 20);
 		c.allies.forEach((a, i) => {
 			// Le mal (fumée sombre) s'envole, une lumière dorée le remplace.
-			e.burst(a, 8, { speed: 60, life: 800, delay: 250 + i * 80, size: 9, sizeEnd: 3, color: '#9a72c0', ay: -200, ink: true });
-			e.burst(a, 4, { speed: 120, life: 700, delay: 400 + i * 80, size: 9, sizeEnd: 4, color: '#ffe28a', shape: 'star', vr: 5, ink: true });
+			e.burst(a, 8, { speed: 60, life: 800, delay: 250 + i * 80, size: 9, sizeEnd: 3, color: '#9a72c0', ay: -200, neon: true });
+			e.burst(a, 4, { speed: 120, life: 700, delay: 400 + i * 80, size: 9, sizeEnd: 4, color: '#ffe28a', shape: 'star', vr: 5, neon: true });
 		});
 		return 300;
 	},
@@ -987,7 +986,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 				ctx.lineTo(at.x + Math.cos(l.a - wd) * r1, at.y + Math.sin(l.a - wd) * r1);
 				ctx.lineTo(at.x + Math.cos(l.a + wd) * r1, at.y + Math.sin(l.a + wd) * r1);
 				ctx.closePath();
-				inkFill(ctx, color, 2.5);
+				glowFill(ctx, color, 2.5);
 			}
 		},
 	});
@@ -1034,7 +1033,7 @@ export function playFoeAttack(eng: FxEngine, foeName: string, from: P, to: P, hu
 
 /** Un coup encaissé (armure, bouclier) : étincelles grises. */
 function clang(eng: FxEngine, at: P, delay: number) {
-	eng.burst(at, 10, { speed: 240, life: 420, delay, size: 5, color: ['#e6ecf5', '#9fb0c8'], shape: 'spark', drag: 2, ink: true });
+	eng.burst(at, 10, { speed: 240, life: 420, delay, size: 5, color: ['#e6ecf5', '#9fb0c8'], shape: 'spark', drag: 2, neon: true });
 	burstStar(eng, at, '#c9d2e0', '#ffffff', 40, delay, 260);
 }
 
@@ -1045,9 +1044,9 @@ export function playPoison(eng: FxEngine, at: P) {
 
 /** Victoire : une gerbe dorée qui jaillit de chaque héros debout. */
 export function celebrate(eng: FxEngine, at: P) {
-	eng.burst(at, 20, { speed: 320, angle: -Math.PI / 2, spread: Math.PI * 0.9, life: 1300, size: 5, sizeEnd: 3, color: ['#ffe28a', '#fff6dc', '#8fe0a0', '#ffb347', '#ff7aa8'], ay: 420, drag: 0.6, ink: true });
+	eng.burst(at, 20, { speed: 320, angle: -Math.PI / 2, spread: Math.PI * 0.9, life: 1300, size: 5, sizeEnd: 3, color: ['#ffe28a', '#fff6dc', '#8fe0a0', '#ffb347', '#ff7aa8'], ay: 420, drag: 0.6, neon: true });
 	for (let i = 0; i < 4; i += 1)
-		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 12, color: '#ffe28a', shape: 'star', vr: 4, ink: true });
+		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 12, color: '#ffe28a', shape: 'star', vr: 4, neon: true });
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */

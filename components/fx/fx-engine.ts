@@ -27,17 +27,18 @@ export interface Particle {
 	sizeEnd?: number;
 	color: string;
 	alpha?: number;
-	shape?: 'dot' | 'spark' | 'star' | 'ring' | 'glyph';
+	/** « twinkle » : une étincelle de lumière à 4 branches, façon reflet. */
+	shape?: 'dot' | 'spark' | 'star' | 'ring' | 'glyph' | 'twinkle';
 	glyph?: string;
 	rot?: number;
 	vr?: number;
 	age?: number;
-	/** Style BD : aplat de couleur (pas de lumière additive), cerné de noir sauf si outline vaut false. */
-	ink?: boolean;
-	outline?: boolean;
+	/** Style néon : forme pleine et brillante, avec un halo coloré et un cœur blanc (sauf si core vaut false). */
+	neon?: boolean;
+	core?: boolean;
 }
 
-/** L'encre des contours BD. */
+/** L'encre des contours BD (bulles d'onomatopées). */
 export const INK = '#16111c';
 
 /** Un dessin libre, animé de t = 0 à t = 1 sur sa durée. */
@@ -169,10 +170,8 @@ export class FxEngine {
 			ctx.globalAlpha = Math.max(0, alpha);
 			ctx.fillStyle = p.color;
 			ctx.strokeStyle = p.color;
-			if (p.ink) {
-				ctx.globalCompositeOperation = 'source-over';
-				inkParticle(ctx, p, size);
-				ctx.globalCompositeOperation = 'lighter';
+			if (p.neon || p.shape === 'twinkle') {
+				neonParticle(ctx, p, size);
 				return true;
 			}
 			switch (p.shape) {
@@ -250,52 +249,95 @@ export function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
 	ctx.fill();
 }
 
-/** Remplit le chemin courant et le cerne de noir. */
-export function inkFill(ctx: CanvasRenderingContext2D, fill: string, line = 3.5) {
+/** Remplit le chemin courant en lumière : halo coloré, puis un fin liseré blanc. */
+export function glowFill(ctx: CanvasRenderingContext2D, fill: string, line = 3.5) {
+	const op = ctx.globalCompositeOperation;
+	ctx.globalCompositeOperation = 'lighter';
 	ctx.lineJoin = 'round';
+	ctx.shadowColor = fill;
+	ctx.shadowBlur = 18;
 	ctx.fillStyle = fill;
 	ctx.fill();
-	ctx.lineWidth = line;
-	ctx.strokeStyle = INK;
+	ctx.shadowBlur = 0;
+	ctx.lineWidth = Math.max(1, line * 0.5);
+	ctx.strokeStyle = 'rgba(255,255,255,0.85)';
 	ctx.stroke();
+	ctx.globalCompositeOperation = op;
 }
 
-/** Trace le chemin courant en trait épais cerné : d'abord le contour noir, plus large, puis la couleur. */
-export function inkStroke(ctx: CanvasRenderingContext2D, color: string, width: number, edge = 3) {
+/** Trace le chemin courant en néon : un large halo, le trait coloré, puis un cœur blanc. */
+export function glowStroke(ctx: CanvasRenderingContext2D, color: string, width: number, halo = 3) {
+	const op = ctx.globalCompositeOperation;
+	const a = ctx.globalAlpha;
+	ctx.globalCompositeOperation = 'lighter';
 	ctx.lineCap = 'round';
 	ctx.lineJoin = 'round';
-	if (edge > 0) {
-		ctx.strokeStyle = INK;
-		ctx.lineWidth = width + edge * 2;
+	ctx.shadowColor = color;
+	ctx.strokeStyle = color;
+	if (halo > 0) {
+		ctx.shadowBlur = width * 2.5;
+		ctx.globalAlpha = a * 0.45;
+		ctx.lineWidth = width * 1.9;
 		ctx.stroke();
 	}
-	ctx.strokeStyle = color;
+	ctx.globalAlpha = a;
+	ctx.shadowBlur = width;
 	ctx.lineWidth = width;
 	ctx.stroke();
+	ctx.shadowBlur = 0;
+	ctx.strokeStyle = '#ffffff';
+	ctx.lineWidth = Math.max(1, width * 0.38);
+	ctx.stroke();
+	ctx.globalCompositeOperation = op;
 }
 
-/** Une particule en style BD. */
-function inkParticle(ctx: CanvasRenderingContext2D, p: Particle, size: number) {
-	const edge = p.outline === false ? 0 : Math.max(1.5, Math.min(3.5, size * 0.35));
+/** Une étincelle à 4 branches (deux fuseaux croisés), avec un petit halo. */
+export function twinkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number, color: string) {
+	const g = ctx.createRadialGradient(x, y, 0, x, y, r * 0.8);
+	g.addColorStop(0, color);
+	g.addColorStop(1, 'rgba(0,0,0,0)');
+	ctx.fillStyle = g;
+	ctx.beginPath();
+	ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+	ctx.fill();
+	ctx.fillStyle = '#ffffff';
+	for (const a of [rot, rot + Math.PI / 2]) {
+		const c = Math.cos(a);
+		const s = Math.sin(a);
+		const w = r * 0.13;
+		ctx.beginPath();
+		ctx.moveTo(x + c * r, y + s * r);
+		ctx.lineTo(x - s * w, y + c * w);
+		ctx.lineTo(x - c * r, y - s * r);
+		ctx.lineTo(x + s * w, y - c * w);
+		ctx.closePath();
+		ctx.fill();
+	}
+}
+
+/** Une particule en style néon (dessinée en lumière additive, comme le reste du moteur). */
+function neonParticle(ctx: CanvasRenderingContext2D, p: Particle, size: number) {
 	switch (p.shape) {
+		case 'twinkle':
+			twinkle(ctx, p.x, p.y, size, p.rot!, p.color);
+			break;
 		case 'spark': {
 			const len = Math.hypot(p.vx!, p.vy!) * 0.05 + size;
 			const a = Math.atan2(p.vy!, p.vx!);
 			ctx.beginPath();
 			ctx.moveTo(p.x, p.y);
 			ctx.lineTo(p.x - Math.cos(a) * len, p.y - Math.sin(a) * len);
-			inkStroke(ctx, p.color, size * 0.8, edge * 0.7);
+			glowStroke(ctx, p.color, size * 0.8, 0);
 			break;
 		}
 		case 'star':
 			starPath(ctx, p.x, p.y, size, p.rot!);
-			if (edge) inkFill(ctx, p.color, edge);
-			else ctx.fill();
+			glowFill(ctx, p.color, 2);
 			break;
 		case 'ring':
 			ctx.beginPath();
 			ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-			inkStroke(ctx, p.color, Math.max(3, size * 0.12), edge ? 2.5 : 0);
+			glowStroke(ctx, p.color, Math.max(3, size * 0.1), 2);
 			break;
 		case 'glyph':
 			ctx.save();
@@ -304,20 +346,35 @@ function inkParticle(ctx: CanvasRenderingContext2D, p: Particle, size: number) {
 			ctx.font = `900 ${size}px "Arial Black", Impact, sans-serif`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.lineJoin = 'round';
-			if (edge) {
-				ctx.lineWidth = Math.max(3, size * 0.22);
-				ctx.strokeStyle = INK;
-				ctx.strokeText(p.glyph ?? '♥', 0, 0);
-			}
+			ctx.shadowColor = p.color;
+			ctx.shadowBlur = 14;
 			ctx.fillText(p.glyph ?? '♥', 0, 0);
+			ctx.shadowBlur = 0;
+			ctx.lineWidth = 1.2;
+			ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+			ctx.strokeText(p.glyph ?? '♥', 0, 0);
 			ctx.restore();
 			break;
-		default:
+		default: {
+			const r = Math.max(0.5, size);
+			const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.4);
+			g.addColorStop(0, p.color);
+			g.addColorStop(1, 'rgba(0,0,0,0)');
+			ctx.fillStyle = g;
 			ctx.beginPath();
-			ctx.arc(p.x, p.y, Math.max(0.5, size), 0, Math.PI * 2);
-			if (edge) inkFill(ctx, p.color, edge);
-			else ctx.fill();
+			ctx.arc(p.x, p.y, r * 2.4, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = p.color;
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+			ctx.fill();
+			if (p.core !== false) {
+				ctx.fillStyle = '#ffffff';
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, r * 0.45, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
 	}
 }
 
