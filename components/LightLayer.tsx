@@ -206,6 +206,8 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 					// La flamme vacille derrière la vitre : plus calme qu'une bougie, mais bien vivante.
 					const f = still ? 0.8 + 0.3 * (flicker(t, i * 2.3, 0.6) - 0.5) : flicker(t, i * 2.3, 1.5) * (0.8 + 0.2 * flicker(t, i * 1.7, 0.4));
 					glow(x, y, radius * (0.88 + 0.16 * f), color, 0.36 * k * (0.5 + 0.5 * f));
+					// Sa lumière sur ce qui l'entoure (table, mur) : une grande lueur douce qui vacille avec la flamme.
+					glow(x, y, radius * (2.4 + 0.3 * f), color, 0.13 * k * (0.35 + 0.65 * f));
 				} else if (l.kind === 'magie') {
 					const p = still ? 0.6 : 0.5 + 0.5 * Math.sin(t * 1.4 + i);
 					glow(x, y, radius * (0.85 + 0.2 * p), color, 0.3 * k * (0.5 + 0.5 * p));

@@ -12,7 +12,7 @@ import type { Light, MediaAsset, StyleGuide } from '@/engine/types';
 export const PORTAL_LIGHTS: Light[] = [
 	{ kind: 'bougie', x: 92.8, y: 24.4, size: 0.06 },
 	{ kind: 'bougie', x: 96.8, y: 36.3, size: 0.045, intensity: 0.85 },
-	{ kind: 'lanterne', x: 8.3, y: 46.7, size: 0.16 },
+	{ kind: 'lanterne', x: 8.3, y: 46.7, size: 0.16, intensity: 1.3 },
 ];
 
 export const COMMON_STYLE: StyleGuide = {

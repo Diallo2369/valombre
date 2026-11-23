@@ -1,5 +1,12 @@
 @use 'tokens' as *;
 
+/*
+ * L'arrivée sur l'accueil, une seule courbe et un enchaînement régulier (secondes, après l'écran d'entrée) :
+ * 0 → 2,2 l'image se défloute · 0,5 l'en-tête · 0,6 → 2 le titre · 0,9 le sur-titre · 1,4 le trait d'or
+ * · 1,6 le texte · 1,85 les boutons · 2,2 → 2,5 les encarts du bas · 2,4 puis toutes les 6 s le reflet du titre.
+ */
+$home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+
 /* ============ Médias ============ */
 .media-view {
 	position: relative;
@@ -38,7 +45,7 @@
 		-webkit-background-clip: text;
 		/* Même liste de filtres que dans legend-in, pour une transition sans à-coup. */
 		filter: blur(0) brightness(1) drop-shadow(0 2px 0 rgb(40 26 8 / 90%)) drop-shadow(0 0 24px rgb(200 170 110 / 35%));
-		animation: legend-in 1.6s cubic-bezier(0.16, 0.8, 0.3, 1) 0.5s both;
+		animation: legend-in 1.4s $home-ease 0.6s both;
 
 		/* Le reflet de lumière qui balaie les lettres. */
 		&::after {
@@ -51,7 +58,7 @@
 			background-position: 160% 0;
 			background-clip: text;
 			-webkit-background-clip: text;
-			animation: legend-shine 6s ease-in-out 2s infinite;
+			animation: legend-shine 6s ease-in-out 2.4s infinite;
 		}
 	}
 
@@ -62,7 +69,7 @@
 		height: 2px;
 		background: linear-gradient(90deg, transparent, #c8aa6e 20%, #f0d9a0 50%, #c8aa6e 80%, transparent);
 		transform-origin: 50% 50%;
-		animation: legend-rule 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) 1.5s both;
+		animation: legend-rule 0.9s $home-ease 1.4s both;
 	}
 
 	&__gem {
@@ -155,7 +162,7 @@
 
 /* Sur l'accueil, l'en-tête du site arrive lui aussi en fondu, avec l'image. */
 body:has(.home) .site-header {
-	animation: home-fade 1.2s ease 0.3s both;
+	animation: home-fade 0.9s $home-ease 0.5s both;
 }
 
 /* « Réduire les animations » : on garde les effets doux (flou, fondus, apparition du titre), sans mouvement. */
@@ -202,7 +209,7 @@ body:has(.home) .site-header {
 		overflow: hidden;
 		container-type: size;
 		/* Le défloutage : l'image arrive floue et sombre, puis la pièce se dévoile. */
-		animation: home-unblur 2.4s cubic-bezier(0.3, 0.6, 0.3, 1) 0.1s both;
+		animation: home-unblur 2.2s $home-ease both;
 
 		&::after {
 			content: '';
@@ -263,35 +270,35 @@ body:has(.home) .site-header {
 	&__eyebrow,
 	&__lead,
 	&__cta {
-		animation: home-rise 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+		animation: home-rise 0.9s $home-ease both;
 	}
 
 	&__eyebrow {
-		animation-delay: 0.2s;
+		animation-delay: 0.9s;
 	}
 
 	&__lead {
-		animation-delay: 2.4s;
+		animation-delay: 1.6s;
 	}
 
 	&__cta {
-		animation-delay: 2.9s;
+		animation-delay: 1.85s;
 	}
 
 	/* Les encarts du bas arrivent après le titre, l'un après l'autre. */
 	&__features .card {
-		animation: home-rise 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+		animation: home-rise 0.9s $home-ease both;
 
 		&:nth-child(1) {
-			animation-delay: 3.3s;
+			animation-delay: 2.2s;
 		}
 
 		&:nth-child(2) {
-			animation-delay: 3.5s;
+			animation-delay: 2.35s;
 		}
 
 		&:nth-child(3) {
-			animation-delay: 3.7s;
+			animation-delay: 2.5s;
 		}
 	}
 
