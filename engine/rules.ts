@@ -46,6 +46,7 @@ export type AbilityId =
 	| 'double-attaque'
 	| 'moquerie'
 	| 'tourbillon'
+	| 'lancer-hache'
 	| 'ambidextrie'
 	| 'folie'
 	// Rôdeur
@@ -183,6 +184,15 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'foe',
 		taunt: true,
 		text: 'Tu nargues une créature : elle ne pense plus qu’à toi et t’attaquera à son prochain tour (même l’aura du guerrier n’y peut rien).',
+	}),
+	'lancer-hache': A({
+		id: 'lancer-hache', range: 3,
+		name: 'Lancer de hache',
+		icon: '🪓',
+		target: 'foe',
+		stat: 'agilite',
+		damage: 2,
+		text: 'Une hache lancée en tournoyant, jusqu’à 3 cases : 2 PV. Pratique quand personne n’est au contact.',
 	}),
 	tourbillon: A({
 		id: 'tourbillon', range: 1,
@@ -424,7 +434,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		move: 4,
 		aggro: 'charme',
-		abilities: ['double-attaque', 'moquerie', 'tourbillon', 'ambidextrie', 'folie'],
+		abilities: ['double-attaque', 'lancer-hache', 'moquerie', 'tourbillon', 'ambidextrie', 'folie'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
 	},

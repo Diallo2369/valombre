@@ -170,7 +170,7 @@ function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay =
 
 interface ProjectileOpts {
 	color: string;
-	head?: 'arrow' | 'orb' | 'glyph' | 'net';
+	head?: 'arrow' | 'orb' | 'glyph' | 'net' | 'axe';
 	glyph?: string;
 	speed?: number;
 	arc?: number;
@@ -242,6 +242,20 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 				ctx.lineWidth = 1.5;
 				ctx.strokeStyle = '#ffffff';
 				ctx.strokeText(o.glyph ?? '♪', p.x, p.y);
+			} else if (head === 'axe') {
+				// La hache qui tournoie : un manche en bois et une lame d'acier en croissant.
+				ctx.translate(p.x, p.y);
+				ctx.rotate(t * 16);
+				ctx.beginPath();
+				ctx.moveTo(-16, 0);
+				ctx.lineTo(16, 0);
+				glowStroke(ctx, '#c89a5a', 4, 0);
+				ctx.beginPath();
+				ctx.moveTo(8, -3);
+				ctx.quadraticCurveTo(22, -16, 24, 0);
+				ctx.quadraticCurveTo(22, 16, 8, 3);
+				ctx.closePath();
+				glowFill(ctx, '#ffd0a0', 2.5);
 			} else if (head === 'net') {
 				// Le filet roulé en boule, qui tourne en vol.
 				ctx.translate(p.x, p.y);
@@ -669,6 +683,14 @@ const ABILITY_FX: Record<string, Fx> = {
 		else puff(e, to, t);
 		return t;
 	},
+	'lancer-hache': (e, c) => {
+		const to = c.foes[0];
+		const end = c.success ? to : beside(c.from, to);
+		const t = projectile(e, c.from, end, { color: '#ffb070', head: 'axe', speed: 900, arc: 26, size: 6, trail: '#ff8a4a' });
+		if (c.success) impact(e, to, FURY, c.crit ? 1.5 : 1, t);
+		else puff(e, end, t);
+		return t;
+	},
 	tourbillon: (e, c) => {
 		// Un vortex bleuté : des bras de vent en spirale qui tournent autour du danseur et s'élargissent.
 		const at = c.from;
@@ -919,6 +941,7 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	taillade: { word: 'SHLAK !', fill: '#ffb03f', melee: true },
 	intervention: { word: 'HOP !', fill: '#ffe28a' },
 	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
+	'lancer-hache': { word: 'TCHONK !', fill: '#ff9a5a' },
 	moquerie: { word: 'NANANÈRE !', fill: '#ff9a4a' },
 	tourbillon: { word: 'WHOOSH !', fill: '#7fe3ff', melee: true },
 	tir: { word: 'TCHAC !', fill: '#ffe28a' },
