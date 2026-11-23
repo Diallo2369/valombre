@@ -96,39 +96,36 @@ function need(stat: number, target: number) {
 const STUN_ICON = { assomme: '💫', filet: '🕸️', sommeil: '😴' } as const;
 const STUN_TEXT = { assomme: 'est encore sonnée', filet: 'se débat dans le filet', sommeil: 'dort à poings fermés' } as const;
 
-/** Les cœurs d'une créature, avec les demi-cœurs. */
-function Hearts({ foe, hp = foe.hp, small = false }: { foe: FoeState; hp?: number; small?: boolean }) {
-	const count = Math.ceil(foe.maxHp / 2);
-	// Les cœurs qui viennent de tomber sautent et s'éteignent (on garde l'ancien total jusqu'au prochain coup).
-	const track = useRef({ hp, from: hp });
-	if (track.current.hp !== hp) track.current = { hp, from: track.current.hp };
-	const from = track.current.from;
+/**
+ * Barre de vie façon jeu de tactique : un cadre noir gradué, une jauge pleine (verte pour les héros,
+ * rouge pour les créatures) et, derrière, une traînée blanche qui montre la vie perdue puis fond.
+ * Un bouclier s'ajoute en argent au bout de la jauge.
+ */
+function HealthBar({ id, memo, value, max, tone, shield = 0 }: { id: string; memo: Record<string, number>; value: number; max: number; tone: 'hero' | 'foe'; shield?: number }) {
+	// Le jeton est recréé à chaque coup (pour relancer ses animations) : la dernière valeur est gardée
+	// par le plateau (`memo`), pour que la jauge parte de là et que la traînée montre ce qui vient d'être perdu.
+	const before = memo[id] ?? value;
+	const [fill, setFill] = useState(before);
+	const [trail, setTrail] = useState(Math.max(before, value));
+	useEffect(() => {
+		memo[id] = value;
+		const r = requestAnimationFrame(() => setFill(value));
+		const t = window.setTimeout(() => setTrail(value), 450);
+		return () => {
+			cancelAnimationFrame(r);
+			window.clearTimeout(t);
+		};
+	}, [id, memo, value]);
+	const pct = (n: number) => `${Math.max(0, Math.min(1, n / max)) * 100}%`;
+	// Une graduation tous les 2 points (un cœur), toutes les 4 si la barre est très longue.
+	const step = max > 24 ? 4 : 2;
+	const ticks = Math.max(0, Math.ceil(max / step) - 1);
 	return (
-		<span className={`hearts${small ? ' hearts--small' : ''}`} aria-label={`${heartsText(Math.max(0, hp))} sur ${heartsText(foe.maxHp)}`}>
-			{Array.from({ length: count }, (_, i) => {
-				const left = hp - i * 2;
-				const before = from - i * 2;
-				const cls = left >= 2 ? '' : left === 1 ? ' is-half' : ' is-lost';
-				const drop = before > left && before > 0 && left < 2 ? ' is-dropping' : '';
-				return (
-					<span key={i} className={`heart${cls}${drop}`} aria-hidden="true">
-						♥
-					</span>
-				);
-			})}
-		</span>
-	);
-}
-
-/** Des petits cœurs qui s'envolent du jeton touché. */
-function HeartPop({ count }: { count: number }) {
-	return (
-		<span className="token__pop" aria-hidden="true">
-			{Array.from({ length: Math.max(1, Math.min(4, count)) }, (_, i) => (
-				<span key={i} style={{ '--i': i, '--n': Math.max(1, Math.min(4, count)) } as React.CSSProperties}>
-					♥
-				</span>
-			))}
+		<span className={`hp-bar hp-bar--${tone}${value / max <= 0.3 ? ' is-low' : ''}`} aria-hidden="true">
+			<span className="hp-bar__trail" style={{ width: pct(Math.max(trail, fill)) }} />
+			<span className="hp-bar__fill" style={{ width: pct(fill) }} />
+			{shield > 0 ? <span className="hp-bar__shield" style={{ left: pct(fill), width: pct(shield) }} /> : null}
+			{ticks ? <span className="hp-bar__ticks" style={{ '--ticks': Math.ceil(max / step) } as React.CSSProperties} /> : null}
 		</span>
 	);
 }
@@ -164,6 +161,8 @@ export function CombatPanel(props: Props) {
 	const [hurtId, setHurtId] = useState<string | null>(null);
 	/** Le héros qui prend son élan (il grossit avant de frapper, façon jeu de tactique). */
 	const [castId, setCastId] = useState<string | null>(null);
+	/** Dernière valeur de chaque barre de vie (voir HealthBar). */
+	const hpMemo = useRef<Record<string, number>>({});
 	const intentRef = useRef<HTMLElement>(null);
 	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
 	const [landed, setLanded] = useState(false);
@@ -766,8 +765,7 @@ export function CombatPanel(props: Props) {
 										{f.blind ? '🔆' : ''}
 										{f.taunt ? '😜' : ''}
 									</span>
-									<Hearts foe={f} hp={hp} small />
-									{hit ? <HeartPop count={Math.ceil(hit.amount / 2)} /> : null}
+									<HealthBar id={f.id} memo={hpMemo.current} value={hp} max={f.maxHp} tone="foe" />
 									<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
 									{hit ? (
 										<span className="token__burst" aria-hidden="true">
@@ -810,11 +808,8 @@ export function CombatPanel(props: Props) {
 										{st?.fury ? '🔥' : ''}
 										{st?.afflict ? '🤒' : ''}
 									</span>
-									<span className="token__pv" aria-hidden="true">
-										<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
-									</span>
+									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />
 									<span className="token__name">{c.name}</span>
-									{hurtId === c.id && say?.amount ? <HeartPop count={Math.min(4, say.amount)} /> : null}
 									{hurtId === c.id && say?.amount ? (
 										<span className="token__burst token__burst--hurt" aria-hidden="true">
 											−{say.amount} PV
