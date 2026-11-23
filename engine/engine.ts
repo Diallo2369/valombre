@@ -922,6 +922,9 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 	const rage = o.rage && victim.id === target.id ? RAGE[Math.floor(Math.random() * RAGE.length)] : undefined;
 	if (rage) base = Math.round(base * rage);
 	let blow = Math.max(0, base - (guarded ? 1 : 0));
+	// Encaisseur : le guerrier absorbe une partie du choc (davantage s'il est endurant).
+	const soaked = blow > 0 && hasAbility(victim, 'encaisseur') ? Math.min(blow, victim.stats.endurance >= 8 ? 2 : 1) : 0;
+	blow -= soaked;
 	const hs = heroState(combat, victim.id);
 	const shielded = Math.min(hs.shield ?? 0, blow);
 	blow -= shielded;
@@ -960,14 +963,16 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 		...(o.spell ? { spell: o.spell } : {}),
 		...(rage ? { rage } : {}),
 		...(parried ? { parried } : {}),
+		...(soaked ? { soaked } : {}),
 	});
 	const parts = [
 		guarded ? `${victim.name} s’interpose devant ${target.name}.` : '',
 		parried ? `${victim.name} pare le coup !` : '',
+		soaked ? `${victim.name} encaisse le choc (−${soaked}).` : '',
 		rage ? `Folle de rage, elle frappe ${Math.round((rage - 1) * 100)} % plus fort !` : '',
 		shielded ? `Le bouclier de lune encaisse ${shielded}.` : '',
 		absorbed ? `L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '',
-		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed && !parried ? `${victim.name} ne perd rien.` : '',
+		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed && !parried && !soaked ? `${victim.name} ne perd rien.` : '',
 		afflict ? `${victim.name} souffre de ${afflict}.` : '',
 		stunned ? `${victim.name} est assommé·e et passera son tour.` : '',
 	].filter(Boolean);

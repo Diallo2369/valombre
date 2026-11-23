@@ -45,6 +45,7 @@ export type AbilityId =
 	| 'intervention'
 	| 'aura'
 	| 'oeil-pour-oeil'
+	| 'encaisseur'
 	// Cœur-sauvage
 	| 'double-attaque'
 	| 'moquerie'
@@ -218,6 +219,14 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		passive: true,
 		target: 'none',
 		text: 'Tout ce que tu fais énerve davantage les monstres (une fois et demie plus) : ils ont bien du mal à résister à l’envie de t’attaquer, toi plutôt que tes amis.',
+	}),
+	encaisseur: A({
+		id: 'encaisseur',
+		name: 'Encaisseur',
+		icon: '🪨',
+		passive: true,
+		target: 'none',
+		text: 'Tu encaisses les chocs comme un roc : chaque coup que tu reçois (même un sort) fait 1 dégât de moins, et 2 de moins si ton Endurance vaut 8 ou plus. Ça passe avant ton armure.',
 	}),
 	'oeil-pour-oeil': A({
 		id: 'oeil-pour-oeil',
@@ -532,7 +541,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 4,
 		threat: 1.5,
 		move: 2,
-		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'cri-de-rage', 'intervention', 'aura', 'oeil-pour-oeil'],
+		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'cri-de-rage', 'intervention', 'aura', 'encaisseur', 'oeil-pour-oeil'],
 		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +3 PV et 4 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et se jette devant ses amis pour les protéger.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},

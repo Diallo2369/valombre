@@ -559,6 +559,8 @@ export type GameEvent =
 			stunned?: boolean;
 			/** Paré (Cri de rage du guerrier) : rien ne passe. */
 			parried?: boolean;
+			/** Encaisseur : dégâts que le guerrier a absorbés (avant son armure). */
+			soaked?: number;
 			/** Un sort, pas un coup (son nom). */
 			spell?: string;
 			/** Enragée par la Moquerie : multiplicateur des dégâts (1,25 à 2). */

@@ -305,6 +305,7 @@ export function CombatPanel(props: Props) {
 				// Court : le détail se voit sur le plateau (chiffre de dégâts, bulle « CLANG ! » si l'armure encaisse).
 				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount && !e.stunned ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
 				const stun = e.stunned ? (e.spell ? ` 💤 ${victim} s’endort !` : ` 💫 ${victim} est assommé·e !`) : '';
+				const soak = e.soaked ? ` 🪨 ${victim} encaisse (−${e.soaked}).` : '';
 				const rage = e.rage ? ` 😡 Folle de rage : +${Math.round((e.rage - 1) * 100)} % !` : '';
 				const text = e.parried
 					? `🛡️ ${cap(e.name)} frappe ${victim}… PARÉ !`
@@ -312,7 +313,7 @@ export function CombatPanel(props: Props) {
 					? `🌫️ ${cap(e.name)}, aveuglée, frappe à côté de ${victim} !`
 					: e.spell
 						? `${cap(e.spell)} touche ${victim} !${e.amount ? '' : stun ? '' : ' Aucun dégât !'}${e.afflict ? ` 🔥 ${cap(e.afflict)} !` : ''}${stun}`
-						: `${cap(e.name)} ${e.cleave ? 'balaie aussi' : 'frappe'} ${victim} !${rage}${extra}${stun}`;
+						: `${cap(e.name)} ${e.cleave ? 'balaie aussi' : 'frappe'} ${victim} !${rage}${soak}${extra}${stun}`;
 				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.missed ? undefined : e.heroId, amount: e.amount, spell: Boolean(e.spell), ms: 2000, text });
 			} else if (e.kind === 'riposte') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
