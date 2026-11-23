@@ -512,7 +512,17 @@ export const LIGHTS: Record<string, Light[]> = {
 		// La pluie sur toute l'image, poussée par un léger vent (12°).
 		{ kind: 'pluie', x: 12, intensity: 1 },
 	],
-	'img-salle-commune': [{ kind: 'feu', x: 80, y: 58, size: 0.45 }],
+	// Calé sur l'image réelle : l'âtre à droite, trois lanternes, des bougies sur les tables et la cheminée.
+	'img-salle-commune': [
+		{ kind: 'feu', x: 89, y: 55, size: 0.32 },
+		{ kind: 'lanterne', x: 12, y: 12, size: 0.1 },
+		{ kind: 'lanterne', x: 39, y: 19, size: 0.07, intensity: 0.8 },
+		{ kind: 'lanterne', x: 25, y: 28, size: 0.05, intensity: 0.7 },
+		{ kind: 'bougie', x: 2, y: 62, size: 0.06 },
+		{ kind: 'bougie', x: 38, y: 46, size: 0.045, intensity: 0.8 },
+		{ kind: 'bougie', x: 23, y: 43, size: 0.035, intensity: 0.7 },
+		{ kind: 'bougie', x: 72.5, y: 17, size: 0.035, intensity: 0.7 },
+	],
 	'img-cuisine': [{ kind: 'feu', x: 25, y: 62, size: 0.4 }],
 	'img-cave': [{ kind: 'lanterne', x: 30, y: 30, size: 0.22, intensity: 0.6 }],
 	'img-pff': [{ kind: 'magie', x: 50, y: 50, size: 0.25, color: BLEU, intensity: 0.7 }],

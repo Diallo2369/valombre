@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { Light } from '@/engine/types';
 
 /**
- * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble,
+ * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie,
  * brume qui glisse, éclairs, lueur magique qui respire. Un seul canevas, fusionné en « screen »
  * (il ne fait qu'éclairer l'image, jamais l'assombrir).
  * Avec « réduire les animations » activé dans le système, on dessine une lueur fixe, sans mouvement.
@@ -13,6 +13,7 @@ import type { Light } from '@/engine/types';
 const DEFAULT_COLOR: Record<Light['kind'], string> = {
 	feu: '255,140,50',
 	lanterne: '255,185,100',
+	bougie: '255,200,120',
 	magie: '150,190,255',
 	brume: '200,208,222',
 	eclair: '235,240,255',
@@ -119,12 +120,16 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 
 				if (l.kind === 'feu') {
 					const f = still ? 0.75 : flicker(t, i * 3.1, 1.4);
-					glow(x, y, radius * (0.9 + 0.12 * f), color, 0.38 * k * (0.6 + 0.4 * f));
-					// Une lueur très douce sur toute la pièce, qui suit le feu.
-					ctx.fillStyle = `rgba(${color},${0.05 * k * f})`;
+					glow(x, y, radius * (0.85 + 0.2 * f), color, 0.4 * k * (0.45 + 0.55 * f));
+					// Une lueur douce sur toute la pièce, qui suit le feu : les murs « respirent » avec lui.
+					ctx.fillStyle = `rgba(${color},${0.08 * k * f})`;
 					ctx.fillRect(0, 0, w, h);
 					if (!still && Math.random() < 0.06 * k)
 						embers.push({ x: x + (Math.random() - 0.5) * radius * 0.4, y, vy: -(20 + Math.random() * 30), vx: (Math.random() - 0.5) * 12, life: 1 });
+				} else if (l.kind === 'bougie') {
+					// Une flamme de bougie : vive, nerveuse, avec de petits creux comme un courant d'air.
+					const f = still ? 0.8 : flicker(t, i * 4.7, 2.4) * (0.75 + 0.25 * flicker(t, i * 1.3, 0.35));
+					glow(x, y, radius * (0.85 + 0.25 * f), color, 0.42 * k * (0.45 + 0.55 * f));
 				} else if (l.kind === 'lanterne') {
 					const f = still ? 0.8 : flicker(t, i * 2.3, 0.9);
 					glow(x, y, radius * (0.95 + 0.06 * f), color, 0.34 * k * (0.75 + 0.25 * f));

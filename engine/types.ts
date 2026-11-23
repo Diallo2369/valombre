@@ -288,7 +288,7 @@ export interface MediaAsset {
  */
 export interface Light {
 	/** « pluie » : des gouttes qui tombent sur toute l'image (intensity : densité, x : vent en degrés). */
-	kind: 'feu' | 'lanterne' | 'magie' | 'brume' | 'eclair' | 'pluie';
+	kind: 'feu' | 'lanterne' | 'bougie' | 'magie' | 'brume' | 'eclair' | 'pluie';
 	x?: number;
 	y?: number;
 	size?: number;
