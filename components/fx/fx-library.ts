@@ -858,32 +858,6 @@ const ABILITY_FX: Record<string, Fx> = {
 
 	/* Rôdeur */
 	tir: (e, c) => shot(e, c.from, c.foes[0], c, '#ffd27a'),
-	'fleche-visee': (e, c) => {
-		// On vise : un réticule se resserre sur la cible, puis la flèche part, très vite.
-		const to = c.foes[0];
-		e.draw({
-			life: 380,
-			draw(ctx, t) {
-				const r = 60 - 36 * ease.out(t);
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.globalAlpha = 1 - t * 0.3;
-				ctx.beginPath();
-				ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
-				ctx.moveTo(to.x - r - 8, to.y);
-				ctx.lineTo(to.x - r + 8, to.y);
-				ctx.moveTo(to.x + r - 8, to.y);
-				ctx.lineTo(to.x + r + 8, to.y);
-				glowStroke(ctx, '#ffe28a', 4, 2.5);
-			},
-		});
-		const end = c.success ? to : beside(c.from, to);
-		const t = projectile(e, c.from, end, { color: '#ffe28a', head: 'arrow', speed: 1800, size: 6, delay: 360, trail: '#fff1b8' });
-		if (c.success) {
-			impact(e, to, ['#ffffff', '#ffe28a', '#ffb347'], 1.8, t);
-			rising(e, to, ['🤐'], '#ffe28a', 1, t + 120, 22);
-		} else puff(e, end, t);
-		return t;
-	},
 	salve: (e, c) => {
 		let t = 0;
 		const list = c.foes.length ? c.foes : [c.from];
@@ -900,6 +874,23 @@ const ABILITY_FX: Record<string, Fx> = {
 		}
 		net(e, to, t);
 		return t;
+	},
+	pieges: (e, c) => {
+		// Une volée de pièges à mâchoires qui retombent en pluie sur la zone, puis claquent.
+		const to = c.foes[0] ?? c.from;
+		let last = 0;
+		for (let i = 0; i < 7; i += 1) {
+			const a = (i / 7) * Math.PI * 2;
+			const r = i === 0 ? 0 : 70;
+			const p = { x: to.x + Math.cos(a) * r, y: to.y + Math.sin(a) * r * 0.8 };
+			const t = projectile(e, c.from, p, { color: '#b9a27a', head: 'glyph', glyph: '⚙', speed: 750, arc: 70, size: 7, delay: i * 50 });
+			if (c.success) {
+				e.burst(p, 6, { speed: 160, life: 380, delay: t, size: 4, color: ['#e8dcb5', '#8a7a5a'], shape: 'spark', drag: 2 });
+				kapow(e, p, 'CLAC !', '#e8dcb5', t, 0.55);
+			} else puff(e, p, t);
+			last = Math.max(last, t);
+		}
+		return last;
 	},
 	'fleche-empoisonnee': (e, c) => {
 		const to = c.foes[0];
@@ -1007,6 +998,15 @@ const ABILITY_FX: Record<string, Fx> = {
 		});
 		return 300;
 	},
+	melodie: (e, c) => {
+		// Des notes douces qui flottent vers chaque compagnon et y restent un moment, en halo vert.
+		rising(e, c.from, ['♪', '♫', '♪'], '#8fffa0', 6, 0, 20);
+		c.allies.forEach((a, i) => {
+			const t = a === c.from ? 0 : projectile(e, c.from, a, { color: '#8fffa0', head: 'glyph', glyph: '♪', speed: 520, size: 7, wobble: 16, arc: 26, delay: i * 70 });
+			e.add({ x: a.x, y: a.y, life: 900, delay: t, size: 20, sizeEnd: 70, color: '#8fffa0', shape: 'ring', neon: true });
+		});
+		return 300;
+	},
 	ronde: (e, c) => {
 		// Un air de danse : des notes dorées tournent autour de la créature, de plus en plus vite, et se referment en mur.
 		const to = c.foes[0] ?? c.from;
@@ -1066,7 +1066,7 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	salve: { word: 'TAC TAC TAC !', fill: '#ffe28a' },
 	filet: { word: 'FLOP !', fill: '#e8dcb5' },
 	'fleche-empoisonnee': { word: 'BLURP !', fill: '#8cff7a' },
-	'fleche-visee': { word: 'PAF !!', fill: '#ffd23f' },
+	pieges: { word: 'CLAC-CLAC !', fill: '#e8dcb5' },
 	'projectiles-runes': { word: 'PIOU PIOU !', fill: '#e0b8ff' },
 	'rune-eclat': { word: 'KZZAM !', fill: '#d08cff' },
 	'rune-ricochet': { word: 'PING-PONG !', fill: '#e0b8ff' },
@@ -1077,6 +1077,7 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	berceuse: { word: 'ZZZ…', fill: '#cfe0ff' },
 	chant: { word: 'LA LA LAAA !', fill: '#b8f0c4' },
 	ronde: { word: 'TRA-LA-LA !', fill: '#ffe28a' },
+	melodie: { word: 'LA-LI-LA…', fill: '#a8ffb4' },
 };
 
 /**
@@ -1265,4 +1266,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'onde-de-choc', 'fleche-visee', 'cri-de-rage']);
+export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'onde-de-choc', 'pieges', 'cri-de-rage']);

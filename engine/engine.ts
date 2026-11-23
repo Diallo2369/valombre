@@ -511,7 +511,9 @@ export function foeScale(partySize: number) {
 const bandSize = (listed: number, partySize: number) => Math.min(listed, Math.max(2, Math.round((listed * partySize) / 6)));
 
 /** PV des créatures en plus des cœurs écrits (les héros frappent fort : deux haches, flèches à 3 PV…). */
-const SOLID = 1.4;
+const SOLID = 1.5;
+/** Force des coups des créatures, en plus de ce qui est écrit (les héros encaissent, se soignent et contrôlent beaucoup). */
+const HIT = 1.5;
 
 /** Le sort d'une créature, ses dégâts ajustés comme ses coups. */
 function spellOf(sp: FoeSpell | undefined, mul: number): { spell?: FoeSpell } {
@@ -538,13 +540,13 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 			hp,
 			maxHp: hp,
 			image: ('image' in f && f.image) || def.enemy.image,
-			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * dmgMul)),
+			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * dmgMul * HIT)),
 			move: ('move' in f && f.move) || def.enemy.move || 2,
 			range: ('range' in f && f.range) || def.enemy.range || 1,
 			...(('cleave' in f && f.cleave) || (!band && def.enemy.cleave) ? { cleave: true } : {}),
 			...(!band && def.enemy.attacks ? { attacks: def.enemy.attacks } : {}),
 			...((('stun' in f && f.stun) || (!band && def.enemy.stun)) ? { stun: ('stun' in f && f.stun) || def.enemy.stun } : {}),
-			...spellOf(('spell' in f && f.spell) || (!band ? def.enemy.spell : undefined), dmgMul),
+			...spellOf(('spell' in f && f.spell) || (!band ? def.enemy.spell : undefined), dmgMul * HIT),
 			...(afflict ? { afflict } : {}),
 		};
 	});
@@ -720,6 +722,16 @@ function beginEnemyTurn(game: Game, def: CombatDef, events: GameEvent[]): 'inten
 		events.push({ kind: 'foe-poison', foeId: foe.id, name: foe.name, amount, dead: foe.hp <= 0 });
 		log(game.state, 'combat', `Le poison ronge ${foe.name} : −1 PV${foe.hp <= 0 ? ', elle s’effondre !' : '.'}`);
 	}
+	// Plaie béante : l'hémorragie.
+	for (const foe of livingFoes(combat)) {
+		if (!foe.bleed) continue;
+		const amount = Math.min(1, foe.hp);
+		foe.hp -= amount;
+		foe.bleed -= 1;
+		if (!foe.bleed) delete foe.bleed;
+		events.push({ kind: 'foe-poison', foeId: foe.id, name: foe.name, amount, dead: foe.hp <= 0, bleed: true });
+		log(game.state, 'combat', `${capitalize(foe.name)} saigne : −1 PV${foe.hp <= 0 ? ', elle s’effondre !' : '.'}`);
+	}
 	if (!livingFoes(combat).length) return 'victory';
 	combat.intents = computeIntents(game, combat);
 	combat.reclaimed = [];
@@ -816,7 +828,7 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 				delete foe.stunKind;
 			}
 			events.push({ kind: 'foe-skip', foeId: foe.id, name: foe.name, reason });
-			const what = reason === 'filet' ? 'se débat dans le filet' : reason === 'sommeil' ? 'dort à poings fermés' : 'est encore sonnée';
+			const what = { filet: 'se débat dans le filet', sommeil: 'dort à poings fermés', piege: 'est coincée dans un piège', folie: 'tourne en rond, complètement folle', assomme: 'est encore sonnée' }[reason];
 			log(game.state, 'combat', `${capitalize(foe.name)} ${what} et passe son tour.`);
 			// Sonnée, prise au filet, endormie : le sort qu'elle préparait s'éteint.
 			if (foe.charging && foe.spell) {
@@ -1053,13 +1065,15 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 				continue;
 			}
 		}
-		// Mélodie apaisante (barde) : lui et ses compagnons proches reprennent 1 PV.
-		if (hasAbility(hero, 'melodie')) {
-			const near = activeHeroes(game.party).filter((c) => c.pv < c.pvMax && distance(combat.pos[id], combat.pos[c.id]) <= 2 && sameSide(combat, combat.pos[id], combat.pos[c.id]));
-			for (const c of near) c.pv += 1;
-			if (near.length) {
-				events.push({ kind: 'support', heroId: id, what: 'heal', targetIds: near.map((c) => c.id), amount: 1 });
-				log(game.state, 'combat', `Mélodie apaisante : ${near.map((c) => c.name).join(', ')} +1 PV.`);
+		// Mélodie apaisante (sort du barde) : il reprend des PV au début de son tour, quelques tours.
+		if (hs?.regen) {
+			const gain = Math.min(hs.regen.amount, hero.pvMax - hero.pv);
+			hero.pv += gain;
+			hs.regen.turns -= 1;
+			if (hs.regen.turns <= 0) delete hs.regen;
+			if (gain) {
+				events.push({ kind: 'support', heroId: id, what: 'heal', targetIds: [id], amount: gain, label: '🎵 Mélodie apaisante' });
+				log(game.state, 'combat', `Mélodie apaisante : ${hero.name} +${gain} PV.`);
 			}
 		}
 		combat.actor = idx;
@@ -1156,7 +1170,8 @@ export function repairGame(campaign: Campaign, game: Game): Game {
 	return work;
 }
 
-function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability, action: Extract<CombatAction, { kind: 'ability' }>, events: GameEvent[]) {
+/** `free` : l'Écho (le sort repart, sans dé ni délai). */
+function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability, action: Extract<CombatAction, { kind: 'ability' }>, events: GameEvent[], free = false) {
 	const combat = work.state.combat!;
 	const inRange = targetsFor(combat, work.party, hero, ab);
 	let foes: FoeState[] = [];
@@ -1196,8 +1211,25 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	const ally = ab.target === 'ally' ? inRange.allies.find((c) => c.id === action.targets?.[0]) : undefined;
 	if (ab.target === 'ally' && !ally) throw new Error('Compagnon hors de portée');
 
-	if (cooldownLeft(combat, hero, ab)) throw new Error('Compétence pas encore prête');
-	if (ab.every) {
+	// Une volée sur une case (Pièges en pagaille) : les créatures de la case et des 6 voisines.
+	if (at && ab.area) {
+		const zone = new Set([at, ...neighbors(at)].map(hexKey));
+		foes = livingFoes(combat).filter((f) => zone.has(hexKey(combat.pos[f.id])) && sameSide(combat, combat.pos[hero.id], combat.pos[f.id]));
+	}
+	// Boule de neige (mage) : le sort rebondit sur une créature proche, et encore, tant que la chance tient.
+	if (hasAbility(hero, 'boule-de-neige') && ab.spell && ab.damage && foes.length) {
+		while (Math.random() < 0.15) {
+			const last = foes[foes.length - 1];
+			const next = livingFoes(combat)
+				.filter((o) => !foes.includes(o) && sameSide(combat, combat.pos[hero.id], combat.pos[o.id]) && distance(combat.pos[o.id], combat.pos[last.id]) <= 2)
+				.sort((a, b) => distance(combat.pos[a.id], combat.pos[last.id]) - distance(combat.pos[b.id], combat.pos[last.id]))[0];
+			if (!next) break;
+			foes.push(next);
+			events.push({ kind: 'proc', heroId: hero.id, name: 'Boule de neige', icon: '❄️', foeId: next.id });
+		}
+	}
+	if (!free && cooldownLeft(combat, hero, ab)) throw new Error('Compétence pas encore prête');
+	if (ab.every && !free) {
 		combat.ready = { ...combat.ready, [hero.id]: { ...combat.ready?.[hero.id], [ab.id]: combat.round + ab.every } };
 		events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
 	}
@@ -1210,7 +1242,9 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 			events.push({ kind: 'hero-move', heroId: hero.id, from, to });
 		}
 	}
-	const success = !ab.stat || Boolean(action.roll?.success);
+	// Une créature prise au filet est touchée à coup sûr ; l'Écho ne rate jamais.
+	const netted = foes.length > 0 && foes.every((f) => f.stunned && f.stunKind === 'filet');
+	const success = free || !ab.stat || Boolean(action.roll?.success) || netted;
 	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && Boolean(ab.crit), ...(at ? { at } : {}) });
 	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
 	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
@@ -1231,7 +1265,8 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		for (const foe of foes) {
 			let main = ab.damage;
 			if (ab.brumeBonus && def.enemy.brume) main *= 2;
-			const crit = Boolean(ab.crit);
+			// Œil de lynx : une flèche sur 5 est un coup critique.
+			const crit = Boolean(ab.crit) || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
 			// Critique : dégâts doublés (les deux mains). Folie vengeresse : +50 % (arrondi au-dessus), sans être un critique.
 			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
@@ -1281,6 +1316,17 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 				foe.silenced = Math.max(foe.silenced ?? 0, 2);
 				events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'muet' });
 			}
+		}
+		// Plaie béante : une flèche sur 4 fait saigner.
+		if (ab.arrow && ab.damage && hasAbility(hero, 'plaie-beante') && Math.random() < 0.25) {
+			foe.bleed = Math.max(foe.bleed ?? 0, 2);
+			events.push({ kind: 'proc', heroId: hero.id, name: 'Hémorragie', icon: '🩸', foeId: foe.id });
+		}
+		// Folie (mage) : la créature touchée perd la tête (1 tour seulement pour un gros monstre seul).
+		if (ab.spell && ab.damage && hasAbility(hero, 'folie-mage') && Math.random() < 0.15) {
+			foe.stunned = Math.max(foe.stunned ?? 0, combat.foes.length === 1 ? 1 : 2);
+			foe.stunKind = 'folie';
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'folie' });
 		}
 		if (ab.stun) {
 			foe.stunned = Math.max(foe.stunned ?? 0, ab.stun.turns);
@@ -1359,6 +1405,29 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
 		events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: ab.heal });
 		log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +${ab.heal} PV pour tout le groupe.`);
+	}
+	if (ab.regen) {
+		const team = activeHeroes(work.party).filter((c) => sameSide(combat, combat.pos[hero.id], combat.pos[c.id]));
+		for (const c of team) heroState(combat, c.id).regen = { ...ab.regen };
+		events.push({ kind: 'support', heroId: hero.id, what: 'regen', targetIds: team.map((c) => c.id), label: '🎵 Mélodie apaisante' });
+		log(work.state, 'combat', `${hero.name} joue la Mélodie apaisante : ${ab.regen.amount} PV au début de chaque tour, pendant ${ab.regen.turns} tours.`);
+	}
+	// Les passifs du barde, à chaque sort (pas sur l'Écho : une seule fois).
+	if (ab.spell && !free) {
+		const team = activeHeroes(work.party).filter((c) => sameSide(combat, combat.pos[hero.id], combat.pos[c.id]));
+		if (hasAbility(hero, 'coeur-vaillant') && Math.random() < 0.25) {
+			const healed = team.filter((c) => c.pv < c.pvMax);
+			for (const c of healed) c.pv = Math.min(c.pvMax, c.pv + 2);
+			events.push({ kind: 'support', heroId: hero.id, what: 'heal', targetIds: team.map((c) => c.id), amount: 2, label: '💛 Cœur vaillant' });
+			log(work.state, 'combat', `Cœur vaillant : la musique de ${hero.name} redonne courage à tout le groupe (+2 PV).`);
+		}
+		if (hasAbility(hero, 'note-purete') && Math.random() < 0.15 && team.length) {
+			const weak = [...team].sort((a, b) => a.pv / a.pvMax - b.pv / b.pvMax)[0];
+			const hs = heroState(combat, weak.id);
+			hs.shield = (hs.shield ?? 0) + 2;
+			events.push({ kind: 'support', heroId: hero.id, what: 'shield', targetIds: [weak.id], amount: 2, label: '🤍 Note de pureté' });
+			log(work.state, 'combat', `Note de pureté : un petit bouclier (2) entoure ${weak.name}.`);
+		}
 	}
 	if (ab.cleanse) {
 		const healed = work.party.filter((c) => combat.heroes[c.id]?.afflict && sameSide(combat, combat.pos[hero.id], combat.pos[c.id]));
@@ -1480,6 +1549,18 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		const ab = ABILITIES[action.ability];
 		if (!ab || !availableAbilities(combat, hero).some((a) => a.id === ab.id)) throw new Error('Action impossible');
 		resolveAbility(work, def, hero, ab, action, events);
+		// Écho (mage, barde) : 1 chance sur 4 que le sort reparte, gratuitement, sur les mêmes cibles.
+		if (ab.spell && hasAbility(hero, 'echo') && hero.pv > 0 && livingFoes(combat).length && Math.random() < 0.25) {
+			const mark = events.length;
+			events.push({ kind: 'proc', heroId: hero.id, name: 'Écho', icon: '🔁' });
+			try {
+				resolveAbility(work, def, hero, ab, { ...action, roll: null }, events, true);
+				log(work.state, 'combat', `Écho : le sort de ${hero.name} repart !`);
+			} catch {
+				// Plus de cible (elle est tombée) : l'écho s'éteint.
+				events.splice(mark);
+			}
+		}
 		return afterHero();
 	}
 	throw new Error('Action inconnue');

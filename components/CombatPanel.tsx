@@ -105,8 +105,8 @@ function need(stat: number, target: number) {
 	return `il faut ${min} ou plus`;
 }
 
-const STUN_ICON = { assomme: '💫', filet: '🕸️', sommeil: '😴' } as const;
-const STUN_TEXT = { assomme: 'est encore sonnée', filet: 'se débat dans le filet', sommeil: 'dort à poings fermés' } as const;
+const STUN_ICON = { assomme: '💫', filet: '🕸️', sommeil: '😴', piege: '🪤', folie: '🌀' } as const;
+const STUN_TEXT = { assomme: 'est encore sonnée', filet: 'se débat dans le filet', sommeil: 'dort à poings fermés', piege: 'est coincée dans un piège', folie: 'tourne en rond, complètement folle' } as const;
 
 /**
  * Barre de vie façon jeu de tactique : un cadre noir gradué, une jauge pleine (verte pour les héros,
@@ -293,7 +293,7 @@ export function CombatPanel(props: Props) {
 				beats.push({ kind: 'banner', title: turnOf(e.name), subtitle: e.attack ?? 'Attention…', voice: e.attack, tone: 'foe', ms: 2200 });
 			} else if (e.kind === 'foe-poison') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + 1;
-				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −1 PV${e.dead ? ', elle s’effondre !' : '.'}` });
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `${e.bleed ? `🩸 ${cap(e.name)} saigne` : `🧪 Le poison ronge ${e.name}`} : −1 PV${e.dead ? ', elle s’effondre !' : '.'}` });
 			} else if (e.kind === 'foe-skip') {
 				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1900, text: `${STUN_ICON[e.reason]} ${cap(e.name)} ${STUN_TEXT[e.reason]} et passe son tour.` });
 			} else if (e.kind === 'foe-move') {
@@ -327,7 +327,11 @@ export function CombatPanel(props: Props) {
 			} else if (e.kind === 'wake') {
 				beats.push({ kind: 'say', tone: 'hero', ms: 1800, text: `💤 ${nameOf(e.heroId)}, qui était KO, se relève avec 1 PV.` });
 			} else if (e.kind === 'support' && e.targetIds) {
-				beats.push({ kind: 'say', tone: 'hero', ms: 1800, text: `🎵 Mélodie apaisante : ${e.targetIds.map(nameOf).join(', ')} +${e.amount ?? 1} PV.` });
+				const who = e.targetIds.length > 2 ? 'tout le groupe' : e.targetIds.map(nameOf).join(', ');
+				const what = e.what === 'regen' ? 'reprendra 1 PV à chaque tour' : e.what === 'shield' ? `reçoit un bouclier de ${e.amount ?? 2}` : `+${e.amount ?? 1} PV`;
+				beats.push({ kind: 'say', tone: 'hero', ms: 1900, text: `${e.label ?? '✨'} : ${who} ${what}.` });
+			} else if (e.kind === 'proc') {
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1300, text: `${e.icon} ${e.name.toUpperCase()} !` });
 			} else if (e.kind === 'combat-end') {
 				const end = {
 					victory: { title: 'Victoire !', subtitle: `${cap(e.name)} ${/^les\s/i.test(e.name) ? 'sont vaincus' : 'est vaincu'} !`, tone: 'win' as const },

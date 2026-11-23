@@ -419,13 +419,15 @@ export interface FoeState {
 	stunKind?: StunKind;
 	/** Tours de poison restants (1 PV perdu à chacun de ses tours). */
 	poison?: number;
+	/** Hémorragie (Plaie béante) : tours restants (1 PV perdu à chacun de ses tours). */
+	bleed?: number;
 	/** Tours d'aveuglement restants (elle rate un coup sur deux). */
 	blind?: number;
 	/** Héros qui l'a provoquée (Moquerie) : sa prochaine attaque est pour lui. */
 	taunt?: string;
 }
 
-export type StunKind = 'assomme' | 'filet' | 'sommeil';
+export type StunKind = 'assomme' | 'filet' | 'sommeil' | 'piege' | 'folie';
 
 /** Ce qui arrive à un héros pendant le combat. */
 export interface HeroCombatState {
@@ -437,6 +439,8 @@ export interface HeroCombatState {
 	fury?: boolean;
 	/** Assommé par un gros coup : il passe son prochain tour. */
 	stunned?: boolean;
+	/** Mélodie apaisante : PV repris au début de ses prochains tours. */
+	regen?: { amount: number; turns: number };
 	/** Cri de rage : jusqu'à son prochain tour, il pare les coups (cette chance, 0-1). */
 	guarding?: number;
 	/** Le guerrier qui le protège (Intervention) jusqu'à son prochain tour. */
@@ -583,7 +587,7 @@ export type GameEvent =
 	/** Une créature passe son tour (sonnée, au filet, endormie). */
 	| { kind: 'foe-skip'; foeId: string; name: string; reason: StunKind }
 	/** Le poison ronge une créature. */
-	| { kind: 'foe-poison'; foeId: string; name: string; amount: number; dead: boolean }
+	| { kind: 'foe-poison'; foeId: string; name: string; amount: number; dead: boolean; bleed?: boolean }
 	/** Un état posé sur une créature par un héros (ou raté). */
 	| { kind: 'foe-status'; foeId: string; heroId: string; what: StunKind | 'poison' | 'aveugle' | 'provoque' | 'muet'; failed?: boolean }
 	/** Un mal ronge un héros au début de son tour. */
@@ -599,7 +603,10 @@ export type GameEvent =
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
-	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier' | 'rally'; targetId?: string; targetIds?: string[]; amount?: number }
+	/** `targetIds` + `label` : un effet de passif sur plusieurs héros (Cœur vaillant, Mélodie…), raconté à part. */
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier' | 'rally' | 'regen'; targetId?: string; targetIds?: string[]; amount?: number; label?: string }
+	/** Un passif se déclenche (bulle de BD) : Écho, Boule de neige, Folie… */
+	| { kind: 'proc'; heroId: string; name: string; icon: string; foeId?: string }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

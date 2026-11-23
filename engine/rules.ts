@@ -57,24 +57,31 @@ export type AbilityId =
 	| 'coeur-battant'
 	// Rôdeur
 	| 'tir'
-	| 'fleche-visee'
 	| 'salve'
 	| 'filet'
 	| 'fleche-empoisonnee'
+	| 'pieges'
 	| 'pointes-trempees'
+	| 'plaie-beante'
+	| 'oeil-de-lynx'
 	// Mage : la magie des runes
 	| 'projectiles-runes'
 	| 'rune-eclat'
 	| 'rune-ricochet'
 	| 'orbe-runique'
 	| 'deflagration'
+	| 'echo'
+	| 'boule-de-neige'
+	| 'folie-mage'
 	// Barde
 	| 'bouclier-lune'
 	| 'berceuse'
 	| 'air-guerison'
 	| 'chant'
 	| 'ronde'
-	| 'melodie';
+	| 'melodie'
+	| 'coeur-vaillant'
+	| 'note-purete';
 
 /** Qui l'action vise : une créature, plusieurs, toutes ; un compagnon ; le groupe ; personne ; une case (Ronde enchantée). */
 export type AbilityTarget = 'foe' | 'foes' | 'all' | 'ally' | 'party' | 'none' | 'hex';
@@ -113,6 +120,8 @@ export interface Ability {
 	offhand?: number;
 	/** PV que le héros récupère si ça touche (Fureur de l'ours). */
 	lifesteal?: number;
+	/** Mélodie apaisante : chaque héros du groupe reprend `amount` PV au début de ses `turns` prochains tours. */
+	regen?: { amount: number; turns: number };
 	/** Bondit jusqu'à la cible (sur une case libre collée à elle) avant de frapper (Bond sauvage). */
 	leap?: boolean;
 	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
@@ -134,7 +143,7 @@ export interface Ability {
 	/** Dégâts doublés contre une créature de brume. */
 	brumeBonus?: boolean;
 	/** États posés sur la créature touchée. */
-	stun?: { kind: 'assomme' | 'filet' | 'sommeil'; turns: number };
+	stun?: { kind: 'assomme' | 'filet' | 'sommeil' | 'piege'; turns: number };
 	poison?: number;
 	blind?: number;
 	taunt?: boolean;
@@ -321,19 +330,6 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 
 	/* ---- Rôdeur : à distance ---- */
 	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 3, arrow: true, text: 'Une flèche bien ajustée, de loin : 3 PV.' }),
-	'fleche-visee': A({
-		id: 'fleche-visee', range: 5,
-		name: 'Flèche visée',
-		icon: '🎯',
-		target: 'foe',
-		stat: 'agilite',
-		harder: 2,
-		damage: 3,
-		crit: true,
-		silence: 2,
-		arrow: true,
-		text: 'Prendre le temps de viser la gorge : plus dur à réussir (+2), mais coup critique (6 PV), et la créature, bâillonnée, ne peut plus lancer de sort pendant 2 tours.',
-	}),
 	salve: A({
 		id: 'salve', range: 5,
 		name: 'Salve',
@@ -346,6 +342,18 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 3 PV.',
 	}),
+	pieges: A({
+		id: 'pieges', range: 4,
+		name: 'Pièges en pagaille',
+		icon: '🪤',
+		target: 'hex',
+		area: true,
+		stat: 'agilite',
+		damage: 3,
+		stun: { kind: 'piege', turns: 1 },
+		every: 3,
+		text: 'Tu lances une volée de pièges à mâchoires sur une case et les 6 cases voisines : chaque créature dedans perd 3 PV et reste coincée, elle passe son prochain tour.',
+	}),
 	filet: A({
 		id: 'filet', range: 4,
 		name: 'Filet',
@@ -354,7 +362,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		stun: { kind: 'filet', turns: 2 },
 		every: 3,
-		text: 'Un filet lancé de loin : la créature, empêtrée, passe ses 2 prochains tours.',
+		text: 'Un filet lancé de loin : la créature, empêtrée, passe ses 2 prochains tours. Tant qu’elle est prise, tout le monde la touche à coup sûr !',
 	}),
 	'fleche-empoisonnee': A({
 		id: 'fleche-empoisonnee', range: 5,
@@ -367,6 +375,22 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		arrow: true,
 		every: 3,
 		text: '3 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
+	}),
+	'plaie-beante': A({
+		id: 'plaie-beante',
+		name: 'Plaie béante',
+		icon: '🩸',
+		passive: true,
+		target: 'none',
+		text: 'Tes flèches ouvrent de vilaines plaies : chaque flèche qui touche a 1 chance sur 4 de faire saigner la créature (1 PV à chacun de ses 2 prochains tours), en plus du poison.',
+	}),
+	'oeil-de-lynx': A({
+		id: 'oeil-de-lynx',
+		name: 'Œil de lynx',
+		icon: '🐈',
+		passive: true,
+		target: 'none',
+		text: 'Tu vises le point faible sans même y penser : chaque flèche qui touche a 1 chance sur 5 d’être un coup critique (dégâts doublés).',
 	}),
 	'pointes-trempees': A({
 		id: 'pointes-trempees',
@@ -435,6 +459,31 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		text: 'Un cercle de runes explose autour de toi : toutes les créatures collées à toi perdent 2 PV et sont repoussées d’une case.',
 	}),
 
+	echo: A({
+		id: 'echo',
+		name: 'Écho',
+		icon: '🔁',
+		passive: true,
+		target: 'none',
+		text: 'Ta magie résonne : chaque sort a 1 chance sur 4 de repartir une seconde fois, gratuitement (sans dé, sur les mêmes cibles).',
+	}),
+	'boule-de-neige': A({
+		id: 'boule-de-neige',
+		name: 'Boule de neige',
+		icon: '❄️',
+		passive: true,
+		target: 'none',
+		text: 'Tes sorts d’attaque grossissent en roulant : 15 % de chance de rebondir sur une autre créature proche (2 cases), et de rebondir encore, avec la même chance.',
+	}),
+	'folie-mage': A({
+		id: 'folie-mage',
+		name: 'Folie',
+		icon: '🌀',
+		passive: true,
+		target: 'none',
+		text: 'Tes runes embrouillent les esprits : chaque créature touchée par un sort a 15 % de chance de devenir folle et de passer ses 2 prochains tours (1 seul pour un gros monstre seul).',
+	}),
+
 	/* ---- Barde : magie et contrôle ---- */
 	'bouclier-lune': A({
 		id: 'bouclier-lune', range: 4,
@@ -485,9 +534,27 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		id: 'melodie',
 		name: 'Mélodie apaisante',
 		icon: '🎵',
+		target: 'party',
+		regen: { amount: 1, turns: 3 },
+		spell: true,
+		every: 3,
+		text: 'Une mélodie douce qui ne s’arrête plus : pendant 3 tours, chaque compagnon (et toi) reprend 1 PV au début de son tour.',
+	}),
+	'coeur-vaillant': A({
+		id: 'coeur-vaillant',
+		name: 'Cœur vaillant',
+		icon: '💛',
 		passive: true,
 		target: 'none',
-		text: 'Ta musique ne s’arrête jamais vraiment : au début de chacun de tes tours, toi et tes compagnons à 2 cases ou moins reprenez 1 PV.',
+		text: 'Ta musique met du baume au cœur : chaque fois que tu joues un sort, 1 chance sur 4 que tout le groupe reprenne courage (+2 PV pour chacun).',
+	}),
+	'note-purete': A({
+		id: 'note-purete',
+		name: 'Note de pureté',
+		icon: '🤍',
+		passive: true,
+		target: 'none',
+		text: 'Une note si pure qu’elle protège : chaque fois que tu joues un sort, 15 % de chance de poser un petit bouclier (2) sur le compagnon le plus blessé.',
 	}),
 	ronde: A({
 		id: 'ronde', range: 4,
@@ -570,7 +637,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 1,
 		armor: 1,
 		move: 3,
-		abilities: ['tir', 'fleche-visee', 'salve', 'filet', 'fleche-empoisonnee', 'pointes-trempees'],
+		abilities: ['tir', 'salve', 'filet', 'fleche-empoisonnee', 'pieges', 'pointes-trempees', 'plaie-beante', 'oeil-de-lynx'],
 		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
 		kit: ['Arc et flèches', 'Cape de laine', 'Silex'],
 	},
@@ -584,7 +651,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 0,
 		armor: 0,
 		move: 2,
-		abilities: ['projectiles-runes', 'rune-eclat', 'rune-ricochet', 'orbe-runique', 'deflagration'],
+		abilities: ['projectiles-runes', 'rune-eclat', 'rune-ricochet', 'orbe-runique', 'deflagration', 'echo', 'boule-de-neige', 'folie-mage'],
 		power: { name: 'La magie des runes', text: 'Projectiles runiques à volonté ; Rune d’éclat, Rune ricochet et Orbe runique un tour sur trois, Déflagration runique un tour sur deux.' },
 		kit: ['Bâton noueux', 'Grimoire de runes', 'Craie violette'],
 	},
@@ -598,7 +665,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 0,
 		armor: 0,
 		move: 3,
-		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'ronde', 'melodie'],
+		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'ronde', 'melodie', 'echo', 'coeur-vaillant', 'note-purete'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
 	},
