@@ -493,6 +493,8 @@ export function CombatPanel(props: Props) {
 			dragStart.current = null;
 			setDrag(null);
 		},
+		// Le portrait est une image : sans ça, le navigateur lance son propre glisser d'image, qui annule le nôtre.
+		onDragStart: (e: React.DragEvent<HTMLButtonElement>) => e.preventDefault(),
 	};
 	const intents = phase === 'intent' && !busy ? combat.intents : [];
 	const posOf = (id: string) => posFrom[id] ?? combat.pos[id];

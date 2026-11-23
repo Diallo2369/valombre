@@ -1559,6 +1559,14 @@
 	&.is-draggable {
 		cursor: grab;
 		touch-action: none;
+		user-select: none;
+
+		/* Pas de glisser d'image natif (il volerait le glisser du jeton). */
+		img {
+			-webkit-user-drag: none;
+			user-select: none;
+			pointer-events: none;
+		}
 	}
 
 	/* Pendant qu'on le glisse : il suit le pointeur, soulevé et un peu transparent. */
