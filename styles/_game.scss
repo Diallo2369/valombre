@@ -426,6 +426,15 @@
 	100% { opacity: 1; scale: 1; }
 }
 
+/* Un jeton qu'on pose : il tombe un peu, s'écrase, rebondit. */
+@keyframes land-bounce {
+	0% { scale: 1.18; translate: 0 -14px; }
+	30% { scale: 1.22 0.8; translate: 0 2px; }
+	52% { scale: 0.92 1.1; translate: 0 -6px; }
+	72% { scale: 1.04 0.97; translate: 0 0; }
+	100% { scale: 1; translate: 0 0; }
+}
+
 /* L'élan avant un coup : le jeton grossit et se ramasse, puis se détend d'un coup quand le coup part. */
 @keyframes windup {
 	0% { scale: 1; translate: 0 0; }
@@ -1393,6 +1402,13 @@
 	}
 
 	/* Une case où l'on peut aller : elle s'allume. */
+	/* La case survolée pendant qu'on glisse un héros. */
+	&.is-move.is-drop {
+		fill: rgb(127 179 138 / 55%);
+		stroke: #c8ffd4;
+		stroke-width: 4;
+	}
+
 	&.is-move {
 		fill: rgb(127 179 138 / 22%);
 		stroke: rgb(127 179 138 / 80%);
@@ -1442,6 +1458,35 @@
 
 	&:disabled {
 		cursor: default;
+	}
+
+	/* Le héros qui joue peut être glissé jusqu'à une case lumineuse. */
+	&.is-draggable {
+		cursor: grab;
+		touch-action: none;
+	}
+
+	/* Pendant qu'on le glisse : il suit le pointeur, soulevé et un peu transparent. */
+	&.is-dragging {
+		z-index: 20;
+		translate: calc(-50% + var(--dx, 0px)) calc(-50% + var(--dy, 0px));
+		opacity: 0.6;
+		cursor: grabbing;
+		transition: opacity 0.15s ease;
+
+		.token__img {
+			scale: 1.12;
+			box-shadow: 0 18px 30px rgb(0 0 0 / 55%), 0 0 0 3px rgb(246 194 127 / 60%);
+		}
+	}
+
+	/* Posé : il saute sur sa case et rebondit. */
+	&.is-landing {
+		transition: none;
+
+		.token__img {
+			animation: land-bounce 0.6s cubic-bezier(0.3, 0.7, 0.4, 1);
+		}
 	}
 
 	&__img {
@@ -2005,6 +2050,7 @@
 	.token.is-hurt .token__img,
 	.token.is-acting .token__img,
 	.token.is-casting .token__img,
+	.token.is-landing .token__img,
 	.intent-panel {
 		animation: none;
 	}

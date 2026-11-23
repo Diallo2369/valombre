@@ -186,6 +186,11 @@ export function CombatPanel(props: Props) {
 	const [hurtId, setHurtId] = useState<string | null>(null);
 	/** Le héros qui prend son élan (il grossit avant de frapper, façon jeu de tactique). */
 	const [castId, setCastId] = useState<string | null>(null);
+	/** Glisser-déposer du héros qui joue : décalage depuis sa case, et case survolée. */
+	const [drag, setDrag] = useState<{ dx: number; dy: number; over: string | null } | null>(null);
+	const dragStart = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+	/** Le jeton qui vient d'être posé (il rebondit). */
+	const [landId, setLandId] = useState<string | null>(null);
 	/** Dernière valeur de chaque barre de vie (voir HealthBar). */
 	const hpMemo = useRef<Record<string, number>>({});
 	const intentRef = useRef<HTMLElement>(null);
@@ -418,6 +423,48 @@ export function CombatPanel(props: Props) {
 	const targets = ability ? targetsFor(combat, party, actor, ability) : { foes: [], allies: [] };
 	const moves = useMemo(() => (busy || selected || phase !== 'hero' ? [] : moveOptions(combat, actor)), [busy, selected, phase, combat, actor]);
 	const moveSet = new Set(moves.map(hexKey));
+	/** Aller sur une case : le jeton s'y pose en rebondissant. */
+	const moveTo = (h: Hex) => {
+		setLandId(actor.id);
+		// Pas dans `timers` : le déplacement relance la séquence, qui vide cette liste.
+		window.setTimeout(() => setLandId(null), 650);
+		props.onMove(h);
+	};
+	/** La case de déplacement sous le pointeur, s'il y en a une. */
+	const hexUnder = (x: number, y: number) => {
+		const el = document.elementsFromPoint(x, y).find((n) => n instanceof SVGElement && n.dataset.hex && n.classList.contains('is-move'));
+		return el instanceof SVGElement ? (el.dataset.hex ?? null) : null;
+	};
+	const canDrag = moves.length > 0 && !ability;
+	const dragHandlers = {
+		onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+			if (!canDrag || e.button !== 0) return;
+			dragStart.current = { x: e.clientX, y: e.clientY, moved: false };
+			e.currentTarget.setPointerCapture(e.pointerId);
+		},
+		onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => {
+			const st = dragStart.current;
+			if (!st) return;
+			const dx = e.clientX - st.x;
+			const dy = e.clientY - st.y;
+			if (!st.moved && Math.hypot(dx, dy) < 6) return;
+			st.moved = true;
+			setDrag({ dx, dy, over: hexUnder(e.clientX, e.clientY) });
+		},
+		onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+			const st = dragStart.current;
+			dragStart.current = null;
+			if (!st?.moved) return;
+			const key = hexUnder(e.clientX, e.clientY);
+			const to = key ? moves.find((h) => hexKey(h) === key) : undefined;
+			setDrag(null);
+			if (to) moveTo(to);
+		},
+		onPointerCancel: () => {
+			dragStart.current = null;
+			setDrag(null);
+		},
+	};
 	const rangeSet = useMemo(() => {
 		const set = new Set<string>();
 		if (!ability?.range) return set;
@@ -727,9 +774,10 @@ export function CombatPanel(props: Props) {
 										<polygon
 											key={k}
 											points={hexPoints(h)}
-											className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
-											onClick={canMove ? () => props.onMove(h) : undefined}
-											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}${drag?.over === k ? ' is-drop' : ''}`}
+											data-hex={k}
+											onClick={canMove ? () => moveTo(h) : undefined}
+											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h) : undefined}
 											tabIndex={canMove ? 0 : undefined}
 											role={canMove ? 'button' : undefined}
 											aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
@@ -811,8 +859,9 @@ export function CombatPanel(props: Props) {
 								<button
 									key={`${c.id}-${landed && ((support?.what === 'heal' && !support.targetId) || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
-									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
-									style={place(combat.pos[c.id])}
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+									style={c.id === actor.id && drag ? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties) : place(combat.pos[c.id])}
+									{...(c.id === actor.id ? dragHandlers : {})}
 									disabled={ability ? !targetable : false}
 									aria-pressed={!ability ? shown.id === c.id : undefined}
 									onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
