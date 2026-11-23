@@ -3,7 +3,7 @@
 /*
  * L'arrivée sur l'accueil, une seule courbe et un enchaînement régulier (secondes, après l'écran d'entrée) :
  * 0 → 2,2 l'image se défloute · 0,5 l'en-tête · 0,6 → 2 le titre · 0,9 le sur-titre · 1,4 le trait d'or
- * · 1,6 le texte · 1,85 les boutons · 2,2 → 2,5 les encarts du bas · 2,4 puis toutes les 6 s le reflet du titre.
+ * · 1,6 le texte · 1,85 les boutons · 2 → 3,4 le reflet sur le titre (une fois) · 2,2 → 2,5 les encarts du bas.
  */
 $home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 
@@ -23,7 +23,7 @@ $home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 
 /*
  * Le titre façon cinématique de jeu : or métallique ; il arrive grand, flou et espacé, se resserre avec un éclat,
- * puis un reflet de lumière le traverse de temps en temps. Un trait d'or s'ouvre dessous.
+ * puis un reflet de lumière le traverse une fois. Un trait d'or s'ouvre dessous.
  */
 .legend-title {
 	display: grid;
@@ -58,7 +58,7 @@ $home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 			background-position: 160% 0;
 			background-clip: text;
 			-webkit-background-clip: text;
-			animation: legend-shine 6s ease-in-out 2.4s infinite;
+			animation: legend-shine 1.4s ease-in-out 2s both;
 		}
 	}
 
@@ -105,12 +105,10 @@ $home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 }
 
 @keyframes legend-shine {
-	0%,
-	55% {
+	from {
 		background-position: 160% 0;
 	}
-	85%,
-	100% {
+	to {
 		background-position: -60% 0;
 	}
 }
