@@ -149,7 +149,10 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	};
 
 	useEffect(() => {
-		if (blocked && !inGame) gate.current?.querySelector<HTMLElement>('button')?.focus();
+		const gated = blocked && !inGame;
+		if (gated) gate.current?.querySelector<HTMLElement>('button')?.focus();
+		// Tant que l'écran d'entrée est là, les animations de la page attendent (le titre s'écrira une fois entré).
+		document.documentElement.classList.toggle('is-gated', gated);
 	}, [blocked, inGame]);
 
 	const enter = (withSound: boolean) => {
@@ -180,13 +183,11 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 			{blocked ? (
 				<div className="intro-gate" role="dialog" aria-modal="true" aria-labelledby="intro-gate-title" ref={gate} onKeyDown={trapFocus}>
 					<div className="intro-gate__card">
-						<p className="intro-gate__eyebrow">Jeu de rôle familial</p>
-						<h2 id="intro-gate-title" className="intro-gate__title">
+						<h2 id="intro-gate-title" className="visually-hidden">
 							Valombre
 						</h2>
-						<p>Une vallée noyée de brume vous attend. Montez le son !</p>
-						<button type="button" className="btn" onClick={() => enter(true)}>
-							🔊 Entrer dans Valombre
+						<button type="button" className="intro-gate__enter" onClick={() => enter(true)}>
+							Entrer dans Valombre
 						</button>
 						<button type="button" className="intro-gate__quiet" onClick={() => enter(false)}>
 							Entrer sans le son
