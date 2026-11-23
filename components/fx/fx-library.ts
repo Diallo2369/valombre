@@ -787,6 +787,22 @@ const ABILITY_FX: Record<string, Fx> = {
 	},
 
 	/* Mage */
+	'chaine-eclairs': (e, c) => {
+		// Un éclair bleu-blanc qui saute de créature en créature : du mage à la première, puis de l'une à l'autre.
+		if (!c.success) {
+			const to = beside(c.from, c.foes[0]);
+			zap(e, c.from, to, '#9cd8ff', 0, 380, 10);
+			puff(e, to, 120);
+			return 120;
+		}
+		const chain = [c.from, ...c.foes];
+		for (let i = 1; i < chain.length; i += 1) {
+			const d = (i - 1) * 160;
+			zap(e, chain[i - 1], chain[i], '#9cd8ff', d, 420, 11 - i * 1.5);
+			impact(e, chain[i], ['#ffffff', '#9cd8ff', '#5aa8ff'], 1.1 - i * 0.1, d + 110);
+		}
+		return 110;
+	},
 	'trait-lumiere': (e, c) => {
 		// L'éclair jaune, du bâton jusqu'à la cible.
 		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
@@ -849,13 +865,15 @@ const ABILITY_FX: Record<string, Fx> = {
 	},
 
 	/* Barde */
-	'note-percante': (e, c) => {
-		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
-		const t = projectile(e, c.from, to, { color: '#d9a8ff', head: 'glyph', glyph: '♫', speed: 800, size: 8, wobble: 14 });
-		if (c.success) {
-			impact(e, to, ['#f3e0ff', '#c58cff'], 1, t);
-			for (let i = 0; i < 3; i += 1) e.add({ x: to.x, y: to.y, life: 500, delay: t + i * 90, size: 14, sizeEnd: 70, color: '#c58cff', shape: 'ring', neon: true });
-		} else puff(e, to, t);
+	'air-guerison': (e, c) => {
+		// Des notes vertes volent jusqu'au compagnon, puis une colonne de lumière et des « + » qui montent.
+		const to = c.allies[0] ?? c.from;
+		const t = to === c.from ? 0 : projectile(e, c.from, to, { color: '#8fffa0', head: 'glyph', glyph: '♫', speed: 650, size: 8, wobble: 12, arc: 24 });
+		e.add({ x: to.x, y: to.y, life: 600, delay: t, size: 40, sizeEnd: 80, color: '#8fffa0', alpha: 0.8 });
+		for (let i = 0; i < 2; i += 1) e.add({ x: to.x, y: to.y, life: 600, delay: t + i * 120, size: 14, sizeEnd: 75, color: '#8fffa0', shape: 'ring', neon: true });
+		e.burst(to, 12, { speed: 60, life: 1000, delay: t, size: 4, color: ['#c8ffd0', '#8fffa0'], ay: -220, neon: true });
+		for (let i = 0; i < 4; i += 1) e.add({ x: to.x + (Math.random() - 0.5) * 50, y: to.y + (Math.random() - 0.5) * 30, life: 600, delay: t + 100 + i * 90, size: 14, sizeEnd: 2, rot: Math.random(), vr: 2, color: '#8fffa0', shape: 'twinkle' });
+		rising(e, to, ['+'], '#8fffa0', 5, t + 80, 24);
 		return t;
 	},
 	berceuse: (e, c) => {
@@ -891,7 +909,6 @@ const LINK: Record<string, string> = {
 	etincelle: '#ff9a3c',
 	'pluie-etoiles': '#fff1a8',
 	lueur: '#ffffff',
-	'note-percante': '#d78cff',
 	berceuse: '#9cc8ff',
 };
 
@@ -914,7 +931,8 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	'pluie-etoiles': { word: 'BLING !', fill: '#fff1a8' },
 	'bouclier-lune': { word: 'BLOING !', fill: '#bcd6ff' },
 	lueur: { word: 'FLASH !', fill: '#ffffff' },
-	'note-percante': { word: 'DIIING !', fill: '#e2b8ff' },
+	'air-guerison': { word: 'AAAH !', fill: '#a8ffb4' },
+	'chaine-eclairs': { word: 'KRAKOOM !', fill: '#9cd8ff' },
 	berceuse: { word: 'ZZZ…', fill: '#cfe0ff' },
 	chant: { word: 'LA LA LAAA !', fill: '#b8f0c4' },
 	delivrance: { word: 'POUF !', fill: '#ffe28a' },
@@ -1050,4 +1068,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['tourbillon', 'coup-assommant', 'etincelle', 'pluie-etoiles', 'fleche-visee', 'taillade']);
+export const BIG_FX = new Set(['chaine-eclairs', 'tourbillon', 'coup-assommant', 'etincelle', 'pluie-etoiles', 'fleche-visee', 'taillade']);

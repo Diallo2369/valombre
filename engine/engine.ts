@@ -850,6 +850,18 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		if (!f) throw new Error('Cible hors de portée');
 		foes = [f];
 		if (ab.area) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1));
+		const chain = ab.chain;
+		if (chain) {
+			// L'éclair rebondit chaque fois sur la créature la plus proche de la précédente (dans l'ordre : c'est celui de l'effet).
+			for (let i = 0; i < chain.jumps; i += 1) {
+				const last = foes[foes.length - 1];
+				const next = livingFoes(combat)
+					.filter((o) => !foes.includes(o) && distance(combat.pos[o.id], combat.pos[last.id]) <= chain.reach)
+					.sort((a, b) => distance(combat.pos[a.id], combat.pos[last.id]) - distance(combat.pos[b.id], combat.pos[last.id]))[0];
+				if (!next) break;
+				foes.push(next);
+			}
+		}
 	} else if (ab.target === 'foes') {
 		const chosen = inRange.foes.filter((f) => action.targets?.includes(f.id));
 		foes = (chosen.length ? chosen : inRange.foes).slice(0, ab.maxTargets ?? 3);
@@ -931,7 +943,13 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		events.push({ kind: 'support', heroId: hero.id, what: 'shield', targetId: ally.id, amount: ab.shield });
 		log(work.state, 'combat', `${hero.name} entoure ${ally.id === hero.id ? 'son propre corps' : ally.name} d’un bouclier de lune.`);
 	}
-	if (ab.heal) {
+	if (ab.heal && ally) {
+		const amount = Math.min(ab.heal, ally.pvMax - ally.pv);
+		ally.pv += amount;
+		events.push({ kind: 'sfx', id: 'sfx-soin' });
+		events.push({ kind: 'support', heroId: hero.id, what: 'heal', targetId: ally.id, amount });
+		log(work.state, 'combat', `${hero.name} joue l’${ab.name} : ${ally.id === hero.id ? 'soi-même' : ally.name} +${amount} PV.`);
+	} else if (ab.heal) {
 		for (const c of work.party) c.pv = Math.min(c.pvMax, c.pv + ab.heal);
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
 		events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: ab.heal });

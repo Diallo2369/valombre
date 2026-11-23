@@ -809,7 +809,7 @@ export function CombatPanel(props: Props) {
 							const isTurn = c.id === actor.id && phase === 'hero' && !busy;
 							return (
 								<button
-									key={`${c.id}-${landed && (support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
+									key={`${c.id}-${landed && ((support?.what === 'heal' && !support.targetId) || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
 									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
 									style={place(combat.pos[c.id])}
@@ -834,7 +834,7 @@ export function CombatPanel(props: Props) {
 										<span className="token__burst token__burst--miss" aria-hidden="true">
 											Raté !
 										</span>
-									) : support?.what === 'heal' ? (
+									) : support?.what === 'heal' && (!support.targetId || support.targetId === c.id) ? (
 										<CombatNumber value={support.amount ?? 0} />
 									) : support?.targetId === c.id ? (
 										<span className="token__burst token__burst--heal" aria-hidden="true">

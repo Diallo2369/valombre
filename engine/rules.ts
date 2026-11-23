@@ -57,10 +57,11 @@ export type AbilityId =
 	| 'etincelle'
 	| 'pluie-etoiles'
 	| 'bouclier-lune'
+	| 'chaine-eclairs'
 	| 'lueur'
 	// Barde
-	| 'note-percante'
 	| 'berceuse'
+	| 'air-guerison'
 	| 'chant'
 	| 'delivrance';
 
@@ -79,6 +80,8 @@ export interface Ability {
 	range?: number;
 	/** Zone : la cible et les créatures collées à elle. */
 	area?: boolean;
+	/** Chaîne : depuis la cible, rebondit sur `jumps` autres créatures, chacune à `reach` cases au plus de la précédente. */
+	chain?: { jumps: number; reach: number };
 	/** Pour `foes` : nombre maximal de créatures touchées. */
 	maxTargets?: number;
 	/** Pour `ally` : le héros peut se choisir lui-même. */
@@ -102,7 +105,7 @@ export interface Ability {
 	taunt?: boolean;
 	/** Protéger un compagnon (Intervention). */
 	protect?: boolean;
-	/** PV rendus à tout le groupe. */
+	/** PV rendus : à tout le groupe (cible `party`), ou au compagnon choisi (cible `ally`). */
 	heal?: number;
 	/** Bouclier posé sur un compagnon (dégâts absorbés). */
 	shield?: number;
@@ -297,6 +300,18 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: 'Une bulle argentée entoure un compagnon (ou toi) : elle absorbe les 2 prochains dégâts.',
 	}),
+	'chaine-eclairs': A({
+		id: 'chaine-eclairs', range: 4,
+		name: 'Chaîne d’éclairs',
+		icon: '⚡',
+		target: 'foe',
+		stat: 'esprit',
+		damage: 2,
+		chain: { jumps: 2, reach: 2 },
+		spell: true,
+		every: 3,
+		text: 'Un éclair frappe une créature puis rebondit sur 2 autres proches d’elle : 2 PV chacune.',
+	}),
 	lueur: A({
 		id: 'lueur', range: 4,
 		name: 'Lueur aveuglante',
@@ -309,16 +324,6 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 	}),
 
 	/* ---- Barde : magie et contrôle ---- */
-	'note-percante': A({
-		id: 'note-percante', range: 4,
-		name: 'Note perçante',
-		icon: '🎵',
-		target: 'foe',
-		stat: 'charme',
-		damage: 2,
-		spell: true,
-		text: 'Une note magique si aiguë qu’elle fait mal aux oreilles : 2 PV.',
-	}),
 	berceuse: A({
 		id: 'berceuse', range: 4,
 		name: 'Berceuse',
@@ -329,6 +334,17 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		spell: true,
 		every: 3,
 		text: 'La créature s’endort et passe son prochain tour.',
+	}),
+	'air-guerison': A({
+		id: 'air-guerison', range: 4,
+		name: 'Air de guérison',
+		icon: '💚',
+		target: 'ally',
+		self: true,
+		heal: 5,
+		spell: true,
+		every: 2,
+		text: 'Une mélodie douce referme les blessures d’un compagnon (ou les tiennes) : +5 PV.',
 	}),
 	chant: A({
 		id: 'chant',
@@ -440,8 +456,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		initiative: 0,
 		move: 2,
-		abilities: ['trait-lumiere', 'etincelle', 'pluie-etoiles', 'bouclier-lune', 'lueur'],
-		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Bouclier de lune un tour sur trois.' },
+		abilities: ['trait-lumiere', 'etincelle', 'pluie-etoiles', 'chaine-eclairs', 'lueur'],
+		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Chaîne d’éclairs un tour sur trois.' },
 		kit: ['Bâton noueux', 'Grimoire écorné', 'Bougie'],
 	},
 	barde: {
@@ -455,7 +471,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		initiative: 0,
 		move: 3,
-		abilities: ['note-percante', 'berceuse', 'chant', 'delivrance'],
+		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'delivrance'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
 	},

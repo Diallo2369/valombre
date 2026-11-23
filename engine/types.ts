@@ -376,7 +376,7 @@ export type StunKind = 'assomme' | 'filet' | 'sommeil';
 export interface HeroCombatState {
 	/** Armure restante : elle prend les coups avant les PV, réparée à chaque combat. */
 	armor: number;
-	/** Bouclier de lune posé par le mage : absorbe les prochains dégâts. */
+	/** Bouclier de lune posé par le barde : absorbe les prochains dégâts. */
 	shield?: number;
 	/** Folie vengeresse : il a reçu un coup, sa prochaine attaque est un coup critique. */
 	fury?: boolean;
