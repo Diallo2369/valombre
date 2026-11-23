@@ -288,7 +288,8 @@ export interface MediaAsset {
  */
 export interface Light {
 	/** « pluie » : des gouttes qui tombent sur toute l'image (intensity : densité, x : vent en degrés). */
-	kind: 'feu' | 'lanterne' | 'bougie' | 'magie' | 'brume' | 'eclair' | 'pluie';
+	/** « yeux » : une paire d'yeux qui clignent et se déplacent parfois ; « flaque » : des ronds dans l'eau (size : largeur de la flaque). */
+	kind: 'feu' | 'lanterne' | 'bougie' | 'magie' | 'brume' | 'eclair' | 'pluie' | 'yeux' | 'flaque';
 	x?: number;
 	y?: number;
 	size?: number;

@@ -501,7 +501,16 @@ const OR = '255,205,110';
 
 export const LIGHTS: Record<string, Light[]> = {
 	// Calé sur l'image réelle : fenêtre de l'auberge en haut à droite, yeux de Pff dans la brume à gauche.
-	'img-route-brume': [brume, { kind: 'lanterne', x: 81, y: 18, size: 0.05, intensity: 0.9 }, { kind: 'magie', x: 31, y: 55, size: 0.025, color: BLEU, intensity: 0.7 }],
+	'img-route-brume': [
+		brume,
+		{ kind: 'lanterne', x: 81, y: 18, size: 0.05, intensity: 0.9 },
+		// Les yeux de Pff dans la brume, à gauche du chemin.
+		{ kind: 'yeux', x: 31.3, y: 55, size: 0.019, intensity: 0.8 },
+		{ kind: 'pluie', x: 8, intensity: 0.45 },
+		{ kind: 'flaque', x: 19, y: 77, size: 0.06 },
+		{ kind: 'flaque', x: 25, y: 74.5, size: 0.04, intensity: 0.7 },
+		{ kind: 'flaque', x: 43, y: 69, size: 0.07 },
+	],
 	// Calé sur l'image réelle : lanterne au-dessus de la porte, feu de la salle par la porte entrouverte, deux fenêtres.
 	'img-auberge-porte': [
 		{ ...brume, intensity: 0.7 },

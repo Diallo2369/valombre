@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { Light } from '@/engine/types';
 
 /**
- * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie,
+ * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie, yeux qui guettent, ronds dans les flaques,
  * brume qui glisse, éclairs, lueur magique qui respire. Un seul canevas, fusionné en « screen »
  * (il ne fait qu'éclairer l'image, jamais l'assombrir).
  * Avec « réduire les animations » activé dans le système, on dessine une lueur fixe, sans mouvement.
@@ -18,6 +18,8 @@ const DEFAULT_COLOR: Record<Light['kind'], string> = {
 	brume: '200,208,222',
 	eclair: '235,240,255',
 	pluie: '190,205,225',
+	yeux: '140,190,255',
+	flaque: '200,212,230',
 };
 
 /** Bruit lisse et irrégulier (somme de sinus décalés) : un feu ne vacille jamais en rythme. */
@@ -41,6 +43,25 @@ interface Splash {
 	x: number;
 	y: number;
 	life: number;
+}
+
+/** Un rond dans une flaque : une ellipse qui s'élargit et s'efface. */
+interface Ripple {
+	x: number;
+	y: number;
+	life: number;
+	r: number;
+}
+
+/** Les yeux qui guettent : clignement, et parfois ils s'éteignent pour se rallumer un peu plus loin. */
+interface Eyes {
+	dx: number;
+	alpha: number;
+	target: number;
+	nextBlink: number;
+	blinkUntil: number;
+	nextMove: number;
+	moveDx: number;
 }
 
 interface Ember {
@@ -91,6 +112,15 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 			ground: 0.55 + Math.random() * 0.45,
 		});
 		if (rain) for (let i = 0; i < Math.round(160 * (rain.intensity ?? 1)); i += 1) drops.push(newDrop(true));
+		const ripples: Ripple[] = [];
+		const puddles = lights.filter((l) => l.kind === 'flaque');
+		const eyes = new Map<number, Eyes>();
+		lights.forEach((l, i) => {
+			if (l.kind === 'yeux') {
+				const now = performance.now();
+				eyes.set(i, { dx: 0, alpha: 1, target: 1, nextBlink: now + 1500 + Math.random() * 3000, blinkUntil: 0, nextMove: now + 9000 + Math.random() * 6000, moveDx: 0 });
+			}
+		});
 		let flash = 0;
 		let nextFlash = performance.now() + 3000 + Math.random() * 6000;
 
@@ -130,6 +160,46 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 					// Une flamme de bougie : vive, nerveuse, avec de petits creux comme un courant d'air.
 					const f = still ? 0.8 : flicker(t, i * 4.7, 2.4) * (0.75 + 0.25 * flicker(t, i * 1.3, 0.35));
 					glow(x, y, radius * (0.85 + 0.25 * f), color, 0.42 * k * (0.45 + 0.55 * f));
+				} else if (l.kind === 'yeux') {
+					const e = eyes.get(i)!;
+					if (!still) {
+						if (now > e.nextBlink) {
+							e.blinkUntil = now + 140;
+							// Parfois un double clignement.
+							e.nextBlink = now + (Math.random() < 0.25 ? 320 : 2500 + Math.random() * 4500);
+						}
+						if (now > e.nextMove) {
+							// Les yeux s'éteignent… et se rallument un peu plus loin (ou reviennent à leur place).
+							e.target = 0;
+							e.moveDx = e.dx === 0 ? (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 3) : 0;
+							e.nextMove = now + 12000 + Math.random() * 10000;
+						}
+						const speed = dt * 1.2;
+						e.alpha += Math.max(-speed, Math.min(speed, e.target - e.alpha));
+						if (e.target === 0 && e.alpha <= 0) {
+							e.dx = e.moveDx;
+							e.target = 1;
+						}
+					}
+					const open = now < e.blinkUntil ? 0 : e.alpha;
+					if (open > 0) {
+						const ex = x + (e.dx / 100) * w;
+						const gap = (l.size ?? 0.016) * w;
+						for (const side of [-1, 1]) {
+							const cx = ex + (side * gap) / 2;
+							glow(cx, y, gap * 0.9, color, 0.55 * k * open);
+							ctx.fillStyle = `rgba(230,240,255,${0.9 * k * open})`;
+							ctx.beginPath();
+							ctx.ellipse(cx, y, gap * 0.13, gap * 0.09, 0, 0, Math.PI * 2);
+							ctx.fill();
+						}
+					}
+				} else if (l.kind === 'flaque' && !still) {
+					// De petits ronds dans l'eau, là où tombent les gouttes.
+					if (Math.random() < dt * 4 * k) {
+						const span = (l.size ?? 0.05) * w;
+						ripples.push({ x: x + (Math.random() - 0.5) * span, y: y + (Math.random() - 0.5) * span * 0.15, life: 1, r: span * (0.08 + Math.random() * 0.08) });
+					}
 				} else if (l.kind === 'lanterne') {
 					const f = still ? 0.8 : flicker(t, i * 2.3, 0.9);
 					glow(x, y, radius * (0.95 + 0.06 * f), color, 0.34 * k * (0.75 + 0.25 * f));
@@ -191,6 +261,25 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 					ctx.strokeStyle = `rgba(${color},${0.45 * s.life})`;
 					ctx.beginPath();
 					ctx.ellipse(s.x * w, s.y * h, (1 - s.life) * 7 + 1, (1 - s.life) * 2.2 + 0.5, 0, Math.PI, Math.PI * 2);
+					ctx.stroke();
+				}
+			}
+
+			// Ronds dans les flaques.
+			if (puddles.length) {
+				const color = puddles[0].color ?? DEFAULT_COLOR.flaque;
+				ctx.lineWidth = 1;
+				for (let j = ripples.length - 1; j >= 0; j--) {
+					const r = ripples[j];
+					r.life -= dt * 1.1;
+					if (r.life <= 0) {
+						ripples.splice(j, 1);
+						continue;
+					}
+					const grow = 1 - r.life;
+					ctx.strokeStyle = `rgba(${color},${0.5 * r.life})`;
+					ctx.beginPath();
+					ctx.ellipse(r.x, r.y, r.r * (0.3 + grow * 1.7), r.r * (0.3 + grow * 1.7) * 0.3, 0, 0, Math.PI * 2);
 					ctx.stroke();
 				}
 			}
