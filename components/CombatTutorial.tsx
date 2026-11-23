@@ -47,6 +47,8 @@ export function CombatTutorial(props: Props) {
 	const { busy, phase, actorName, moved, canMove, aiming, seq, acted, hasGuard, spellComing, onDone } = props;
 	const [step, setStep] = useState<Step>('ordre');
 	const [rect, setRect] = useState<DOMRect | null>(null);
+	/** Hauteur réelle de la bulle (elle dépend du texte et de la largeur) : pour la garder dans l'écran. */
+	const [bubbleH, setBubbleH] = useState(240);
 	const bubble = useRef<HTMLDivElement>(null);
 	/** L'étape de jeu quand on a demandé de choisir une action : on attend une action jouée après. */
 	const [mark, setMark] = useState(seq);
@@ -77,6 +79,8 @@ export function CombatTutorial(props: Props) {
 			const el = key ? document.querySelector<HTMLElement>(`[data-tuto="${key}"]`) : null;
 			const r = el?.getBoundingClientRect() ?? null;
 			setRect((old) => (old && r && old.x === r.x && old.y === r.y && old.width === r.width && old.height === r.height ? old : r));
+			const h = bubble.current?.offsetHeight;
+			if (h) setBubbleH((old) => (old === h ? old : h));
 			raf = requestAnimationFrame(read);
 		};
 		read();
@@ -142,19 +146,23 @@ export function CombatTutorial(props: Props) {
 		go(order[order.indexOf(step) + 1]);
 	};
 
-	// La bulle : sous l'élément éclairé s'il y a la place, sinon au-dessus ; au centre sans élément.
+	// La bulle, toujours entière dans l'écran : sous l'élément éclairé s'il y a la place, sinon au-dessus,
+	// sinon posée sur le bas de l'élément (le plateau, souvent) ; au centre sans élément.
 	const pad = 10;
+	const gap = 16;
 	const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
 	const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
 	const w = Math.min(380, vw - 32);
-	let style: React.CSSProperties = { width: w, left: (vw - w) / 2, top: vh / 2 - 120 };
+	const h = Math.min(bubbleH, vh - 2 * gap);
+	let style: React.CSSProperties = { width: w, left: (vw - w) / 2, top: Math.max(gap, (vh - h) / 2) };
 	if (rect) {
-		const left = Math.max(16, Math.min(vw - w - 16, rect.left + rect.width / 2 - w / 2));
-		const below = rect.bottom + pad + 16;
-		style = below + 220 < vh ? { width: w, left, top: below } : { width: w, left, bottom: Math.max(16, vh - rect.top + pad + 16) };
-		// L'élément éclairé occupe presque tout l'écran (le plateau sur un téléphone) : la bulle se pose en bas.
-		if (rect.height > vh * 0.6) style = { width: w, left: (vw - w) / 2, bottom: 16 };
+		const left = Math.max(gap, Math.min(vw - w - gap, rect.left + rect.width / 2 - w / 2));
+		const below = rect.bottom + pad + gap;
+		const above = rect.top - pad - gap - h;
+		const top = below + h <= vh - gap ? below : above >= gap ? above : Math.min(vh - gap - h, Math.max(gap, rect.bottom - h - gap));
+		style = { width: w, left, top };
 	}
+	style.maxHeight = vh - 2 * gap;
 
 	return createPortal(
 		<div className="tuto" aria-live="polite">

@@ -1853,10 +1853,16 @@
 		display: none;
 	}
 
-	/* C'est son tour : le jeton brille. */
+	/* C'est son tour : le jeton brille d'un halo doré qui pulse (on voit tout de suite qui doit jouer). */
 	&.is-turn .token__img {
-		border-color: var(--ember-300);
-		box-shadow: 0 0 0 3px rgb(246 194 127 / 45%), 0 0 24px rgb(246 194 127 / 55%);
+		border-color: #ffe28a;
+		box-shadow: 0 0 0 5px #ffe28a, 0 0 34px 10px rgb(255 226 138 / 75%);
+	}
+
+	/* Le pouls laisse la place aux autres animations du jeton (rebond à l'atterrissage, élan, coup reçu) : :where()
+	   ne compte pas dans la priorité, les règles écrites plus bas l'emportent. */
+	&.is-turn:where(:not(.is-landing, .is-dragging)) .token__img {
+		animation: turn-pulse 1.3s ease-in-out infinite;
 	}
 
 	/* On regarde ses compétences. */
@@ -2374,6 +2380,7 @@
 	&__bubble {
 		position: fixed;
 		pointer-events: auto;
+		overflow-y: auto;
 		padding: 16px 18px;
 		border-color: #ffe28a;
 		box-shadow: 0 0 0 1px rgb(255 226 138 / 40%), 0 18px 44px rgb(0 0 0 / 65%);
@@ -2417,20 +2424,14 @@
 	}
 }
 
-/* Pendant le tutoriel, le héros qui joue ressort nettement : halo doré qui pulse, les autres plus ternes. */
+/* Pendant le tutoriel, le héros qui joue ressort encore plus : les autres sont plus ternes. */
 .board.is-tuto {
-	.token.is-turn .token__img {
-		border-color: #ffe28a;
-		box-shadow: 0 0 0 5px #ffe28a, 0 0 34px 10px rgb(255 226 138 / 75%);
-		animation: tuto-pulse 1.3s ease-in-out infinite;
-	}
-
 	.token--hero:not(.is-turn) .token__img {
 		filter: saturate(0.55) brightness(0.75);
 	}
 }
 
-@keyframes tuto-pulse {
+@keyframes turn-pulse {
 	50% {
 		box-shadow: 0 0 0 8px rgb(255 226 138 / 85%), 0 0 48px 16px rgb(255 226 138 / 45%);
 	}
@@ -2438,7 +2439,7 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.tuto__bubble,
-	.board.is-tuto .token.is-turn .token__img {
+	.token.is-turn .token__img {
 		animation: none;
 	}
 
