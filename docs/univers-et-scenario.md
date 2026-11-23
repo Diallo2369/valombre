@@ -13,6 +13,12 @@ et peuvent presque toujours être apaisés.
 
 **Le point de départ.** Les héros, surpris par la nuit et la brume, se réfugient à l’auberge du **Chaudron Fêlé**, à Combeloup.
 Ce soir-là, **Lisette** (10 ans), la fille du meunier, a disparu : elle a suivi un feu-follet bleu.
+Et ce soir, pour la première fois, **la Grise descend dans les rues**. La cloche sonne l’alarme, on barricade l’auberge,
+Mathis, le garde parti chercher la petite, est ramené endormi : impossible de le réveiller.
+**La règle de la Grise** : elle endort tous ceux dont elle connaît le nom, donc tous les gens de la vallée. Les héros,
+venus d’ailleurs, sont les seuls à pouvoir sortir… mais plus ils restent, plus elle les connaît : à l’aube, elle saura
+leurs noms. Il faut donc partir cette nuit, et ne jamais dire son nom dans la brume. À la fin, la lumière revenue,
+la Grise oublie les noms et tous les dormeurs se réveillent.
 Ce qu’on découvre peu à peu : il y a sept jours, **Gaspard** le colporteur a ramassé le Cœur de l’Aube au sanctuaire pour le vendre.
 Privée de lumière, la **Dame Grise** (gardienne, pas méchante) s’est endormie, la Grise déborde, et ses feux-follets lui amènent
 des enfants pour qu’elle ne soit pas seule dans son rêve.
