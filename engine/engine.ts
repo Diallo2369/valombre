@@ -622,7 +622,7 @@ function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
 /** Menace : ce qu'un héros fait énerve les créatures ; l'Aura de bataille du guerrier la double. */
 function addThreat(foe: FoeState, hero: Character, amount: number) {
 	if (amount <= 0) return;
-	const k = hasAbility(hero, 'aura') ? 1.5 : 1;
+	const k = CLASSES[hero.classId].threat ?? 1;
 	foe.threat = { ...foe.threat, [hero.id]: (foe.threat?.[hero.id] ?? 0) + amount * k };
 }
 
@@ -932,7 +932,7 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 	if (victim.pv === 0) log(game.state, 'combat', `${victim.name} tombe, ${epuise(victim)} !`);
 	// Œil pour œil (passif) : un coup au contact revient à l'envoyeur (même si l'armure l'a encaissé).
 	const back = victim.pv > 0 && !o.spell && distance(combat.pos[foe.id], combat.pos[victim.id]) <= 1 ? ABILITIES['oeil-pour-oeil'].riposte : undefined;
-	if (back && hasAbility(victim, 'oeil-pour-oeil') && foe.hp > 0) {
+	if (back && hasAbility(victim, 'oeil-pour-oeil') && foe.hp > 0 && Math.random() < (back.chance ?? 1)) {
 		const hurt = Math.min(back.damage, foe.hp);
 		foe.hp -= hurt;
 		addThreat(foe, victim, hurt);

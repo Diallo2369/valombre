@@ -110,7 +110,7 @@ export interface Ability {
 	/** Repousse d'une case les créatures touchées, loin du héros (Déflagration runique). */
 	push?: boolean;
 	/** Œil pour œil (passif) : chaque créature qui le frappe au contact reçoit `damage` PV, avec `stunChance` d'être assommée. */
-	riposte?: { damage: number; stunChance: number };
+	riposte?: { damage: number; stunChance: number; chance?: number };
 	/** Cône : la créature visée (collée au héros) et celles juste derrière elle (Onde de choc). */
 	cone?: boolean;
 	/** Bâillonne la créature touchée (pas de sort) pendant ce nombre de tours. */
@@ -207,8 +207,8 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '👁️',
 		passive: true,
 		target: 'none',
-		riposte: { damage: 1, stunChance: 0.25 },
-		text: 'Chaque créature qui te frappe au contact reçoit le coup en retour : 1 PV, et 1 fois sur 4 elle est assommée.',
+		riposte: { damage: 2, stunChance: 0.25, chance: 2 / 3 },
+		text: 'Quand une créature te frappe au contact, 2 fois sur 3 tu lui renvoies le coup : 2 PV, et 1 fois sur 4 elle est assommée. Plus on te frappe, plus ça leur coûte !',
 	}),
 
 	/* ---- Virevolteur : deux haches, pas d'armure ---- */
@@ -218,9 +218,9 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🪓',
 		target: 'foe',
 		stat: 'agilite',
-		damage: 2,
+		damage: 3,
 		offhand: 2,
-		text: 'Une hache, puis l’autre : 2 PV + 2 PV.',
+		text: 'Une hache, puis l’autre : 3 PV + 2 PV.',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,
@@ -240,9 +240,9 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		offhand: 2,
-		lifesteal: 3,
+		lifesteal: 2,
 		every: 2,
-		text: 'La rage de l’ours te porte : 2 PV + 2 PV, et si ça touche tu récupères 3 PV.',
+		text: 'La rage de l’ours te porte : 2 PV + 2 PV, et si ça touche tu récupères 2 PV.',
 	}),
 	bond: A({
 		id: 'bond', range: 3,
@@ -273,7 +273,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '✋',
 		passive: true,
 		target: 'none',
-		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, aussi fort d’une main que de l’autre.',
+		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, et la main gauche tape presque aussi fort que la droite.',
 	}),
 	folie: A({
 		id: 'folie',
@@ -281,7 +281,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🔥',
 		passive: true,
 		target: 'none',
-		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque est un coup critique (les deux haches font double dégâts, même en Tourbillon).',
+		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque est un coup critique (les deux haches font double dégâts, même en Tourbillon). Mais ta fureur se voit de loin : les monstres t’en veulent davantage.',
 	}),
 
 	/* ---- Rôdeur : à distance ---- */
@@ -306,10 +306,10 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'foes',
 		maxTargets: 3,
 		stat: 'agilite',
-		damage: 2,
+		damage: 3,
 		arrow: true,
 		every: 3,
-		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 2 PV.',
+		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 3 PV.',
 	}),
 	filet: A({
 		id: 'filet', range: 4,
@@ -327,11 +327,11 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🧪',
 		target: 'foe',
 		stat: 'agilite',
-		damage: 2,
+		damage: 3,
 		poison: 3,
 		arrow: true,
 		every: 3,
-		text: '2 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
+		text: '3 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
 	}),
 	'pointes-trempees': A({
 		id: 'pointes-trempees',
@@ -472,6 +472,8 @@ export interface ClassDef {
 	pvBonus: number;
 	/** Armure : elle prend les coups avant les PV, et se répare à chaque combat. */
 	armor: number;
+	/** Menace : ce qu'il fait énerve les monstres davantage (guerrier : son aura ; virevolteur : sa fureur se voit de loin). */
+	threat?: number;
 	/** Points de mouvement : cases parcourues par tour. */
 	move: number;
 	/** Actions en combat. */
@@ -491,6 +493,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		bonus: { force: 1, endurance: 2 },
 		pvBonus: 3,
 		armor: 4,
+		threat: 1.5,
 		move: 2,
 		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'intervention', 'aura', 'oeil-pour-oeil'],
 		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +3 PV et 4 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et se jette devant ses amis pour les protéger.' },
@@ -503,8 +506,9 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		tagline: 'Deux haches, un grand sourire, et la fureur au fond des yeux.',
 		stat: 'agilite',
 		bonus: { agilite: 2, initiative: 1 },
-		pvBonus: 1,
+		pvBonus: 0,
 		armor: 0,
+		threat: 1.7,
 		move: 4,
 		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },

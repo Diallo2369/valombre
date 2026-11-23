@@ -138,14 +138,14 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 - Réglage visé (simulation par classe, 4 héros) : ~15 % de PV perdus contre Pff, ~25 % au rappel des brumelins, ~40 %
   à la clairière ; contre le Loup de Cendre (2 attaques dont un coup balayé, gros coups qui assomment, Souffle de braise),
   ~40 % de PV perdus, un héros épuisé, 5 à 7 tours, 8 à 9 victoires sur 10.
-  Par classe : le virevolteur fait le plus de dégâts et tombe aussi souvent que le guerrier, qui prend 2 à 3 fois plus
-  de coups ; le rôdeur fait mal sans risque ; le mage brille contre les groupes ; le barde soigne.
+  Par classe (dégâts par combat, PV restants à la fin) : virevolteur ~14, ~58 %, le plus souvent épuisé ; guerrier ~13
+  (dont Œil pour œil), ~60 %, 2 à 3 fois plus de coups reçus ; rôdeur ~13 et mage ~12.5, ~82 % ; le barde soigne.
 
 ### La menace (l’aggro)
 
 - Chaque créature retient la menace de chaque héros (`FoeState.threat`) : 1 par PV infligé (×2 sur un coup critique),
   +2 pour un contrôle (assommer, filet, berceuse, aveugler, poison, bâillon), la moitié des PV soignés ou du bouclier
-  posé (sur toutes les créatures). L’Aura de bataille du guerrier multiplie sa menace par 1,5 (et il en a un peu dès le début).
+  posé (sur toutes les créatures). La classe multiplie la menace (`ClassDef.threat`) : le guerrier ×1,5 (son Aura, et il en a un peu dès le début), le virevolteur ×1,7 (sa fureur se voit de loin : il fait le plus mal, et finit le plus entamé).
 - Elle attaque la plus forte menace parmi les héros qu’elle peut atteindre ce tour-ci (sinon la plus forte tout court,
   sinon le plus proche). La menace baisse d’un quart à chaque tour.
 - Moquerie : la créature est provoquée (elle attaque le moqueur, en tête de sa menace) et enragée : ce coup fait +25 %,
@@ -157,9 +157,9 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 
 | Classe | Profil | Actions | Passifs |
 |---|---|---|---|
-| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +3 PV, 🛡️ 4, 👣 2 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Onde de choc (cône devant lui : la créature collée et celles juste derrière, 3 PV et repoussées, 1 tour sur 3) | Aura de bataille (menace ×1,5) · Œil pour œil (chaque coup reçu au contact : 1 PV renvoyé, 1 chance sur 4 d’assommer) · Intervention (réaction, voir la menace) |
-| Virevolteur·se (corps à corps) | +2 Agilité, +1 Initiative, +1 PV, aucune armure, 👣 4 | Double attaque (2 + 2 PV) · Bond sauvage (saute sur une créature jusqu’à 3 cases, 2 + 2 PV, 1 tour sur 2) · Fureur de l’ours (2 + 2 PV et +3 PV pour lui, 1 tour sur 2) · Tourbillon (toutes les créatures au contact : 2 + 2 PV, 1 tour sur 2) · Moquerie (une créature l’attaquera, enragée : +25 à +100 % de dégâts ; 1 tour sur 2) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique, les deux haches doublées, Tourbillon compris)  |
-| Rôdeur·se (distance) | +1 Agilité, +1 Force, +2 Initiative, +1 PV, 🛡️ 1, 👣 3 | Tir à l’arc (3 PV, portée 5) · Flèche visée (+2 de difficulté, critique : 6 PV, bâillonne 2 tours) · Salve (3 cibles, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 3) · Flèche empoisonnée (2 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) | Pointes trempées (chaque flèche qui touche : 1 chance sur 4 d’aveugler, 1 sur 4 de bâillonner) · Seconde chance hors combat |
+| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +3 PV, 🛡️ 4, 👣 2, menace ×1,5 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Onde de choc (cône devant lui : la créature collée et celles juste derrière, 3 PV et repoussées, 1 tour sur 3) | Aura de bataille (menace ×1,5) · Œil pour œil (coup reçu au contact : 2 fois sur 3, 2 PV renvoyés, 1 chance sur 4 d’assommer) · Intervention (réaction, voir la menace) |
+| Virevolteur·se (corps à corps) | +2 Agilité, +1 Initiative, aucune armure, 👣 4, menace ×1,7 | Double attaque (3 + 2 PV) · Bond sauvage (saute sur une créature jusqu’à 3 cases, 2 + 2 PV, 1 tour sur 2) · Fureur de l’ours (2 + 2 PV et +2 PV pour lui, 1 tour sur 2) · Tourbillon (toutes les créatures au contact : 2 + 2 PV, 1 tour sur 2) · Moquerie (une créature l’attaquera, enragée : +25 à +100 % de dégâts ; 1 tour sur 2) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique, les deux haches doublées, Tourbillon compris)  |
+| Rôdeur·se (distance) | +1 Agilité, +1 Force, +2 Initiative, +1 PV, 🛡️ 1, 👣 3 | Tir à l’arc (3 PV, portée 5) · Flèche visée (+2 de difficulté, critique : 6 PV, bâillonne 2 tours) · Salve (3 cibles, 3 PV chacune, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 3) · Flèche empoisonnée (3 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) | Pointes trempées (chaque flèche qui touche : 1 chance sur 4 d’aveugler, 1 sur 4 de bâillonner) · Seconde chance hors combat |
 | Mage (magie des runes) | +2 Esprit, 👣 2 | Projectiles runiques (2 PV) · Rune d’éclat (sans dé, 4 PV contre la brume, 1 tour sur 3) · Rune ricochet (une créature puis 2 rebonds à 2 cases au plus, 2 PV chacune, 1 tour sur 3) · Orbe runique (une créature et ses voisines, 1 tour sur 3) · Déflagration runique (créatures au contact : 2 PV et repoussées d’une case, 1 tour sur 2) | — |
 | Barde | +1 Charme, +1 Esprit, 👣 3 | Aucun sort de dégâts : Air de guérison (+5 PV à un compagnon ou à soi, 1 tour sur 2) · Bouclier de lune (absorbe 2 dégâts, 1 tour sur 3) · Berceuse (passe son tour, 1 tour sur 3) · Chant de courage (+2 PV au groupe, 1 tour sur 4) · Chant de délivrance (enlève poison, brûlure, froid) | — |
 
@@ -169,7 +169,7 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 - **Armure** : des points qui prennent les coups avant les PV, réparés au début de chaque combat.
 - **Initiative** : 6ᵉ caractéristique, tirée au dé comme les autres (+1 virevolteur, +2 rôdeur). En combat : dé + Initiative (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
   ordre ; les créatures agissent ensemble à leur place dans la file. La frise des tours reste affichée.
-- **Dégâts** en PV : un coup normal = 2 PV, chaque hache du virevolteur = 2 PV, un critique double tout.
+- **Dégâts** en PV : un coup normal = 2 PV (une flèche : 3), les haches du virevolteur = 3 + 2 PV (2 + 2 en Tourbillon, Bond, Fureur), un critique double tout.
 - **Cinq actions par classe** (les passifs en plus ; le guerrier : quatre, plus l’Intervention en réaction) : que chaque joueur ait autant de choses à faire.
 - **Aveuglée** : la créature rate un coup sur deux (ses sorts partent quand même). **Bâillonnée** : pas de sort.
 - **Délais** : les coups puissants se relancent « 1 tour sur 3 » (ou 4) ; les autres sont à volonté.
