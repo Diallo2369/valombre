@@ -2,7 +2,7 @@ import type { Character, ClassId, Difficulty, Gender, StatKey, Stats } from './t
 
 /**
  * Règles « Valombre » pensées pour une première initiation :
- * - 5 caractéristiques, tirées chacune avec 1 dé à 6 faces (un 1 compte comme 2) ;
+ * - 6 caractéristiques, tirées chacune avec 1 dé à 6 faces (un 1 compte comme 2) ;
  * - +1 dans la caractéristique favorite de la classe ;
  * - un test = 1 dé + la caractéristique, à comparer à la difficulté ;
  * - un 6 naturel réussit toujours (« coup de chance ! ») ;
@@ -16,6 +16,7 @@ export const STATS: { key: StatKey; label: string; short: string; hint: string }
 	{ key: 'endurance', label: 'Endurance', short: 'END', hint: 'Encaisser les coups, résister au froid : donne les points de vie.' },
 	{ key: 'esprit', label: 'Esprit', short: 'ESP', hint: 'Observer, réfléchir, lancer un sort.' },
 	{ key: 'charme', label: 'Charme', short: 'CHA', hint: 'Convaincre, rassurer, amadouer une bête.' },
+	{ key: 'initiative', label: 'Initiative', short: 'INI', hint: 'Réagir le premier : en combat, décide qui joue avant les autres.' },
 ];
 
 export const STAT_LABEL: Record<StatKey, string> = {
@@ -24,6 +25,7 @@ export const STAT_LABEL: Record<StatKey, string> = {
 	endurance: 'Endurance',
 	esprit: 'Esprit',
 	charme: 'Charme',
+	initiative: 'Initiative',
 };
 
 export const DIFFICULTY: Record<Difficulty, { label: string; target: number }> = {
@@ -384,8 +386,6 @@ export interface ClassDef {
 	pvBonus: number;
 	/** Armure : elle prend les coups avant les PV, et se répare à chaque combat. */
 	armor: number;
-	/** Bonus d'initiative (ajouté au dé et à l'Agilité au début du combat). */
-	initiative: number;
 	/** Points de mouvement : cases parcourues par tour. */
 	move: number;
 	/** Capacité d'aggro : peut tenter de détourner un monstre vers lui (avec cette caractéristique). */
@@ -407,7 +407,6 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		bonus: { force: 1, endurance: 2 },
 		pvBonus: 2,
 		armor: 3,
-		initiative: 0,
 		move: 2,
 		aggro: 'force',
 		abilities: ['frapper', 'coup-assommant', 'taillade', 'intervention', 'aura'],
@@ -420,10 +419,9 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Danseuse de guerre', m: 'Danseur de guerre' },
 		tagline: 'Deux haches, un grand sourire, et la fureur au fond des yeux.',
 		stat: 'agilite',
-		bonus: { agilite: 2 },
+		bonus: { agilite: 2, initiative: 1 },
 		pvBonus: 1,
 		armor: 0,
-		initiative: 1,
 		move: 4,
 		aggro: 'charme',
 		abilities: ['double-attaque', 'moquerie', 'tourbillon', 'ambidextrie', 'folie'],
@@ -436,10 +434,9 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Rôdeuse', m: 'Rôdeur' },
 		tagline: 'Les sentiers n’ont pas de secret pour toi.',
 		stat: 'agilite',
-		bonus: { agilite: 1, force: 1 },
+		bonus: { agilite: 1, force: 1, initiative: 2 },
 		pvBonus: 1,
 		armor: 1,
-		initiative: 2,
 		move: 3,
 		abilities: ['tir', 'fleche-visee', 'salve', 'filet', 'fleche-empoisonnee'],
 		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
@@ -454,7 +451,6 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		bonus: { esprit: 2 },
 		pvBonus: 0,
 		armor: 0,
-		initiative: 0,
 		move: 2,
 		abilities: ['trait-lumiere', 'etincelle', 'pluie-etoiles', 'chaine-eclairs', 'lueur'],
 		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Chaîne d’éclairs un tour sur trois.' },
@@ -469,7 +465,6 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		bonus: { charme: 1, esprit: 1 },
 		pvBonus: 0,
 		armor: 0,
-		initiative: 0,
 		move: 3,
 		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'delivrance'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
@@ -493,21 +488,34 @@ export function levelFromXp(xp: number): number {
 	return 1 + Math.floor(xp / 10);
 }
 
-/** Initiative d'un héros : Agilité + bonus de classe (on y ajoute un dé au début du combat). */
+/** Initiative d'un héros (on y ajoute un dé au début du combat). */
 export function initiativeOf(c: Character): number {
-	return c.stats.agilite + CLASSES[c.classId].initiative;
+	return c.stats.initiative;
 }
 
 export function computePvMax(stats: Stats, xp: number, classId?: ClassId): number {
 	return 6 + (stats.endurance ?? stats.force) + 2 * (levelFromXp(xp) - 1) + (classId ? CLASSES[classId].pvBonus : 0);
 }
 
+/** Ancien bonus d'initiative des classes, ajouté à l'Agilité avant que l'Initiative soit une caractéristique. */
+const LEGACY_INITIATIVE: Partial<Record<ClassId, number>> = { danseur: 1, rodeur: 2 };
+
 /**
- * Les héros créés avant l'Endurance n'en ont pas : on reprend leur Force (c'est elle qui donnait leurs PV).
+ * Les héros créés avant certaines caractéristiques ne les ont pas : on les déduit de ce qui en tenait lieu.
+ * - Endurance : leur Force (c'est elle qui donnait leurs PV) ;
+ * - Initiative : leur Agilité + l'ancien bonus de classe (le même ordre de jeu qu'avant).
  */
-export function withEndurance(c: Character): Character {
-	if (typeof c.stats.endurance === 'number') return c;
-	return { ...c, stats: { ...c.stats, endurance: c.stats.force } };
+export function withStats(c: Character): Character {
+	const s = c.stats as Partial<Stats> & Pick<Stats, 'force' | 'agilite' | 'esprit' | 'charme'>;
+	if (typeof s.endurance === 'number' && typeof s.initiative === 'number') return c;
+	return {
+		...c,
+		stats: {
+			...c.stats,
+			endurance: s.endurance ?? s.force,
+			initiative: s.initiative ?? s.agilite + (LEGACY_INITIATIVE[c.classId] ?? 0),
+		},
+	};
 }
 
 export function finalStats(classId: ClassId, base: Stats): Stats {
@@ -516,7 +524,7 @@ export function finalStats(classId: ClassId, base: Stats): Stats {
 	return stats;
 }
 
-/** Bonus d'initiative du monstre selon sa difficulté (les héros ajoutent leur Agilité). */
+/** Bonus d'initiative du monstre selon sa difficulté (les héros ajoutent leur Initiative). */
 export const ENEMY_INITIATIVE: Record<Difficulty, number> = { facile: 2, moyen: 4, difficile: 5 };
 
 export function makeCharacter(input: {

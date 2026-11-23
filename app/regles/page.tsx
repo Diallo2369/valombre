@@ -17,8 +17,8 @@ export default function RulesPage() {
 				</p>
 
 				<section className="card rules__block">
-					<h2>1. Les cinq caractéristiques</h2>
-					<p>Chaque héros a cinq talents, notés avec un chiffre. Plus le chiffre est grand, plus le héros est doué.</p>
+					<h2>1. Les six caractéristiques</h2>
+					<p>Chaque héros a six talents, notés avec un chiffre. Plus le chiffre est grand, plus le héros est doué.</p>
 					<ul className="rules__stats">
 						{STATS.map((s) => (
 							<li key={s.key}>
@@ -56,7 +56,7 @@ export default function RulesPage() {
 					<h2>3. Les combats</h2>
 					<p>
 						Le combat se joue sur un <strong>plateau d’hexagones</strong> : les monstres en haut, les aventuriers en bas. Au début,
-						chacun lance l’<strong>initiative</strong> (un dé + l’Agilité + le bonus de sa classe) : on joue dans cet ordre. À son tour,
+						chacun lance l’<strong>initiative</strong> (un dé + sa caractéristique d’Initiative) : on joue dans cet ordre. À son tour,
 						un héros peut <strong>se déplacer</strong> (les cases qui s’allument), puis il choisit une action de sa classe : un coup au
 						contact, une flèche, un sort… Si c’est réussi, la créature perd des points de vie (sa barre de vie se vide).
 					</p>

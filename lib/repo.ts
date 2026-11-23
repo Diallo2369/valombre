@@ -1,6 +1,6 @@
 import 'server-only';
 import { CAMPAIGNS, getCampaign } from '@/campaigns';
-import { withEndurance } from '@/engine/rules';
+import { withStats } from '@/engine/rules';
 import type { Campaign, Character, GameState } from '@/engine/types';
 import { db } from './db';
 
@@ -47,7 +47,7 @@ export function listCharacters(userId: string): Character[] {
 	const rows = db()
 		.prepare('SELECT data FROM characters WHERE user_id = ? ORDER BY updated_at DESC')
 		.all(userId) as { data: string }[];
-	return rows.map((r) => withEndurance(JSON.parse(r.data) as Character));
+	return rows.map((r) => withStats(JSON.parse(r.data) as Character));
 }
 
 export function getCharacters(userId: string, ids: string[]): Character[] {

@@ -53,6 +53,6 @@ La Dame révèle que la vraie flamme a été volée par le Prince de Sel → **f
 
 ## Règles en bref
 
-5 caractéristiques (Force, Agilité, Endurance, Esprit, Charme), tirées chacune avec 1 dé (un 1 compte comme 2), bonus de classe, un échange possible. PV = 6 + Endurance + bonus de classe.
+6 caractéristiques (Force, Agilité, Endurance, Esprit, Charme, Initiative), tirées chacune avec 1 dé (un 1 compte comme 2), bonus de classe, un échange possible. PV = 6 + Endurance + bonus de classe.
 Test : 1 dé + caractéristique ≥ 5 (facile), 7 (moyen) ou 9 (difficile). Un 6 réussit toujours.
 Classes : Guerrier·ère (coup puissant), Rôdeur·se (seconde chance), Mage (étincelle d’aube), Barde (chant de courage).

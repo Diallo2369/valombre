@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCampaign } from '@/campaigns';
 import { startGame } from '@/engine/engine';
-import { computePvMax } from '@/engine/rules';
+import { computePvMax, withStats } from '@/engine/rules';
 import type { Character, GameState } from '@/engine/types';
 import { requireUser } from '@/lib/auth';
 import { newId } from '@/lib/ids';
@@ -26,12 +26,14 @@ const MAX_HEROES = 6;
 
 function sanitizeCharacter(c: Character): Character {
 	const clampStat = (n: number) => Math.max(1, Math.min(12, Math.round(Number(n) || 1)));
+	const full = withStats(c).stats;
 	const stats = {
-		force: clampStat(c.stats.force),
-		agilite: clampStat(c.stats.agilite),
-		endurance: clampStat(c.stats.endurance ?? c.stats.force),
-		esprit: clampStat(c.stats.esprit),
-		charme: clampStat(c.stats.charme),
+		force: clampStat(full.force),
+		agilite: clampStat(full.agilite),
+		endurance: clampStat(full.endurance),
+		esprit: clampStat(full.esprit),
+		charme: clampStat(full.charme),
+		initiative: clampStat(full.initiative),
 	};
 	const xp = Math.max(0, Math.round(Number(c.xp) || 0));
 	const pvMax = computePvMax(stats, xp, c.classId);

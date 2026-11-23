@@ -12,11 +12,11 @@ export type TestTeam = 'test' | 'miens';
  */
 function testTeam(): Character[] {
 	return [
-		makeCharacter({ id: 'test-1', name: 'Brunehaut', player: 'Test', gender: 'f', classId: 'guerrier', base: { force: 3, agilite: 2, endurance: 3, esprit: 2, charme: 2 }, rolls: [3, 2, 3, 1, 2] }),
-		makeCharacter({ id: 'test-5', name: 'Saïan', player: 'Test', gender: 'm', classId: 'danseur', base: { force: 3, agilite: 3, endurance: 2, esprit: 2, charme: 2 }, rolls: [3, 3, 2, 2, 1] }),
-		makeCharacter({ id: 'test-2', name: 'Faucon', player: 'Test', gender: 'm', classId: 'rodeur', base: { force: 2, agilite: 3, endurance: 3, esprit: 2, charme: 2 }, rolls: [2, 3, 3, 2, 1] }),
-		makeCharacter({ id: 'test-3', name: 'Lumen', player: 'Test', gender: 'm', classId: 'mage', base: { force: 2, agilite: 2, endurance: 2, esprit: 3, charme: 2 }, rolls: [1, 2, 2, 3, 2] }),
-		makeCharacter({ id: 'test-4', name: 'Mélodie', player: 'Test', gender: 'f', classId: 'barde', base: { force: 2, agilite: 2, endurance: 2, esprit: 2, charme: 3 }, rolls: [1, 2, 2, 2, 3] }),
+		makeCharacter({ id: 'test-1', name: 'Brunehaut', player: 'Test', gender: 'f', classId: 'guerrier', base: { force: 3, agilite: 2, endurance: 3, esprit: 2, charme: 2, initiative: 2 }, rolls: [3, 2, 3, 1, 2, 2] }),
+		makeCharacter({ id: 'test-5', name: 'Saïan', player: 'Test', gender: 'm', classId: 'danseur', base: { force: 3, agilite: 3, endurance: 2, esprit: 2, charme: 2, initiative: 3 }, rolls: [3, 3, 2, 2, 1, 3] }),
+		makeCharacter({ id: 'test-2', name: 'Faucon', player: 'Test', gender: 'm', classId: 'rodeur', base: { force: 2, agilite: 3, endurance: 3, esprit: 2, charme: 2, initiative: 3 }, rolls: [2, 3, 3, 2, 1, 3] }),
+		makeCharacter({ id: 'test-3', name: 'Lumen', player: 'Test', gender: 'm', classId: 'mage', base: { force: 2, agilite: 2, endurance: 2, esprit: 3, charme: 2, initiative: 2 }, rolls: [1, 2, 2, 3, 2, 2] }),
+		makeCharacter({ id: 'test-4', name: 'Mélodie', player: 'Test', gender: 'f', classId: 'barde', base: { force: 2, agilite: 2, endurance: 2, esprit: 2, charme: 3, initiative: 3 }, rolls: [1, 2, 2, 2, 3, 3] }),
 	];
 }
 

@@ -5,7 +5,7 @@
 
 import type { Hex } from './board';
 
-export type StatKey = 'force' | 'agilite' | 'endurance' | 'esprit' | 'charme';
+export type StatKey = 'force' | 'agilite' | 'endurance' | 'esprit' | 'charme' | 'initiative';
 export type Stats = Record<StatKey, number>;
 export type ClassId = 'guerrier' | 'danseur' | 'rodeur' | 'mage' | 'barde';
 export type Gender = 'f' | 'm';
