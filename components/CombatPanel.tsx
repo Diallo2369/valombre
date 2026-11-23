@@ -193,8 +193,8 @@ export function CombatPanel(props: Props) {
 	const [landId, setLandId] = useState<string | null>(null);
 	/** Dernière valeur de chaque barre de vie (voir HealthBar). */
 	const hpMemo = useRef<Record<string, number>>({});
-	/** Pendant le tour des monstres : le héros qui provoque (s'il y en a plusieurs). */
-	const [provokerId, setProvokerId] = useState<string | null>(null);
+	/** Pendant le tour des monstres : les héros qui ont passé leur tour de provocation. */
+	const [passed, setPassed] = useState<string[]>([]);
 	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
 	const [landed, setLanded] = useState(false);
 	const [shake, setShake] = useState(false);
@@ -495,9 +495,18 @@ export function CombatPanel(props: Props) {
 	/* ---------- Tour des monstres : on voit leurs flèches, et on peut en provoquer un en touchant son jeton ---------- */
 	const intentOpen = phase === 'intent' && !busy;
 	// Les héros qui peuvent provoquer (guerrier, danseur de guerre), et le monstre que chacun peut attirer.
-	const provokers = intentOpen ? [...new Map(combat.intents.flatMap((i) => reclaimers(combat, party, i)).map((c) => [c.id, c])).values()] : [];
-	const provoker = provokers.find((c) => c.id === provokerId) ?? provokers[0];
+	// Chacun son tour, dans l'ordre d'initiative : le premier provoque (ou passe), puis le suivant.
+	const provokers = intentOpen
+		? [...new Map(combat.intents.flatMap((i) => reclaimers(combat, party, i)).map((c) => [c.id, c])).values()]
+				.filter((c) => !passed.includes(c.id))
+				.sort((a, b) => combat.order.indexOf(a.id) - combat.order.indexOf(b.id))
+		: [];
+	const provoker = provokers[0];
 	const provokable = new Set(provoker ? combat.intents.filter((i) => reclaimers(combat, party, i).some((c) => c.id === provoker.id)).map((i) => i.foeId) : []);
+	// Nouveau tour des monstres : personne n'a encore passé.
+	useEffect(() => {
+		if (!intentOpen) setPassed([]);
+	}, [intentOpen]);
 	const provokeText = (c: Character) => {
 		const stat = CLASSES[c.classId].aggro!;
 		const how = c.classId === 'danseur' ? 'peut utiliser Moquerie pour provoquer un monstre' : 'peut défier un monstre avec son Aura de bataille';
@@ -512,13 +521,9 @@ export function CombatPanel(props: Props) {
 						<small> ({provokeText(provoker).chance})</small>
 					</p>
 					{provokers.length > 1 ? (
-						<div className="intent-bar__who" role="group" aria-label="Qui provoque">
-							{provokers.map((c) => (
-								<button key={c.id} type="button" className={`btn btn--small${c.id === provoker.id ? '' : ' btn--ghost'}`} aria-pressed={c.id === provoker.id} onClick={() => setProvokerId(c.id)}>
-									{c.name}
-								</button>
-							))}
-						</div>
+						<button type="button" className="btn btn--ghost" onClick={() => setPassed((p) => [...p, provoker.id])}>
+							Passer → à {provokers[1].name}
+						</button>
 					) : null}
 				</>
 			) : (
