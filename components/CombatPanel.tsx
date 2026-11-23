@@ -474,14 +474,10 @@ export function CombatPanel(props: Props) {
 		props.onAbility(ab.id, ids);
 	};
 	const pickAbility = (ab: Ability) => {
-		const t = targetsFor(combat, party, actor, ab);
-		if (ab.target === 'foe') {
-			if (t.foes.length === 1) fire(ab, [t.foes[0].id]);
-			else setSelected(ab.id);
-		} else if (ab.target === 'ally') {
-			if (t.allies.length === 1) fire(ab, [t.allies[0].id]);
-			else setSelected(ab.id);
-		} else fire(ab);
+		// Une compétence à une seule cible attend toujours qu'on touche le jeton visé, même s'il n'y en a qu'un :
+		// on choisit qui on frappe (ou qui on aide), rien ne part tout seul.
+		if (ab.target === 'foe' || ab.target === 'ally') setSelected(ab.id);
+		else fire(ab);
 	};
 
 	const order = combat.order;
