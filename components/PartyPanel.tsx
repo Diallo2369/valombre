@@ -8,18 +8,16 @@ import { HeroPortrait } from './HeroPortrait';
 interface Props {
 	party: Character[];
 	media: MediaMap;
+	/** En combat : le héros qui joue. */
 	activeId?: string;
-	/** Héros dont on regarde les compétences en combat. */
-	viewedId?: string;
-	spokesId?: string;
-	/** Ce que fait le clic sur un héros (« Fiche de », ou en combat « Compétences de »). */
-	openLabel?: string;
+	/** Le héros dont la fiche est ouverte à côté. */
+	openId?: string;
 	onOpenSheet: (id: string) => void;
 	onBardSong: (id: string) => void;
 }
 
-/** Le groupe (dans le volet « Le groupe ») : PV, pouvoir, porte-parole, accès à la fiche. */
-export function PartyPanel({ party, media, activeId, viewedId, spokesId, openLabel = 'Fiche de', onOpenSheet, onBardSong }: Props) {
+/** Le groupe (dans le volet « Le groupe ») : PV, pouvoir ; toucher un héros ouvre sa fiche à côté. */
+export function PartyPanel({ party, media, activeId, openId, onOpenSheet, onBardSong }: Props) {
 	return (
 		<ul className="party" aria-label="Le groupe">
 			{party.map((c) => {
@@ -32,13 +30,18 @@ export function PartyPanel({ party, media, activeId, viewedId, spokesId, openLab
 							'party__hero',
 							c.pv === 0 ? 'is-down' : '',
 							c.id === activeId ? 'is-active' : '',
-							c.id === viewedId ? 'is-viewed' : '',
-							c.id === spokesId ? 'is-spokes' : '',
+							c.id === openId ? 'is-open' : '',
 						]
 							.filter(Boolean)
 							.join(' ')}
 					>
-						<button type="button" className="party__main" onClick={() => onOpenSheet(c.id)} aria-label={`${openLabel} ${c.name}`}>
+						<button
+							type="button"
+							className="party__main"
+							onClick={() => onOpenSheet(c.id)}
+							aria-expanded={c.id === openId}
+							aria-label={`${c.id === openId ? 'Fermer la fiche de' : 'Ouvrir la fiche de'} ${c.name}`}
+						>
 							<HeroPortrait className="party__portrait" character={c} media={media} />
 							<span className="party__text">
 								<span className="party__name">{c.name}</span>
@@ -46,6 +49,9 @@ export function PartyPanel({ party, media, activeId, viewedId, spokesId, openLab
 									{c.player ? `${c.player} · ` : ''}
 									{cls.name} niv. {levelFromXp(c.xp)}
 								</span>
+							</span>
+							<span className="party__open" aria-hidden="true">
+								Fiche <span className="party__chevron">›</span>
 							</span>
 						</button>
 						<div className="party__pv" aria-label={`${c.pv} points de vie sur ${c.pvMax}`}>

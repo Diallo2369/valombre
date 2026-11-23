@@ -23,7 +23,7 @@ import { DEFAULT_PREFS, fxLevel, loadPrefs, savePrefs, type Prefs } from '@/lib/
 import { VoicePlayer, speechSupported, type PlayerState, type VoiceItem } from '@/lib/voice';
 import { voiceHash, voiceIndex, voiceKey } from '@/engine/voices';
 import { CharacterSheet } from './CharacterSheet';
-import { BagContent, Drawer, JournalContent, SettingsContent } from './Drawers';
+import { BagContent, Drawer, JournalContent, SettingsContent, SidePanel } from './Drawers';
 import { SoundMenu } from './SoundMenu';
 import { STORY_START_EVENT } from './SiteMusic';
 import { CombatPanel } from './CombatPanel';
@@ -59,6 +59,7 @@ type PendingRoll =
 	| { kind: 'talk'; request: RollRequest }
 	| { kind: 'flee'; request: RollRequest };
 
+/** Le volet ouvert ; pour le groupe, la fiche du héros ouverte à côté (à gauche). */
 type Panel = null | 'groupe' | 'journal' | 'sac' | 'reglages' | { sheet: string };
 
 
@@ -133,7 +134,6 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const combatDef = scene.combat;
 	const combat = state.combat;
 	const actor = combat ? party[combat.actor] : undefined;
-	const spokes = party.length ? party[state.spokes % party.length] : undefined;
 
 	const lines = useMemo(() => {
 		const narr = narration.map((n) => ({ ...n, result: true }));
@@ -410,6 +410,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	});
 
 	const sheetHero = panel && typeof panel === 'object' ? party.find((c) => c.id === panel.sheet) : undefined;
+	const groupOpen = panel === 'groupe' || Boolean(sheetHero);
 	const stageImage = combat && combatDef?.enemy.image ? combatDef.enemy.image : scene.media?.image;
 	// L'écran de chargement : la carte du monde, et la position du groupe dessus (sa zone).
 	const mapUrl = campaign.map ? media[campaign.map.image] : undefined;
@@ -423,9 +424,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			party={party}
 			media={media}
 			activeId={actor?.id}
-			viewedId={fighting ? viewId ?? undefined : undefined}
-			spokesId={prefs.spokesperson && !combat ? spokes?.id : undefined}
-			onOpenSheet={(id) => setPanel({ sheet: id })}
+			openId={sheetHero?.id}
+			onOpenSheet={(id) => setPanel(sheetHero?.id === id ? 'groupe' : { sheet: id })}
 			onBardSong={(id) => apply(bardSong(game, id))}
 		/>
 	);
@@ -684,8 +684,29 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 					<BagContent campaign={campaign} state={state} party={party} onUse={(itemId, target) => apply(consumeItem(campaign, game, itemId, target))} />
 				</Drawer>
 			) : null}
-			{panel === 'groupe' ? (
-				<Drawer title="Le groupe" onClose={() => setPanel(null)}>
+			{groupOpen ? (
+				<Drawer
+					title="Le groupe"
+					onClose={() => setPanel(null)}
+					onAsideClose={() => setPanel('groupe')}
+					aside={
+						sheetHero ? (
+							<SidePanel key={sheetHero.id} title={`Fiche de ${sheetHero.name}`} onClose={() => setPanel('groupe')}>
+								{/* On rouvre sur le premier onglet ; en combat, sur ses compétences. */}
+								<CharacterSheet character={sheetHero} media={media} tabs initialTab={fighting ? 'competences' : 'carac'}>
+									<NotesField
+										key={sheetHero.id}
+										initial={sheetHero.notes}
+										onSave={(notes) => {
+											setGame((g) => ({ ...g, party: g.party.map((c) => (c.id === sheetHero.id ? { ...c, notes } : c)) }));
+											if (!sandbox) void saveNotesAction(adventureId, sheetHero.id, notes);
+										}}
+									/>
+								</CharacterSheet>
+							</SidePanel>
+						) : undefined
+					}
+				>
 					<div className="game__party">
 						{partyPanel}
 						<p className="game__gold">
@@ -709,24 +730,6 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							setPanel(null);
 						}}
 					/>
-				</Drawer>
-			) : null}
-			{sheetHero ? (
-				<Drawer title={`Fiche de ${sheetHero.name}`} onClose={() => setPanel(null)}>
-					<button type="button" className="btn btn--small btn--ghost sheet-back" onClick={() => setPanel('groupe')}>
-						← Le groupe
-					</button>
-					{/* Une fiche par héros (la clé) : on rouvre sur le premier onglet ; en combat, sur ses compétences. */}
-					<CharacterSheet key={sheetHero.id} character={sheetHero} media={media} tabs initialTab={fighting ? 'competences' : 'carac'}>
-						<NotesField
-							key={sheetHero.id}
-							initial={sheetHero.notes}
-							onSave={(notes) => {
-								setGame((g) => ({ ...g, party: g.party.map((c) => (c.id === sheetHero.id ? { ...c, notes } : c)) }));
-								if (!sandbox) void saveNotesAction(adventureId, sheetHero.id, notes);
-							}}
-						/>
-					</CharacterSheet>
 				</Drawer>
 			) : null}
 

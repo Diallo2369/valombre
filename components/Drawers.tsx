@@ -8,12 +8,34 @@ import type { Prefs } from '@/lib/prefs';
 /* Tiroir générique (dialogue latéral)                                 */
 /* ------------------------------------------------------------------ */
 
-export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Drawer({
+	title,
+	onClose,
+	aside,
+	onAsideClose,
+	children,
+}: {
+	title: string;
+	onClose: () => void;
+	/** Un panneau qui coulisse à gauche du tiroir (la fiche d'un héros, à côté du groupe). */
+	aside?: React.ReactNode;
+	onAsideClose?: () => void;
+	children: React.ReactNode;
+}) {
 	const ref = useRef<HTMLDivElement>(null);
+	// Échap ferme d'abord le panneau de gauche, puis le tiroir.
+	const asideOpen = useRef(false);
+	asideOpen.current = Boolean(aside);
+	const closeAside = useRef(onAsideClose);
+	closeAside.current = onAsideClose;
 	useEffect(() => {
 		const previous = document.activeElement as HTMLElement | null;
-		ref.current?.querySelector<HTMLElement>('button, [href], input, textarea, select')?.focus();
-		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+		ref.current?.querySelector<HTMLElement>('.drawer button, .drawer [href], .drawer input, .drawer textarea, .drawer select')?.focus();
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== 'Escape') return;
+			if (asideOpen.current && closeAside.current) closeAside.current();
+			else onClose();
+		};
 		window.addEventListener('keydown', onKey);
 		return () => {
 			window.removeEventListener('keydown', onKey);
@@ -22,16 +44,45 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
 	}, [onClose]);
 	return (
 		<div className="overlay overlay--side" onClick={(e) => e.target === e.currentTarget && onClose()} role="presentation">
-			<div className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" ref={ref}>
-				<header className="drawer__head">
-					<h2 id="drawer-title">{title}</h2>
-					<button type="button" className="btn btn--small btn--ghost" onClick={onClose}>
-						Fermer
-					</button>
-				</header>
-				<div className="drawer__body">{children}</div>
+			<div className="drawer-wrap" role="dialog" aria-modal="true" aria-labelledby="drawer-title" ref={ref}>
+				{aside}
+				<div className="drawer">
+					<header className="drawer__head">
+						<h2 id="drawer-title">{title}</h2>
+						<button type="button" className="btn btn--small btn--ghost" onClick={onClose}>
+							Fermer
+						</button>
+					</header>
+					<div className="drawer__body">{children}</div>
+				</div>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * Le panneau qui coulisse à gauche d'un tiroir (dans son dialogue) : il prend le focus en s'ouvrant,
+ * et le rend à ce qui l'a ouvert en se fermant.
+ */
+export function SidePanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+	const ref = useRef<HTMLElement>(null);
+	useEffect(() => {
+		const previous = document.activeElement as HTMLElement | null;
+		ref.current?.querySelector<HTMLElement>('button')?.focus();
+		return () => {
+			if (previous?.isConnected) previous.focus();
+		};
+	}, []);
+	return (
+		<section className="drawer-aside" aria-labelledby="drawer-aside-title" ref={ref}>
+			<header className="drawer__head">
+				<h2 id="drawer-aside-title">{title}</h2>
+				<button type="button" className="btn btn--small btn--ghost" onClick={onClose} aria-label={`Fermer : ${title}`}>
+					✕
+				</button>
+			</header>
+			<div className="drawer__body">{children}</div>
+		</section>
 	);
 }
 
