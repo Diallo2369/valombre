@@ -610,7 +610,7 @@ export function CombatPanel(props: Props) {
 							) : null}
 							<span>👣 {mine && combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
 							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
-							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque critique !</span> : null}
+							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque +50 % !</span> : null}
 							{hs?.stunned ? <span className="is-bad">💫 assommé·e : passe son prochain tour</span> : null}
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}

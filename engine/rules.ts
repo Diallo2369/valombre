@@ -266,7 +266,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		offhand: 2,
-		every: 2,
+		every: 3,
 		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 2 PV + 2 PV.',
 	}),
 	ambidextrie: A({
@@ -283,7 +283,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🔥',
 		passive: true,
 		target: 'none',
-		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque est un coup critique (les deux haches font double dégâts, même en Tourbillon). Mais ta fureur se voit de loin : les monstres t’en veulent davantage.',
+		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque fait 50 % de dégâts en plus. Mais ta fureur se voit de loin : les monstres t’en veulent davantage.',
 	}),
 
 	/* ---- Rôdeur : à distance ---- */

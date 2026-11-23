@@ -1177,7 +1177,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 	}
 	const success = !ab.stat || Boolean(action.roll?.success);
-	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && (ab.crit || Boolean(heroState(combat, hero.id).fury)) });
+	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && Boolean(ab.crit) });
 	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
 	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
 
@@ -1197,9 +1197,9 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		for (const foe of foes) {
 			let main = ab.damage;
 			if (ab.brumeBonus && def.enemy.brume) main *= 2;
-			const crit = Boolean(ab.crit) || fury;
-			// Critique : les deux haches font double dégâts.
-			const amount = Math.min((main + (ab.offhand ?? 0)) * (crit ? 2 : 1), foe.hp);
+			const crit = Boolean(ab.crit);
+			// Critique : dégâts doublés (les deux mains). Folie vengeresse : +50 % (arrondi au-dessus), sans être un critique.
+			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
 			// Menace : les dégâts énervent, un critique deux fois plus.
 			addThreat(foe, hero, amount * (crit ? 2 : 1));
