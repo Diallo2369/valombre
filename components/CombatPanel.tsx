@@ -316,309 +316,315 @@ export function CombatPanel(props: Props) {
 				})}
 			</ol>
 
-			{/* ---------- Le plateau ---------- */}
-			<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
-				<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
-					<defs>
-						<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-							<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
-						</marker>
-						<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-							<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
-						</marker>
-					</defs>
-					{Array.from({ length: BOARD.rows }, (_, r) =>
-						Array.from({ length: BOARD.cols }, (_, c) => {
-							const h = { c, r };
-							const k = hexKey(h);
-							const canMove = moveSet.has(k);
-							const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
-							return (
-								<polygon
-									key={k}
-									points={hexPoints(h)}
-									className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
-									onClick={canMove ? () => props.onMove(h) : undefined}
-									onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
-									tabIndex={canMove ? 0 : undefined}
-									role={canMove ? 'button' : undefined}
-									aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
-								/>
-							);
-						}),
-					)}
-					{intents.map((i) => {
-						const a = posOf(i.foeId);
-						const b = combat.pos[i.heroId];
-						if (!a || !b) return null;
-						const p = center(a);
-						const q = center(b);
-						// On s'arrête au bord du jeton visé.
-						const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
-						const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
-						const aggro = i.why !== 'near';
-						return (
-							<line
-								key={i.foeId}
-								className={`intent${aggro ? ' intent--aggro' : ''}`}
-								x1={p.x}
-								y1={p.y}
-								x2={end.x}
-								y2={end.y}
-								markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
-							/>
-						);
-					})}
-				</svg>
-
-				{combat.foes.map((f) => {
-					const hit = hits.get(f.id);
-					const status = statuses.find((s) => s.foeId === f.id);
-					const targetable = targets.foes.some((t) => t.id === f.id);
-					const acting = say?.foeId === f.id;
-					return (
-						<button
-							key={`${f.id}-${hit ? seq : 0}`}
-							type="button"
-							className={`token token--foe${f.hp <= 0 ? ' is-down' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
-							style={place(posOf(f.id))}
-							disabled={!targetable}
-							onClick={() => ability && fire(ability, [f.id])}
-							aria-label={`${f.name} : ${heartsText(Math.max(0, f.hp))}${targetable ? ' — viser' : ''}`}
-							title={f.name}
-						>
-							<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
-							<span className="token__icons" aria-hidden="true">
-								{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
-								{f.poison ? '🧪' : ''}
-								{f.blind ? '🔆' : ''}
-								{f.taunt ? '😜' : ''}
-							</span>
-							<Hearts foe={f} small />
-							<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
-							{hit ? (
-								<span className="token__burst" aria-hidden="true">
-									{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
-								</span>
-							) : status?.failed ? (
-								<span className="token__burst token__burst--miss" aria-hidden="true">
-									Raté !
-								</span>
-							) : status ? (
-								<span className="token__burst token__burst--status" aria-hidden="true">
-									{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
-								</span>
-							) : null}
-						</button>
-					);
-				})}
-
-				{party.map((c) => {
-					const st = combat.heroes[c.id];
-					const pv = c.pv + (dmgLeft[c.id] ?? 0);
-					const targetable = targets.allies.some((a) => a.id === c.id);
-					const isTurn = c.id === actor.id && phase === 'hero' && !busy;
-					return (
-						<button
-							key={`${c.id}-${support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id ? seq : 0}`}
-							type="button"
-							className={`token token--hero${isTurn ? ' is-turn' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
-							style={place(combat.pos[c.id])}
-							disabled={!targetable}
-							onClick={() => ability && fire(ability, [c.id])}
-							aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ''}`}
-							title={`${c.name} (${className(c)})`}
-						>
-							<HeroPortrait className="token__img" character={c} media={media} />
-							<span className="token__icons" aria-hidden="true">
-								{st?.protectedBy ? '🛡️' : ''}
-								{st?.shield ? '🌕' : ''}
-								{st?.fury ? '🔥' : ''}
-								{st?.afflict ? '🤒' : ''}
-							</span>
-							<span className="token__pv" aria-hidden="true">
-								<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
-							</span>
-							<span className="token__name">{c.name}</span>
-							{hurtId === c.id && say?.amount ? (
-								<span className="token__burst token__burst--hurt" aria-hidden="true">
-									−{say.amount} PV
-								</span>
-							) : missedBy === c.id && !statuses.some((x) => x.failed) ? (
-								<span className="token__burst token__burst--miss" aria-hidden="true">
-									Raté !
-								</span>
-							) : support?.what === 'heal' ? (
-								<span className="token__burst token__burst--heal" aria-hidden="true">
-									+{support.amount} PV
-								</span>
-							) : support?.targetId === c.id ? (
-								<span className="token__burst token__burst--heal" aria-hidden="true">
-									{support.what === 'shield' ? '🌕' : '🛡️'}
-								</span>
-							) : null}
-						</button>
-					);
-				})}
-
-				{say ? (
-					<p className={`board__say board__say--${say.tone}`} role="status" aria-live="assertive" style={{ '--beat': `${say.ms}ms` } as React.CSSProperties}>
-						{say.text}
-					</p>
-				) : null}
-			</div>
-
-			{log.length ? (
-				<ol className="fight__log" aria-label="Les derniers coups">
-					{log.map((line, i) => (
-						<li key={i} className={i === log.length - 1 ? 'is-last' : ''}>
-							{line}
-						</li>
-					))}
-				</ol>
-			) : null}
-
-			{/* ---------- Tour des monstres : on peut tenter de reprendre l'aggro ---------- */}
-			{phase === 'intent' && !busy ? (
-				<section className="intent-panel card" aria-labelledby="intent-title">
-					<h3 id="intent-title">Les monstres préparent leur coup…</h3>
-					<ul className="intent-panel__list">
-						{combat.intents.map((i) => {
-							const who = reclaimers(combat, party, i);
-							return (
-								<li key={i.foeId}>
-									<p>{intentLine(i)}</p>
-									{who.length ? (
-										<div className="intent-panel__actions">
-											{who.map((c) => {
-												const stat = CLASSES[c.classId].aggro!;
-												return (
-													<button key={c.id} type="button" className="btn btn--small" onClick={() => props.onReclaim(i.foeId, c.id)}>
-														{c.classId === 'danseur' ? '😜' : '🔱'} {c.name} tente de l’attirer · {STAT_LABEL[stat]} {c.stats[stat]} : {need(c.stats[stat], difficulty)}
-													</button>
-												);
-											})}
-										</div>
-									) : null}
-								</li>
-							);
-						})}
-					</ul>
-					<button type="button" className="btn btn--ghost" onClick={props.onResolve}>
-						⚔️ Laisser les monstres attaquer
-					</button>
-				</section>
-			) : null}
-
-			{/* ---------- La carte du héros dont c'est le tour ---------- */}
-			{phase === 'hero' ? (
-				<section className={`hero-card card${busy ? ' is-waiting' : ''}`} aria-labelledby="hero-card-title">
-					<HeroPortrait className="hero-card__portrait" character={actor} media={media} />
-					<div className="hero-card__head">
-						<h3 id="hero-card-title">
-							{busy ? '…' : (
-								<>
-									À <strong>{actor.name}</strong>
-									{actor.player ? ` (${actor.player})` : ''}, {classWithArticle(actor)}, de jouer !
-								</>
+			<div className="fight__stage">
+				<div className="fight__field">
+					{/* ---------- Le plateau ---------- */}
+					<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
+							<defs>
+								<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+									<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
+								</marker>
+								<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+									<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
+								</marker>
+							</defs>
+							{Array.from({ length: BOARD.rows }, (_, r) =>
+								Array.from({ length: BOARD.cols }, (_, c) => {
+									const h = { c, r };
+									const k = hexKey(h);
+									const canMove = moveSet.has(k);
+									const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
+									return (
+										<polygon
+											key={k}
+											points={hexPoints(h)}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
+											onClick={canMove ? () => props.onMove(h) : undefined}
+											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
+											tabIndex={canMove ? 0 : undefined}
+											role={canMove ? 'button' : undefined}
+											aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+										/>
+									);
+								}),
 							)}
-						</h3>
-						<p className="hero-card__stats">
-							<span>
-								♥ {actor.pv}/{actor.pvMax} PV
-							</span>
-							{cls.armor ? (
-								<span>
-									🛡️ armure {hs?.armor ?? cls.armor}/{cls.armor}
-								</span>
-							) : null}
-							<span>👣 {combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
-							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
-							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque critique !</span> : null}
-							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
-							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
-						</p>
-						{passives.length ? (
-							<p className="hero-card__passives">
-								{passives.map((a) => (
-									<span key={a.id} className="badge" title={a.text}>
-										{a.icon} {a.name}
-									</span>
-								))}
-							</p>
-						) : null}
-						<p className="hero-card__hint">
-							{ability
-								? ability.target === 'ally'
-									? `Touche le compagnon à aider (il brille).`
-									: `Touche la créature à viser (elle brille).`
-								: !combat.moved
-									? `Tu peux d’abord te déplacer : touche une case lumineuse. Puis choisis ton action.`
-									: `Choisis ton action.`}
-						</p>
-					</div>
-
-					{ability ? (
-						<div className="hero-card__actions">
-							<button type="button" className="btn btn--ghost" onClick={() => setSelected(null)}>
-								← Choisir une autre action
-							</button>
-						</div>
-					) : (
-						<div className="choices hero-card__actions">
-							{abilities.map((a) => {
-								const ok = canUse(combat, party, actor, a);
-								const stat = a.stat ? actor.stats[a.stat] : 0;
+							{intents.map((i) => {
+								const a = posOf(i.foeId);
+								const b = combat.pos[i.heroId];
+								if (!a || !b) return null;
+								const p = center(a);
+								const q = center(b);
+								// On s'arrête au bord du jeton visé.
+								const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+								const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
+								const aggro = i.why !== 'near';
 								return (
-									<button
-										key={a.id}
-										type="button"
-										className={`choice${a.perCombat ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}`}
-										disabled={busy || !ok}
-										onClick={() => pickAbility(a)}
-									>
-										<span className="choice__label">
-											{a.icon} {a.name}
-										</span>
-										<span className="choice__desc">{a.text}</span>
-										<span className="choice__tag">
-											{!ok
-												? a.range === 1
-													? 'Personne au contact : approche-toi'
-													: 'Personne à portée : approche-toi'
-												: a.stat
-													? `${STAT_LABEL[a.stat]} ${stat}${a.harder ? ` (+${a.harder} de difficulté)` : ''} : ${need(stat, difficulty + (a.harder ?? 0))}`
-													: 'Sans dé'}
-											{a.range ? ` · portée ${a.range === 1 ? 'au contact' : `${a.range} cases`}` : ''}
-											{a.perCombat ? ' · une fois par combat' : ''}
-										</span>
-									</button>
+									<line
+										key={i.foeId}
+										className={`intent${aggro ? ' intent--aggro' : ''}`}
+										x1={p.x}
+										y1={p.y}
+										x2={end.x}
+										y2={end.y}
+										markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
+									/>
 								);
 							})}
-							{def.talk ? (
-								<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onTalk}>
-									<span className="choice__label">💬 {def.talk.label}</span>
-									<span className="choice__tag">
-										{STAT_LABEL[def.talk.stat]} {actor.stats[def.talk.stat]} : {need(actor.stats[def.talk.stat], DIFFICULTY[def.talk.difficulty].target)}
+						</svg>
+
+						{combat.foes.map((f) => {
+							const hit = hits.get(f.id);
+							const status = statuses.find((s) => s.foeId === f.id);
+							const targetable = targets.foes.some((t) => t.id === f.id);
+							const acting = say?.foeId === f.id;
+							return (
+								<button
+									key={`${f.id}-${hit ? seq : 0}`}
+									type="button"
+									className={`token token--foe${f.hp <= 0 ? ' is-down' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
+									style={place(posOf(f.id))}
+									disabled={!targetable}
+									onClick={() => ability && fire(ability, [f.id])}
+									aria-label={`${f.name} : ${heartsText(Math.max(0, f.hp))}${targetable ? ' — viser' : ''}`}
+									title={f.name}
+								>
+									<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
+									<span className="token__icons" aria-hidden="true">
+										{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
+										{f.poison ? '🧪' : ''}
+										{f.blind ? '🔆' : ''}
+										{f.taunt ? '😜' : ''}
 									</span>
+									<Hearts foe={f} small />
+									<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
+									{hit ? (
+										<span className="token__burst" aria-hidden="true">
+											{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
+										</span>
+									) : status?.failed ? (
+										<span className="token__burst token__burst--miss" aria-hidden="true">
+											Raté !
+										</span>
+									) : status ? (
+										<span className="token__burst token__burst--status" aria-hidden="true">
+											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
+										</span>
+									) : null}
 								</button>
-							) : null}
-							{def.flee ? (
-								<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onFlee}>
-									<span className="choice__label">🏃 {def.flee.label}</span>
-									<span className="choice__tag">
-										{STAT_LABEL[def.flee.stat]} {actor.stats[def.flee.stat]} : {need(actor.stats[def.flee.stat], DIFFICULTY[def.flee.difficulty].target)}
+							);
+						})}
+
+						{party.map((c) => {
+							const st = combat.heroes[c.id];
+							const pv = c.pv + (dmgLeft[c.id] ?? 0);
+							const targetable = targets.allies.some((a) => a.id === c.id);
+							const isTurn = c.id === actor.id && phase === 'hero' && !busy;
+							return (
+								<button
+									key={`${c.id}-${support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id ? seq : 0}`}
+									type="button"
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+									style={place(combat.pos[c.id])}
+									disabled={!targetable}
+									onClick={() => ability && fire(ability, [c.id])}
+									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ''}`}
+									title={`${c.name} (${className(c)})`}
+								>
+									<HeroPortrait className="token__img" character={c} media={media} />
+									<span className="token__icons" aria-hidden="true">
+										{st?.protectedBy ? '🛡️' : ''}
+										{st?.shield ? '🌕' : ''}
+										{st?.fury ? '🔥' : ''}
+										{st?.afflict ? '🤒' : ''}
 									</span>
+									<span className="token__pv" aria-hidden="true">
+										<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
+									</span>
+									<span className="token__name">{c.name}</span>
+									{hurtId === c.id && say?.amount ? (
+										<span className="token__burst token__burst--hurt" aria-hidden="true">
+											−{say.amount} PV
+										</span>
+									) : missedBy === c.id && !statuses.some((x) => x.failed) ? (
+										<span className="token__burst token__burst--miss" aria-hidden="true">
+											Raté !
+										</span>
+									) : support?.what === 'heal' ? (
+										<span className="token__burst token__burst--heal" aria-hidden="true">
+											+{support.amount} PV
+										</span>
+									) : support?.targetId === c.id ? (
+										<span className="token__burst token__burst--heal" aria-hidden="true">
+											{support.what === 'shield' ? '🌕' : '🛡️'}
+										</span>
+									) : null}
 								</button>
-							) : null}
-							<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onWait}>
-								<span className="choice__label">⏳ Finir mon tour</span>
-								<span className="choice__tag">Sans rien faire de plus</span>
+							);
+						})}
+
+						{say ? (
+							<p className={`board__say board__say--${say.tone}`} role="status" aria-live="assertive" style={{ '--beat': `${say.ms}ms` } as React.CSSProperties}>
+								{say.text}
+							</p>
+						) : null}
+					</div>
+
+					{log.length ? (
+						<ol className="fight__log" aria-label="Les derniers coups">
+							{log.map((line, i) => (
+								<li key={i} className={i === log.length - 1 ? 'is-last' : ''}>
+									{line}
+								</li>
+							))}
+						</ol>
+					) : null}
+				</div>
+
+				<div className="fight__side">
+					{/* ---------- Tour des monstres : on peut tenter de reprendre l'aggro ---------- */}
+					{phase === 'intent' && !busy ? (
+						<section className="intent-panel card" aria-labelledby="intent-title">
+							<h3 id="intent-title">Les monstres préparent leur coup…</h3>
+							<ul className="intent-panel__list">
+								{combat.intents.map((i) => {
+									const who = reclaimers(combat, party, i);
+									return (
+										<li key={i.foeId}>
+											<p>{intentLine(i)}</p>
+											{who.length ? (
+												<div className="intent-panel__actions">
+													{who.map((c) => {
+														const stat = CLASSES[c.classId].aggro!;
+														return (
+															<button key={c.id} type="button" className="btn btn--small" onClick={() => props.onReclaim(i.foeId, c.id)}>
+																{c.classId === 'danseur' ? '😜' : '🔱'} {c.name} tente de l’attirer · {STAT_LABEL[stat]} {c.stats[stat]} : {need(c.stats[stat], difficulty)}
+															</button>
+														);
+													})}
+												</div>
+											) : null}
+										</li>
+									);
+								})}
+							</ul>
+							<button type="button" className="btn btn--ghost" onClick={props.onResolve}>
+								⚔️ Laisser les monstres attaquer
 							</button>
-						</div>
-					)}
-				</section>
-			) : null}
+						</section>
+					) : null}
+
+					{/* ---------- La carte du héros dont c'est le tour ---------- */}
+					{phase === 'hero' ? (
+						<section className={`hero-card card${busy ? ' is-waiting' : ''}`} aria-labelledby="hero-card-title">
+							<HeroPortrait className="hero-card__portrait" character={actor} media={media} />
+							<div className="hero-card__head">
+								<h3 id="hero-card-title">
+									{busy ? '…' : (
+										<>
+											À <strong>{actor.name}</strong>
+											{actor.player ? ` (${actor.player})` : ''}, {classWithArticle(actor)}, de jouer !
+										</>
+									)}
+								</h3>
+								<p className="hero-card__stats">
+									<span>
+										♥ {actor.pv}/{actor.pvMax} PV
+									</span>
+									{cls.armor ? (
+										<span>
+											🛡️ armure {hs?.armor ?? cls.armor}/{cls.armor}
+										</span>
+									) : null}
+									<span>👣 {combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
+									{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
+									{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque critique !</span> : null}
+									{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
+									{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
+								</p>
+								{passives.length ? (
+									<p className="hero-card__passives">
+										{passives.map((a) => (
+											<span key={a.id} className="badge" title={a.text}>
+												{a.icon} {a.name}
+											</span>
+										))}
+									</p>
+								) : null}
+								<p className="hero-card__hint">
+									{ability
+										? ability.target === 'ally'
+											? `Touche le compagnon à aider (il brille).`
+											: `Touche la créature à viser (elle brille).`
+										: !combat.moved
+											? `Tu peux d’abord te déplacer : touche une case lumineuse. Puis choisis ton action.`
+											: `Choisis ton action.`}
+								</p>
+							</div>
+
+							{ability ? (
+								<div className="hero-card__actions">
+									<button type="button" className="btn btn--ghost" onClick={() => setSelected(null)}>
+										← Choisir une autre action
+									</button>
+								</div>
+							) : (
+								<div className="choices hero-card__actions">
+									{abilities.map((a) => {
+										const ok = canUse(combat, party, actor, a);
+										const stat = a.stat ? actor.stats[a.stat] : 0;
+										return (
+											<button
+												key={a.id}
+												type="button"
+												className={`choice${a.perCombat ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}`}
+												disabled={busy || !ok}
+												onClick={() => pickAbility(a)}
+											>
+												<span className="choice__label">
+													{a.icon} {a.name}
+												</span>
+												<span className="choice__desc">{a.text}</span>
+												<span className="choice__tag">
+													{!ok
+														? a.range === 1
+															? 'Personne au contact : approche-toi'
+															: 'Personne à portée : approche-toi'
+														: a.stat
+															? `${STAT_LABEL[a.stat]} ${stat}${a.harder ? ` (+${a.harder} de difficulté)` : ''} : ${need(stat, difficulty + (a.harder ?? 0))}`
+															: 'Sans dé'}
+													{a.range ? ` · portée ${a.range === 1 ? 'au contact' : `${a.range} cases`}` : ''}
+													{a.perCombat ? ' · une fois par combat' : ''}
+												</span>
+											</button>
+										);
+									})}
+									{def.talk ? (
+										<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onTalk}>
+											<span className="choice__label">💬 {def.talk.label}</span>
+											<span className="choice__tag">
+												{STAT_LABEL[def.talk.stat]} {actor.stats[def.talk.stat]} : {need(actor.stats[def.talk.stat], DIFFICULTY[def.talk.difficulty].target)}
+											</span>
+										</button>
+									) : null}
+									{def.flee ? (
+										<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onFlee}>
+											<span className="choice__label">🏃 {def.flee.label}</span>
+											<span className="choice__tag">
+												{STAT_LABEL[def.flee.stat]} {actor.stats[def.flee.stat]} : {need(actor.stats[def.flee.stat], DIFFICULTY[def.flee.difficulty].target)}
+											</span>
+										</button>
+									) : null}
+									<button type="button" className="choice choice--alt" disabled={busy} onClick={props.onWait}>
+										<span className="choice__label">⏳ Finir mon tour</span>
+										<span className="choice__tag">Sans rien faire de plus</span>
+									</button>
+								</div>
+							)}
+						</section>
+					) : null}
+				</div>
+			</div>
 
 			{beat?.kind === 'banner' ? (
 				<div

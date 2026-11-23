@@ -1504,7 +1504,35 @@
 	}
 }
 
-/* La carte du héros dont c'est le tour, en bas. */
+/* Le plateau à gauche, la carte du héros (ses compétences) à droite.
+   Sur un écran plus étroit, la carte repasse sous le plateau. */
+$fight-split: 1200px;
+
+.fight__stage,
+.fight__field,
+.fight__side {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+@media (min-width: $fight-split) {
+	.fight__stage {
+		grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+		align-items: start;
+	}
+
+	.fight__side {
+		position: sticky;
+		top: 80px;
+
+		.hero-card__portrait {
+			width: 72px;
+		}
+	}
+}
+
+/* La carte du héros dont c'est le tour. */
 .hero-card {
 	display: grid;
 	grid-template-columns: auto 1fr;
