@@ -521,6 +521,11 @@
 		grid-template-columns: repeat(2, 1fr);
 	}
 
+	/* En combat sur grand écran : le groupe en rangée sous le plateau. */
+	&--row {
+		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+	}
+
 	&__hero {
 		display: grid;
 		gap: 8px;
@@ -537,6 +542,10 @@
 		&.is-active {
 			border-color: var(--ember-400);
 			box-shadow: 0 0 0 3px rgb(224 138 60 / 25%);
+		}
+
+		&.is-viewed {
+			border-color: var(--moss-400);
 		}
 
 		&.is-down {
@@ -1439,6 +1448,12 @@
 		box-shadow: 0 0 0 3px rgb(246 194 127 / 45%), 0 0 24px rgb(246 194 127 / 55%);
 	}
 
+	/* On regarde ses compétences. */
+	&.is-viewed .token__img {
+		border-color: var(--moss-400);
+		box-shadow: 0 0 0 3px rgb(140 190 120 / 45%);
+	}
+
 	/* On peut le viser, ou le choisir. */
 	&.is-target {
 		cursor: pointer;
@@ -1504,35 +1519,20 @@
 	}
 }
 
-/* Le plateau à gauche, la carte du héros (ses compétences) à droite.
-   Sur un écran plus étroit, la carte repasse sous le plateau. */
-$fight-split: 1200px;
-
-.fight__stage,
-.fight__field,
-.fight__side {
+/* La carte du héros dont c'est le tour (ou celui qu'on regarde), à la place du groupe sur grand écran. */
+.game__combat-side {
 	display: grid;
-	gap: 16px;
-	min-width: 0;
-}
+	gap: 12px;
+	/* La colonne reste à l'écran (sticky) : la carte défile si elle est plus haute que l'écran. */
+	max-height: calc(100vh - 150px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
 
-@media (min-width: $fight-split) {
-	.fight__stage {
-		grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-		align-items: start;
-	}
-
-	.fight__side {
-		position: sticky;
-		top: 80px;
-
-		.hero-card__portrait {
-			width: 72px;
-		}
+	.hero-card__portrait {
+		width: 64px;
 	}
 }
 
-/* La carte du héros dont c'est le tour. */
 .hero-card {
 	display: grid;
 	grid-template-columns: auto 1fr;
@@ -1543,6 +1543,18 @@ $fight-split: 1200px;
 
 	&.is-waiting {
 		opacity: 0.55;
+	}
+
+	/* On regarde les compétences d'un autre héros : rien n'est jouable. */
+	&.is-preview {
+		border-color: var(--moss-400);
+		box-shadow: none;
+	}
+
+	&__tools {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
 	}
 
 	&__portrait {

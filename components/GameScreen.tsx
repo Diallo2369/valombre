@@ -67,6 +67,19 @@ const SETTLE_MS = 1200;
 const readMs = (text: string) => Math.max(2200, text.length * 55);
 const NO_LIGHTS: never[] = [];
 
+/** Vrai à partir de la largeur où le jeu affiche sa colonne du groupe ($bp-l). */
+function useWideScreen() {
+	const [wide, setWide] = useState(false);
+	useEffect(() => {
+		const mq = window.matchMedia('(min-width: 1100px)');
+		const update = () => setWide(mq.matches);
+		update();
+		mq.addEventListener('change', update);
+		return () => mq.removeEventListener('change', update);
+	}, []);
+	return wide;
+}
+
 export function GameScreen({ adventureId, adventureName, campaign, initial, media, voices, sandbox = false }: Props) {
 	const [game, setGame] = useState<Game>(initial);
 	const [narration, setNarration] = useState<{ who: string; text: string }[]>([]);
@@ -86,6 +99,12 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	/** Événements de la dernière étape, pour mettre en scène le combat (coups, tour du monstre, tour suivant). */
 	const [step, setStep] = useState<{ events: GameEvent[]; seq: number }>({ events: [], seq: 0 });
 	const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error' | 'stale'>('idle');
+	/** Combat sur grand écran : la carte des compétences prend la colonne du groupe, le groupe passe sous le plateau. */
+	const wide = useWideScreen();
+	const [combatSide, setCombatSide] = useState<HTMLDivElement | null>(null);
+	/** Héros dont on regarde les compétences en combat (null : celui qui joue). On revient à lui à chaque étape. */
+	const [viewId, setViewId] = useState<string | null>(null);
+	useEffect(() => setViewId(null), [step.seq]);
 	const [playerState, setPlayerState] = useState<PlayerState>('idle');
 	/** Répliques jamais entendues dans la scène actuelle ('all' : on vient d'ouvrir la partie, tout est lu). */
 	const [fresh, setFresh] = useState<Set<string> | 'all'>('all');
@@ -213,6 +232,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		return () => window.clearTimeout(t);
 	}, [started, settling, playerState, revealed, lines]);
 	const allRevealed = revealed >= lines.length;
+	const fighting = Boolean(allRevealed && !scene.ending && combat && combatDef && actor);
+	const sideCombat = fighting && wide;
 	const showAll = () => {
 		player.current?.stop();
 		setSettling(false);
@@ -334,6 +355,20 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 
 	const sheetHero = panel && typeof panel === 'object' ? party.find((c) => c.id === panel.sheet) : undefined;
 	const stageImage = combat && combatDef?.enemy.image ? combatDef.enemy.image : scene.media?.image;
+
+	const partyPanel = (
+		<PartyPanel
+			party={party}
+			media={media}
+			activeId={actor?.id}
+			viewedId={fighting ? viewId ?? undefined : undefined}
+			spokesId={prefs.spokesperson && !combat ? spokes?.id : undefined}
+			row={sideCombat}
+			openLabel={fighting ? 'Compétences de' : 'Fiche de'}
+			onOpenSheet={(id) => (fighting ? setViewId(id === actor?.id ? null : id) : setPanel({ sheet: id }))}
+			onBardSong={(id) => apply(bardSong(game, id))}
+		/>
+	);
 
 	/* ---------------- Rendu ---------------- */
 	return (
@@ -482,6 +517,10 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 									request: { title: combatDef.flee!.label, stat: combatDef.flee!.stat, difficulty: combatDef.flee!.difficulty, heroId: actor.id, cancellable: true },
 								})
 							}
+							sideEl={sideCombat ? combatSide : null}
+							viewId={viewId}
+							onView={setViewId}
+							onSheet={(id) => setPanel({ sheet: id })}
 						/>
 					) : (
 						<section className="decide" aria-labelledby="decide-title">
@@ -521,17 +560,12 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							)}
 						</section>
 					)}
+
+					{sideCombat ? partyPanel : null}
 				</main>
 
-				<aside className="game__side" aria-label="Le groupe">
-					<PartyPanel
-						party={party}
-						media={media}
-						activeId={actor?.id}
-						spokesId={prefs.spokesperson && !combat ? spokes?.id : undefined}
-						onOpenSheet={(id) => setPanel({ sheet: id })}
-						onBardSong={(id) => apply(bardSong(game, id))}
-					/>
+				<aside className="game__side" aria-label={sideCombat ? 'Compétences' : 'Le groupe'}>
+					{sideCombat ? <div className="game__combat-side" ref={setCombatSide} /> : partyPanel}
 					<p className="game__gold">
 						🪙 {state.gold} · 🎒 {Object.values(state.bag).reduce((a, b) => a + b, 0)} objet(s)
 					</p>
