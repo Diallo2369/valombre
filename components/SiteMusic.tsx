@@ -153,9 +153,10 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	};
 
 	useEffect(() => {
-		const gated = blocked && !inGame && !leaving;
-		if (gated) gate.current?.querySelector<HTMLElement>('button')?.focus();
-		// Tant que l'écran d'entrée est là, les animations de la page attendent : elles démarrent quand on le franchit.
+		const gated = blocked && !inGame;
+		if (gated && !leaving) gate.current?.querySelector<HTMLElement>('button')?.focus();
+		// Tant que l'écran d'entrée est là (et pendant qu'on le franchit), les animations de la page attendent :
+		// on voit l'image floue et sombre derrière le noir qui s'ouvre, puis l'apparition démarre une fois l'écran disparu.
 		document.documentElement.classList.toggle('is-gated', gated);
 	}, [blocked, inGame, leaving]);
 
