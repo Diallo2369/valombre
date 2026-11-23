@@ -362,7 +362,7 @@ export interface FoeState {
 	/** Tours qu'elle doit encore passer : sonnée (Coup assommant), prise au filet, endormie. */
 	stunned?: number;
 	stunKind?: StunKind;
-	/** Tours de poison restants (½ ♥ perdu à chacun de ses tours). */
+	/** Tours de poison restants (1 PV perdu à chacun de ses tours). */
 	poison?: number;
 	/** Tours d'aveuglement restants (ses coups font 1 dégât de moins). */
 	blind?: number;

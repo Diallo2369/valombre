@@ -50,7 +50,7 @@ export default function TestsPage({ searchParams }: { searchParams: { c?: string
 								<Link className="tests__link tests__link--fight" href={href(s.id)}>
 									<strong>{s.combat!.enemy.name}</strong>
 									<span>
-										{s.title} · {s.combat!.enemy.hearts} cœurs · {s.combat!.enemy.difficulty}
+										{s.title} · {s.combat!.enemy.hearts * 2} PV (pour 4 héros) · {s.combat!.enemy.difficulty}
 									</span>
 								</Link>
 							</li>

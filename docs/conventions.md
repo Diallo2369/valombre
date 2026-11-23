@@ -112,7 +112,7 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
   tentative par héros et par créature). Puis chaque créature avance et frappe si elle atteint sa cible.
 - Cible d’une créature : celui qui l’a provoquée (Moquerie), sinon le guerrier si son **aura** l’emporte
   (jet caché : 4 chances sur 6), sinon le héros le plus proche.
-- Chaque coup se **voit et s’entend** : le jeton tremble, les cœurs se vident (demi-cœurs possibles), un sort a son
+- Chaque coup se **voit et s’entend** : le jeton tremble, sa barre de vie se vide et un gros chiffre de dégâts surgit, un sort a son
   propre son, un coup raté fend l’air ; la phrase d’action s’affiche au milieu du plateau.
 - Le récit des derniers coups reste affiché (dé + caractéristique = total, touché ou raté, riposte).
 - Un combat a toujours une autre issue possible que la force (parlementer, fuir, un objet…), et on ne meurt jamais.
@@ -121,28 +121,33 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 
 - `enemy` : le nom du groupe (« la bande de brumelins »), la difficulté, l’attaque racontée (lue par le Conteur
   une fois par tour des monstres), les valeurs par défaut (dégâts, mouvement, portée, mal transmis).
-- `foes` : les créatures du groupe, chacune avec ses cœurs (6 au plus). Sans `foes`, une seule créature.
+- `foes` : les créatures du groupe, chacune avec ses cœurs (`hearts` : 1 cœur = 2 PV en jeu). Sans `foes`, une seule créature.
 - `afflict` : un mal laissé par les coups (brûlure, froid de brume…), avec une probabilité ; le barde l’enlève.
-- Les cœurs sont écrits **pour 4 héros** : le moteur les ajuste au groupe (¾ à 2 héros, +¼ à 6).
+- Une créature seule est écrite **pour 4 héros** : le moteur ajuste ses PV et la force de ses coups à la taille du
+  groupe (`foeScale` dans engine.ts).
+- Une bande (`foes`) est écrite **pour une table de 6** : avec moins de héros, on ne garde que les premières de la
+  liste (4 sur 6 à 4 héros) ; mettre les plus importantes en tête. Ses PV totaux suivent la même règle.
+- Réglage visé (simulation `balance`, 4 héros) : ~10-15 % de PV perdus pour un petit combat, un tiers pour la bande
+  de la clairière, la moitié et un héros épuisé contre le Loup de Cendre.
 
 ### Les classes et le combat
 
 | Classe | Profil | Actions | Passifs |
 |---|---|---|---|
-| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3, 👣 2 | Frapper · Coup assommant (1 ♥ + la créature passe son tour, 1×) · Taillade (jusqu’à 3 créatures au contact, 1×) · Intervention (défend un compagnon au contact jusqu’à son prochain tour, −1 dégât) | Aura de bataille (les monstres l’attaquent) ; reprend l’aggro avec la Force |
-| Danseur·se de guerre (corps à corps) | +2 Agilité, +1 PV, aucune armure, 👣 4, initiative +1 | Double attaque (1 ♥ + ½ ♥) · Moquerie (une créature l’attaquera, même contre l’aura) · Tourbillon (toutes les créatures au contact : 1 ♥ ½, 1×) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique) ; reprend l’aggro avec le Charme |
-| Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1, 👣 3, initiative +2 | Tir à l’arc (portée 5) · Flèche visée (+2 de difficulté, critique : 2 ♥) · Salve (3 cibles, 1×) · Filet (2 tours bloquée, 1×) · Flèche empoisonnée (1 ♥ + ½ ♥ par tour pendant 3 tours, 1×) | Seconde chance hors combat |
-| Mage | +2 Esprit, 👣 2 | Trait de lumière · Étincelle d’aube (sans dé, 2 ♥ contre la brume, 1×) · Pluie d’étoiles (une créature et ses voisines, 1×) · Bouclier de lune (absorbe 2 dégâts, 1×) · Lueur aveuglante (−1 dégât pendant 2 tours) | — |
-| Barde | +1 Charme, +1 Esprit, 👣 3 | Note perçante · Berceuse (passe son tour, 1×) · Chant de courage (+2 PV au groupe, 1×) · Chant de délivrance (enlève poison, brûlure, froid) | — |
+| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3, 👣 2 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Intervention (défend un compagnon au contact jusqu’à son prochain tour, −1 dégât) | Aura de bataille (les monstres l’attaquent) ; reprend l’aggro avec la Force |
+| Danseur·se de guerre (corps à corps) | +2 Agilité, +1 PV, aucune armure, 👣 4, initiative +1 | Double attaque (2 PV + 1 PV) · Moquerie (une créature l’attaquera, même contre l’aura) · Tourbillon (toutes les créatures au contact : 3 PV, 1 tour sur 3) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique) ; reprend l’aggro avec le Charme |
+| Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1, 👣 3, initiative +2 | Tir à l’arc (portée 5) · Flèche visée (+2 de difficulté, critique : 4 PV) · Salve (3 cibles, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 4) · Flèche empoisonnée (2 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) | Seconde chance hors combat |
+| Mage | +2 Esprit, 👣 2 | Trait de lumière · Étincelle d’aube (sans dé, 4 PV contre la brume, 1 tour sur 3) · Pluie d’étoiles (une créature et ses voisines, 1 tour sur 3) · Bouclier de lune (absorbe 2 dégâts, 1 tour sur 3) · Lueur aveuglante (−1 dégât pendant 2 tours) | — |
+| Barde | +1 Charme, +1 Esprit, 👣 3 | Note perçante · Berceuse (passe son tour, 1 tour sur 3) · Chant de courage (+2 PV au groupe, 1 tour sur 4) · Chant de délivrance (enlève poison, brûlure, froid) | — |
 
 - **Endurance** : 5ᵉ caractéristique. PV = 6 + Endurance + bonus de classe (+2 par niveau). Les héros créés avant
   l’Endurance reçoivent leur Force à la place (`withEndurance`), pour garder les mêmes PV.
 - **Armure** : des points qui prennent les coups avant les PV, réparés au début de chaque combat.
 - **Initiative** : dé + Agilité + bonus de classe (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
   ordre ; les créatures agissent ensemble à leur place dans la file. La frise des tours reste affichée.
-- **Dégâts** comptés en demi-cœurs : un coup normal = 1 ♥, le second coup de hache = ½ ♥, un critique double.
-- Durée visée (simulation, héros moyens) : 1 à 2 tours de table pour un petit combat, 3 à 6 pour le Loup selon la
-  taille du groupe ; quelques PV perdus, jamais de mort.
+- **Dégâts** en PV : un coup normal = 2 PV, le second coup de hache = 1 PV, un critique double.
+- **Délais** : les coups puissants se relancent « 1 tour sur 3 » (ou 4) ; les autres sont à volonté.
+- Durée visée (simulation, héros moyens) : 2 à 4 tours de table pour un petit combat, 5 à 7 pour le Loup ; jamais de mort.
 - Le code : `engine/board.ts` (plateau), `engine/rules.ts` (`CLASSES`, `ABILITIES`), `engine/engine.ts` (combat).
 
 ### Les jonctions entre scènes

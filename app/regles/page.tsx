@@ -58,7 +58,7 @@ export default function RulesPage() {
 						Le combat se joue sur un <strong>plateau d’hexagones</strong> : les monstres en haut, les aventuriers en bas. Au début,
 						chacun lance l’<strong>initiative</strong> (un dé + l’Agilité + le bonus de sa classe) : on joue dans cet ordre. À son tour,
 						un héros peut <strong>se déplacer</strong> (les cases qui s’allument), puis il choisit une action de sa classe : un coup au
-						contact, une flèche, un sort… Si c’est réussi, la créature perd des cœurs ♥ (parfois un demi-cœur).
+						contact, une flèche, un sort… Si c’est réussi, la créature perd des points de vie (sa barre de vie se vide).
 					</p>
 					<p>
 						Au tour des monstres, chacun montre d’une flèche <strong>qui il va attaquer</strong>. Le guerrier et le danseur de guerre

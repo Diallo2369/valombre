@@ -87,7 +87,7 @@ export interface Ability {
 	stat?: StatKey;
 	/** Plus dur à réussir : s'ajoute au score à atteindre. */
 	harder?: number;
-	/** Dégâts si ça touche, en demi-cœurs (2 = 1 ♥). */
+	/** Dégâts si ça touche, en PV. */
 	damage?: number;
 	/** Second coup, de l'autre main (Ambidextrie), en demi-cœurs. */
 	offhand?: number;
@@ -120,7 +120,7 @@ const A = (a: Ability) => a;
 
 export const ABILITIES: Record<AbilityId, Ability> = {
 	/* ---- Guerrier : le rempart ---- */
-	frapper: A({ id: 'frapper', range: 1, name: 'Frapper', icon: '⚔️', target: 'foe', stat: 'force', damage: 2, text: 'Un bon coup d’épée : 1 ♥.' }),
+	frapper: A({ id: 'frapper', range: 1, name: 'Frapper', icon: '⚔️', target: 'foe', stat: 'force', damage: 2, text: 'Un bon coup d’épée : 2 PV.' }),
 	'coup-assommant': A({
 		id: 'coup-assommant', range: 1,
 		name: 'Coup assommant',
@@ -130,7 +130,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 2,
 		stun: { kind: 'assomme', turns: 1 },
 		every: 3,
-		text: 'Un coup de pommeau sur le crâne : 1 ♥, et la créature, sonnée, passe son prochain tour.',
+		text: 'Un coup de pommeau sur le crâne : 2 PV, et la créature, sonnée, passe son prochain tour.',
 	}),
 	taillade: A({
 		id: 'taillade', range: 1,
@@ -141,7 +141,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'force',
 		damage: 2,
 		every: 3,
-		text: 'Un grand revers d’épée : jusqu’à 3 créatures collées à toi perdent 1 ♥.',
+		text: 'Un grand revers d’épée : jusqu’à 3 créatures collées à toi perdent 2 PV.',
 	}),
 	intervention: A({
 		id: 'intervention', range: 1,
@@ -169,7 +169,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		offhand: 1,
-		text: 'Une hache, puis l’autre : 1 ♥ et encore ½ ♥ si ça touche.',
+		text: 'Une hache, puis l’autre : 2 PV, et encore 1 PV si ça touche.',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,
@@ -188,7 +188,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 2,
 		offhand: 1,
 		every: 3,
-		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 1 ♥ ½.',
+		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 3 PV.',
 	}),
 	ambidextrie: A({
 		id: 'ambidextrie',
@@ -196,7 +196,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '✋',
 		passive: true,
 		target: 'none',
-		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, le second coup un peu moins fort (½ ♥).',
+		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, le second coup un peu moins fort (1 PV).',
 	}),
 	folie: A({
 		id: 'folie',
@@ -208,7 +208,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 	}),
 
 	/* ---- Rôdeur : à distance ---- */
-	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 2, text: 'Une flèche bien ajustée, de loin : 1 ♥.' }),
+	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 2, text: 'Une flèche bien ajustée, de loin : 2 PV.' }),
 	'fleche-visee': A({
 		id: 'fleche-visee', range: 5,
 		name: 'Flèche visée',
@@ -218,7 +218,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		harder: 2,
 		damage: 2,
 		crit: true,
-		text: 'Prendre le temps de viser le point faible : plus dur à réussir (+2), mais coup critique : 2 ♥.',
+		text: 'Prendre le temps de viser le point faible : plus dur à réussir (+2), mais coup critique : 4 PV.',
 	}),
 	salve: A({
 		id: 'salve', range: 5,
@@ -229,7 +229,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		every: 3,
-		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 1 ♥.',
+		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 2 PV.',
 	}),
 	filet: A({
 		id: 'filet', range: 4,
@@ -250,7 +250,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 2,
 		poison: 3,
 		every: 3,
-		text: '1 ♥, puis le poison ronge la créature : ½ ♥ à chacun de ses 3 prochains tours.',
+		text: '2 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
 	}),
 
 	/* ---- Mage ---- */
@@ -262,7 +262,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'esprit',
 		damage: 2,
 		spell: true,
-		text: 'Un rayon de lumière jaillit du bâton : 1 ♥.',
+		text: 'Un rayon de lumière jaillit du bâton : 2 PV.',
 	}),
 	etincelle: A({
 		id: 'etincelle', range: 4,
@@ -273,7 +273,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		brumeBonus: true,
 		spell: true,
 		every: 3,
-		text: 'Touche à coup sûr, sans dé : 1 ♥, et 2 ♥ contre une créature de brume.',
+		text: 'Touche à coup sûr, sans dé : 2 PV, et 4 PV contre une créature de brume.',
 	}),
 	'pluie-etoiles': A({
 		id: 'pluie-etoiles', range: 4, area: true,
@@ -284,7 +284,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 2,
 		spell: true,
 		every: 3,
-		text: 'Des étoiles filantes tombent sur une créature et sur celles collées à elle : 1 ♥ chacune.',
+		text: 'Des étoiles filantes tombent sur une créature et sur celles collées à elle : 2 PV chacune.',
 	}),
 	'bouclier-lune': A({
 		id: 'bouclier-lune', range: 4,
@@ -317,7 +317,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'charme',
 		damage: 2,
 		spell: true,
-		text: 'Une note magique si aiguë qu’elle fait mal aux oreilles : 1 ♥.',
+		text: 'Une note magique si aiguë qu’elle fait mal aux oreilles : 2 PV.',
 	}),
 	berceuse: A({
 		id: 'berceuse', range: 4,
@@ -353,14 +353,6 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 
 /** Le délai d'une compétence, en texte : « 1 tour sur 3 ». */
 export const everyText = (ab: Ability) => (ab.every ? `1 tour sur ${ab.every}` : '');
-
-/** Demi-cœurs en texte : 1 → « ½ ♥ », 3 → « 1 ♥ ½ ». */
-export function heartsText(half: number): string {
-	const full = Math.floor(half / 2);
-	const rest = half % 2;
-	if (!full) return '½ ♥';
-	return `${full} ♥${rest ? ' ½' : ''}`;
-}
 
 export interface ClassDef {
 	id: ClassId;

@@ -1,5 +1,5 @@
 import { BOARD, approach, distance, hexKey, reachable, sameHex, startPositions, type Hex } from './board';
-import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, heartsText, initiativeOf, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
+import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, initiativeOf, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
 import { voiceHash } from './voices';
 import type {
 	Campaign,
@@ -637,7 +637,7 @@ function beginEnemyTurn(game: Game, def: CombatDef, events: GameEvent[]): 'inten
 		foe.poison -= 1;
 		if (!foe.poison) delete foe.poison;
 		events.push({ kind: 'foe-poison', foeId: foe.id, name: foe.name, amount, dead: foe.hp <= 0 });
-		log(game.state, 'combat', `Le poison ronge ${foe.name} : −½ ♥${foe.hp <= 0 ? ', elle s’effondre !' : '.'}`);
+		log(game.state, 'combat', `Le poison ronge ${foe.name} : −1 PV${foe.hp <= 0 ? ', elle s’effondre !' : '.'}`);
 	}
 	if (!livingFoes(combat).length) return 'victory';
 	combat.intents = computeIntents(game, combat);
@@ -890,7 +890,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 			const amount = Math.min(main + (ab.offhand ?? 0), foe.hp);
 			foe.hp -= amount;
 			events.push({ kind: 'hit', heroId: hero.id, foeId: foe.id, amount, spell: ab.spell, crit, offhand: Boolean(ab.offhand) });
-			hits.push(`${foe.name} −${heartsText(amount)}${foe.hp <= 0 ? ' (vaincue !)' : ''}`);
+			hits.push(`${foe.name} −${amount} PV${foe.hp <= 0 ? ' (vaincue !)' : ''}`);
 		}
 		events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 		log(work.state, 'combat', `${hero.name} (${how})${fury ? ', en pleine folie vengeresse,' : ''} touche : ${hits.join(' · ')}.`);

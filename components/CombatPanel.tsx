@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
 import { availableAbilities, canUse, cooldownLeft, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
-import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, heartsText, type Ability, type AbilityId } from '@/engine/rules';
+import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
@@ -269,7 +269,7 @@ export function CombatPanel(props: Props) {
 				if (e.attack) beats.push({ kind: 'say', tone: 'foe', text: e.attack, voice: e.attack, ms: 3400 });
 			} else if (e.kind === 'foe-poison') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + 1;
-				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −½ ♥${e.dead ? ', elle s’effondre !' : '.'}` });
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −1 PV${e.dead ? ', elle s’effondre !' : '.'}` });
 			} else if (e.kind === 'foe-skip') {
 				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1900, text: `${STUN_ICON[e.reason]} ${cap(e.name)} ${STUN_TEXT[e.reason]} et passe son tour.` });
 			} else if (e.kind === 'foe-move') {
@@ -546,7 +546,7 @@ export function CombatPanel(props: Props) {
 						</h3>
 						<p className="hero-card__stats">
 							<span>
-								♥ {shown.pv}/{shown.pvMax} PV
+								{shown.pv}/{shown.pvMax} PV
 							</span>
 							{cls.armor ? (
 								<span>
@@ -780,7 +780,7 @@ export function CombatPanel(props: Props) {
 									style={place(posOf(f.id))}
 									disabled={!targetable}
 									onClick={() => ability && fire(ability, [f.id])}
-									aria-label={`${f.name} : ${heartsText(Math.max(0, hp))}${targetable ? ' — viser' : ''}`}
+									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${targetable ? ' — viser' : ''}`}
 									title={f.name}
 								>
 									<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />

@@ -53,7 +53,7 @@ export function PartyPanel({ party, media, activeId, viewedId, spokesId, row = f
 						<div className="party__pv" aria-label={`${c.pv} points de vie sur ${c.pvMax}`}>
 							<span className="party__pv-bar" style={{ width: `${Math.round(ratio * 100)}%` }} />
 							<span className="party__pv-text">
-								♥ {c.pv}/{c.pvMax}
+								{c.pv}/{c.pvMax} PV
 								{c.pv === 0 ? ` · ${c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e'}` : ''}
 							</span>
 						</div>
