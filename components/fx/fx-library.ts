@@ -458,6 +458,70 @@ function net(eng: FxEngine, at: P, delay: number) {
 	});
 }
 
+/**
+ * Un nuage de poison de dessin animé : des boules vertes cernées qui gonflent, ondulent et montent,
+ * des bulles qui éclatent et une petite tête de mort qui s'échappe.
+ */
+function poisonCloud(eng: FxEngine, at: P, delay = 0, k = 1) {
+	const blobs = Array.from({ length: 7 }, (_, i) => {
+		const a = (i / 7) * Math.PI * 2 + Math.random() * 0.5;
+		return { dx: Math.cos(a) * 24 * k, dy: Math.sin(a) * 14 * k - 6, r: (15 + Math.random() * 9) * k, ph: Math.random() * 6 };
+	});
+	eng.draw({
+		life: 1500,
+		delay,
+		draw(ctx, t) {
+			// Gonfle en dépassant, ondule, puis se dissipe en rétrécissant.
+			const g = t < 0.22 ? ease.out(t / 0.22) * 1.18 : t < 0.35 ? 1.18 - 0.18 * ease.inOut((t - 0.22) / 0.13) : t < 0.75 ? 1 : 1 - ease.in((t - 0.75) / 0.25);
+			if (g <= 0.02) return;
+			ctx.globalCompositeOperation = 'source-over';
+			const rise = -22 * t * k;
+			const pos = (b: (typeof blobs)[number]) => ({
+				x: at.x + b.dx * (0.7 + 0.5 * t) + Math.sin(t * 9 + b.ph) * 3,
+				y: at.y + b.dy + rise + Math.cos(t * 7 + b.ph) * 2,
+				r: b.r * g * (1 + 0.06 * Math.sin(t * 12 + b.ph)),
+			});
+			// Contours, aplat vert, puis l'ombre plus foncée en bas : un seul nuage bien cerné.
+			for (const b of blobs) {
+				const q = pos(b);
+				ctx.beginPath();
+				ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+				ctx.lineWidth = 8;
+				ctx.strokeStyle = INK;
+				ctx.stroke();
+			}
+			for (const [col, oy, m] of [
+				['#5fc24a', 0, 1],
+				['#9cf07a', -0.25, 0.6],
+			] as const)
+				for (const b of blobs) {
+					const q = pos(b);
+					ctx.beginPath();
+					ctx.arc(q.x, q.y + q.r * oy, q.r * m, 0, Math.PI * 2);
+					ctx.fillStyle = col;
+					ctx.fill();
+				}
+		},
+	});
+	// Les bulles qui montent et éclatent.
+	for (let i = 0; i < 8; i += 1)
+		eng.add({
+			x: at.x + (Math.random() - 0.5) * 60 * k,
+			y: at.y - 10,
+			vx: (Math.random() - 0.5) * 20,
+			vy: -40 - Math.random() * 40,
+			life: 700,
+			delay: delay + 150 + i * 110,
+			size: 4 + Math.random() * 4,
+			sizeEnd: 9,
+			color: '#b6f59a',
+			ink: true,
+		});
+	// La petite tête de mort qui s'échappe du nuage.
+	eng.add({ x: at.x, y: at.y - 20, vy: -55, life: 1100, delay: delay + 250, size: 26 * k, color: '#e9ffe0', shape: 'glyph', glyph: '☠', vr: 0.6, ink: true });
+	return delay + 330;
+}
+
 /* ---------------- Les compétences ---------------- */
 
 const STEEL = ['#fff6dc', '#ffc76b', '#ff8a3c'];
@@ -636,9 +700,7 @@ const ABILITY_FX: Record<string, Fx> = {
 	'fleche-empoisonnee': (e, c) => {
 		const to = c.foes[0];
 		const t = shot(e, c.from, to, c, '#8cff7a', 0, ['#d6ffcc', '#6fdc5a']);
-		if (c.success)
-			for (let i = 0; i < 12; i += 1)
-				e.add({ x: to.x + (Math.random() - 0.5) * 50, y: to.y + 10, vy: -40 - Math.random() * 40, life: 900, delay: t + i * 50, size: 5, sizeEnd: 9, color: '#6fdc5a', ink: true });
+		if (c.success) poisonCloud(e, to, t);
 		return t;
 	},
 
@@ -760,7 +822,6 @@ const ABILITY_FX: Record<string, Fx> = {
 	},
 };
 
-/** Joue l'effet d'une compétence ; renvoie le moment de l'impact (ms). */
 /* ---------------- Le côté bande dessinée ---------------- */
 
 /** Onomatopée et couleur de bulle de chaque compétence. */
@@ -860,7 +921,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 	});
 }
 
-/** Joue l'effet d'une compétence (et sa bulle de BD) ; renvoie le moment de l'impact (ms). */
+/** Joue l'effet d'une compétence (et sa bulle de BD) ; renvoie le moment de l'impact (ms réelles). */
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
 	let t: number;
@@ -870,7 +931,7 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	} else t = fx(eng, c);
 	const w = WORDS[ability];
 	if (!c.success && c.foes[0]) kapow(eng, c.foes[0], 'RATÉ !', '#c9ced8', t, 0.75);
-	if (!c.success || !w) return t;
+	if (!c.success || !w) return eng.real(t);
 	// La bulle sur la cible principale (le danseur pour le tourbillon, le barde pour un chant),
 	// et de plus petites sur les autres cibles.
 	const main = ability === 'tourbillon' || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
@@ -878,7 +939,7 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	kapow(eng, main, word, c.crit ? '#ff5a3c' : w.fill, t, c.crit ? 1.25 : 1);
 	if (w.melee) for (const f of c.foes.slice(0, 3)) speedLines(eng, f, t);
 	for (const f of c.foes.slice(ability === 'tourbillon' ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
-	return t;
+	return eng.real(t);
 }
 
 /** L'attaque d'une créature sur un héros : morsure pour les bêtes, griffes pour le reste. */
@@ -893,7 +954,7 @@ export function playFoeAttack(eng: FxEngine, foeName: string, from: P, to: P, hu
 		clang(eng, to, t);
 		kapow(eng, to, 'CLANG !', '#d5dbe6', t, 0.85);
 	}
-	return t;
+	return eng.real(t);
 }
 
 /** Un coup encaissé (armure, bouclier) : étincelles grises. */
@@ -902,11 +963,9 @@ function clang(eng: FxEngine, at: P, delay: number) {
 	burstStar(eng, at, '#c9d2e0', '#ffffff', 40, delay, 260);
 }
 
-/** Le poison qui ronge une créature à son tour. */
+/** Le poison qui ronge une créature à son tour ; renvoie le moment (ms réelles) où elle perd ses PV. */
 export function playPoison(eng: FxEngine, at: P) {
-	for (let i = 0; i < 10; i += 1)
-		eng.add({ x: at.x + (Math.random() - 0.5) * 50, y: at.y + 14, vy: -50 - Math.random() * 40, life: 800, delay: i * 50, size: 5, sizeEnd: 10, color: '#6fdc5a', ink: true });
-	return 300;
+	return eng.real(poisonCloud(eng, at, 0, 1.1));
 }
 
 /** Victoire : une gerbe dorée qui jaillit de chaque héros debout. */

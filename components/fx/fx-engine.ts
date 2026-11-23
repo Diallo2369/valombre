@@ -56,6 +56,16 @@ export class FxEngine {
 	private last = 0;
 	/** Unités du plateau → pixels du canvas. */
 	scale = 1;
+	/**
+	 * Vitesse des effets (1 : temps réel). Plus lent, façon jeu de tactique : on a le temps de voir chaque coup.
+	 * Les durées écrites dans les effets sont en « temps d'effet » ; real() les convertit en vraies ms.
+	 */
+	speed = 0.6;
+
+	/** Convertit une durée d'effet en millisecondes réelles. */
+	real(ms: number) {
+		return Math.round(ms / this.speed);
+	}
 
 	constructor(
 		private canvas: HTMLCanvasElement,
@@ -122,7 +132,7 @@ export class FxEngine {
 	}
 
 	private tick = (now: number) => {
-		const dt = Math.min(50, now - this.last);
+		const dt = Math.min(50, now - this.last) * this.speed;
 		this.last = now;
 		const { ctx } = this;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);

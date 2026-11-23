@@ -148,6 +148,9 @@ function place(h: Hex) {
 /** Durée de lecture confortable d'un texte (lecture à voix haute en famille). */
 const readMs = (text: string) => 1500 + text.length * 60;
 
+/** Durée de l'élan avant un coup (ms) : le jeton grossit, puis le coup part. */
+const WINDUP = 420;
+
 export function CombatPanel(props: Props) {
 	const { def, combat, party, actor, media, events, seq, log, onSfx, voiceFor, voiceVolume } = props;
 	const difficulty = DIFFICULTY[def.enemy.difficulty].target;
@@ -159,6 +162,9 @@ export function CombatPanel(props: Props) {
 	const [dmgLeft, setDmgLeft] = useState<Record<string, number>>({});
 	const [posFrom, setPosFrom] = useState<Record<string, Hex>>({});
 	const [hurtId, setHurtId] = useState<string | null>(null);
+	/** Le héros qui prend son élan (il grossit avant de frapper, façon jeu de tactique). */
+	const [castId, setCastId] = useState<string | null>(null);
+	const intentRef = useRef<HTMLElement>(null);
 	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
 	const [landed, setLanded] = useState(false);
 	const [shake, setShake] = useState(false);
@@ -219,7 +225,7 @@ export function CombatPanel(props: Props) {
 					ms: 4200,
 				});
 			} else if (e.kind === 'ability') {
-				beats.push({ kind: 'act', ev: e, ms: 1900 });
+				beats.push({ kind: 'act', ev: e, ms: 2900 });
 				acted = true;
 			} else if (e.kind === 'hit' || e.kind === 'miss' || e.kind === 'support' || e.kind === 'foe-status') {
 				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
@@ -310,16 +316,23 @@ export function CombatPanel(props: Props) {
 								return next;
 							});
 						};
-						const eng = fxEngine.current;
-						const hitAt = eng ? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) }) : 350;
-						timers.current.push(window.setTimeout(land, hitAt));
+						// L'élan d'abord (le jeton grossit), puis le coup part.
+						setCastId(ev.heroId);
+						timers.current.push(
+							window.setTimeout(() => {
+								const eng = fxEngine.current;
+								const hitAt = eng ? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) }) : 350;
+								timers.current.push(window.setTimeout(land, hitAt));
+							}, WINDUP),
+						);
 						return;
 					}
+					setCastId(null);
 					if (b.kind !== 'say') return;
 					if (b.poison && b.foeId) {
 						const id = b.foeId;
-						if (fxEngine.current) playPoison(fxEngine.current, center(combat.pos[id]));
-						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - 1) })), 300));
+						const hurtAt = fxEngine.current ? playPoison(fxEngine.current, center(combat.pos[id])) : 300;
+						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - 1) })), hurtAt));
 					}
 					if (b.move && b.foeId) {
 						const id = b.foeId;
@@ -342,20 +355,23 @@ export function CombatPanel(props: Props) {
 						const amount = b.amount ?? 0;
 						if (b.foeId) onSfx('sfx-griffe');
 						const foe = b.foeId ? foeById(b.foeId) : undefined;
-						if (foe && fxEngine.current) {
-							const eng = fxEngine.current;
+						// Les PV baissent au moment où le coup tombe.
+						const hurt = () => {
+							setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - amount) }));
+							setHurtId(id);
+							if (amount > 0) onSfx('sfx-blessure');
+						};
+						const eng = fxEngine.current;
+						if (foe && eng) {
 							const from = center(combat.pos[foe.id]);
 							const to = center(combat.pos[id]);
-							timers.current.push(window.setTimeout(() => playFoeAttack(eng, foe.name, from, to, amount > 0), 520));
-						}
-						// Les PV baissent au moment où le coup tombe.
-						timers.current.push(
-							window.setTimeout(() => {
-								setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - amount) }));
-								setHurtId(id);
-								if (amount > 0) onSfx('sfx-blessure');
-							}, 700),
-						);
+							// Le monstre prend son élan (voir .token.is-acting), puis frappe.
+							timers.current.push(
+								window.setTimeout(() => {
+									timers.current.push(window.setTimeout(hurt, playFoeAttack(eng, foe.name, from, to, amount > 0)));
+								}, WINDUP + 120),
+							);
+						} else timers.current.push(window.setTimeout(hurt, 700));
 					}
 				}, t),
 			);
@@ -365,6 +381,7 @@ export function CombatPanel(props: Props) {
 			window.setTimeout(() => {
 				setBeat(null);
 				setHurtId(null);
+				setCastId(null);
 				setDmgLeft({});
 				setPosFrom({});
 				props.onSequenceEnd?.();
@@ -428,11 +445,30 @@ export function CombatPanel(props: Props) {
 		return `${cap(foe.name)} semble se diriger vers ${hero.name}${why}.`;
 	};
 
-	const side = (
-		<>
-			{/* ---------- Tour des monstres : on peut tenter de reprendre l'aggro ---------- */}
-			{phase === 'intent' && !busy ? (
-				<section className="intent-panel card" aria-labelledby="intent-title">
+	// La fenêtre des monstres prend le focus à l'ouverture, et le garde tant qu'elle est ouverte.
+	const intentOpen = phase === 'intent' && !busy;
+	useEffect(() => {
+		if (intentOpen) intentRef.current?.querySelector<HTMLElement>('button')?.focus();
+	}, [intentOpen]);
+	const trapFocus = (e: React.KeyboardEvent) => {
+		if (e.key !== 'Tab' || !intentRef.current) return;
+		const items = [...intentRef.current.querySelectorAll<HTMLElement>('button')];
+		const first = items[0];
+		const last = items[items.length - 1];
+		if (e.shiftKey && document.activeElement === first) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && document.activeElement === last) {
+			e.preventDefault();
+			first.focus();
+		}
+	};
+
+	/* ---------- Tour des monstres : une fenêtre par-dessus le plateau, on peut tenter de reprendre l'aggro ---------- */
+	const intentPopin =
+		phase === 'intent' && !busy ? (
+			<div className="overlay overlay--light" role="presentation">
+				<section className="intent-panel card" role="dialog" aria-modal="true" aria-labelledby="intent-title" ref={intentRef} onKeyDown={trapFocus}>
 					<h3 id="intent-title">Les monstres préparent leur coup…</h3>
 					<ul className="intent-panel__list">
 						{combat.intents.map((i) => {
@@ -460,8 +496,11 @@ export function CombatPanel(props: Props) {
 						⚔️ Laisser les monstres attaquer
 					</button>
 				</section>
-			) : null}
+			</div>
+		) : null;
 
+	const side = (
+		<>
 			{/* ---------- La carte du héros : celui dont c'est le tour, ou celui qu'on regarde ---------- */}
 			{phase === 'hero' || shown.id !== actor.id ? (
 				<section className={`hero-card card${busy && mine ? ' is-waiting' : ''}${mine ? '' : ' is-preview'}`} aria-labelledby="hero-card-title">
@@ -753,7 +792,7 @@ export function CombatPanel(props: Props) {
 								<button
 									key={`${c.id}-${landed && (support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
-									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
 									style={place(combat.pos[c.id])}
 									disabled={ability ? !targetable : false}
 									aria-pressed={!ability ? shown.id === c.id : undefined}
@@ -816,6 +855,7 @@ export function CombatPanel(props: Props) {
 			) : null}
 
 			{props.sideEl ? createPortal(side, props.sideEl) : side}
+			{intentPopin && typeof document !== 'undefined' ? createPortal(intentPopin, document.body) : null}
 
 			{beat?.kind === 'intro' ? <CombatIntro from={props.introFrom} to={props.introTo ?? props.introFrom} ms={beat.ms} /> : null}
 
