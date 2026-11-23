@@ -1208,11 +1208,14 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 		events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 		log(work.state, 'combat', `${hero.name} (${how})${fury ? ', en pleine folie vengeresse,' : ''} touche : ${hits.join(' · ')}.`);
-		if (ab.lifesteal) {
-			const gain = Math.min(ab.lifesteal, hero.pvMax - hero.pv);
+		// Fureur de l'ours (soin fixe) et Cœur battant (1 chance sur 3 par créature touchée aux haches) : un seul soin affiché.
+		const beats = hasAbility(hero, 'coeur-battant') && !ab.spell ? Array.from({ length: hits.length }, () => Math.random() < 1 / 3).filter(Boolean).length : 0;
+		if (ab.lifesteal || beats) {
+			const gain = Math.min((ab.lifesteal ?? 0) + beats, hero.pvMax - hero.pv);
 			hero.pv += gain;
 			events.push({ kind: 'support', heroId: hero.id, what: 'heal', targetId: hero.id, amount: gain });
-			if (gain) log(work.state, 'combat', `La fureur de l’ours requinque ${hero.name} : +${gain} PV.`);
+			if (gain && ab.lifesteal) log(work.state, 'combat', `La fureur de l’ours requinque ${hero.name} : +${gain} PV.`);
+			else if (gain) log(work.state, 'combat', `Cœur battant : ${hero.name} reprend ${gain} PV.`);
 		}
 		if (ab.push) {
 			const here = combat.pos[hero.id];

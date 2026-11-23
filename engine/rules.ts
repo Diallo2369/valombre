@@ -52,6 +52,7 @@ export type AbilityId =
 	| 'bond'
 	| 'ambidextrie'
 	| 'folie'
+	| 'coeur-battant'
 	// Rôdeur
 	| 'tir'
 	| 'fleche-visee'
@@ -276,6 +277,14 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		passive: true,
 		target: 'none',
 		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, et la main gauche tape presque aussi fort que la droite.',
+	}),
+	'coeur-battant': A({
+		id: 'coeur-battant',
+		name: 'Cœur battant',
+		icon: '❤️‍🔥',
+		passive: true,
+		target: 'none',
+		text: 'Le combat te fait battre le cœur : chaque créature touchée par tes haches a 1 chance sur 3 de te rendre 1 PV (un Tourbillon qui en touche plusieurs, c’est plusieurs chances !).',
 	}),
 	folie: A({
 		id: 'folie',
@@ -514,7 +523,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		threat: 1.7,
 		move: 4,
-		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie'],
+		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie', 'coeur-battant'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
 	},
