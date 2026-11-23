@@ -29,13 +29,17 @@ interface Draft {
 	name: string;
 	classId: ClassId | null;
 	rolls: (number | null)[];
+	/** Relances déjà utilisées (deux au plus, voir MAX_REROLLS). */
+	rerolls: number;
 	swap: [StatKey, StatKey] | null;
 	/** Image choisie à la place du portrait de classe (data URL, enregistrée au départ de l'aventure). */
 	portrait?: string;
 }
 
-const EMPTY: Draft = { player: '', gender: null, name: '', classId: null, rolls: STATS.map(() => null), swap: null };
+const EMPTY: Draft = { player: '', gender: null, name: '', classId: null, rolls: STATS.map(() => null), rerolls: 0, swap: null };
 const MAX = 6;
+/** À la création, on peut relancer deux dés (un mauvais tirage, ça arrive). */
+const MAX_REROLLS = 2;
 
 const NAME_IDEAS = ['Arwel', 'Brune', 'Cassian', 'Doria', 'Elouan', 'Fenna', 'Gwen', 'Hugo le Hardi', 'Isaure', 'Jorik', 'Lune', 'Maël', 'Nell', 'Oriane', 'Perrin', 'Sacha', 'Tanaïs', 'Ysolde'];
 
@@ -85,6 +89,13 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media, mapUr
 			setDraft((d) => (d ? { ...d, rolls: d.rolls.map((r, j) => (j === i ? v : r)) } : d));
 			setRolling(null);
 		}, 800);
+	};
+
+	/** Relancer un dé déjà tiré : il compte parmi les deux relances. Avec de vrais dés, on choisit la nouvelle face. */
+	const reroll = (i: number) => {
+		if (!draft || draft.rerolls >= MAX_REROLLS || rolling !== null) return;
+		setDraft((d) => (d ? { ...d, rerolls: d.rerolls + 1, rolls: d.rolls.map((r, j) => (j === i ? null : r)) } : d));
+		if (!realDice) rollStat(i);
 	};
 
 	const setRoll = (i: number, v: number) => setDraft((d) => (d ? { ...d, rolls: d.rolls.map((r, j) => (j === i ? v : r)) } : d));
@@ -280,6 +291,11 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media, mapUr
 								<input type="checkbox" checked={realDice} onChange={(e) => setRealDice(e.target.checked)} />
 								<span>On lance un vrai dé</span>
 							</label>
+							<p className="stat-rolls__rerolls">
+								{MAX_REROLLS - draft.rerolls > 0
+									? `Un mauvais tirage ? Tu peux relancer ${MAX_REROLLS - draft.rerolls === 2 ? 'deux dés' : 'encore un dé'}.`
+									: 'Tu as utilisé tes deux relances.'}
+							</p>
 							<ul className="stat-rolls">
 								{STATS.map((s, i) => {
 									const v = draft.rolls[i];
@@ -305,7 +321,14 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media, mapUr
 													</button>
 												)
 											) : (
-												<span className="stat-rolls__value">= {statFromDie(v)}</span>
+												<>
+													<span className="stat-rolls__value">= {statFromDie(v)}</span>
+													{draft.rerolls < MAX_REROLLS ? (
+														<button type="button" className="btn btn--small btn--ghost" disabled={rolling !== null} onClick={() => reroll(i)} aria-label={`Relancer le dé de ${s.label}`}>
+															↻ Relancer
+														</button>
+													) : null}
+												</>
 											)}
 										</li>
 									);

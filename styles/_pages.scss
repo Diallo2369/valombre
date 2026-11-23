@@ -713,6 +713,11 @@ body:has(.home) .site-header {
 		font-size: 1.6rem;
 		color: var(--ember-300);
 	}
+
+	&__rerolls {
+		margin: 0 0 8px;
+		color: var(--parchment-300);
+	}
 }
 
 .swap {
