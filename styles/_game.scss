@@ -66,6 +66,15 @@
 			grid-template-columns: minmax(0, 1fr) 320px;
 			align-items: start;
 		}
+
+		/* En combat : le plateau garde sa taille, la carte des compétences prend toute la largeur restante. */
+		&--fight {
+			max-width: none;
+
+			@media (min-width: $bp-l) {
+				grid-template-columns: minmax(0, 800px) minmax(320px, 1fr);
+			}
+		}
 	}
 
 	&__main {
@@ -1521,6 +1530,10 @@
 
 /* La carte du héros dont c'est le tour (ou celui qu'on regarde), à la place du groupe sur grand écran. */
 .game__combat-side {
+	.hero-card__actions.choices {
+		grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+	}
+
 	display: grid;
 	gap: 12px;
 	/* La colonne reste à l'écran (sticky) : la carte défile si elle est plus haute que l'écran. */

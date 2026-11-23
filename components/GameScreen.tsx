@@ -403,7 +403,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 				</nav>
 			</header>
 
-			<div className="game__layout">
+			<div className={`game__layout${sideCombat ? ' game__layout--fight' : ''}`}>
 				<main className="game__main" ref={mainRef} tabIndex={-1} aria-labelledby="scene-title">
 					<div className="game__stage">
 						<MediaView
