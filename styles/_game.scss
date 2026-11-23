@@ -692,6 +692,16 @@
 }
 
 /* ---- Fenêtres ---- */
+/* L'écran de départ d'une aventure : la carte du monde en plein écran, opaque (la scène reste cachée derrière). */
+.overlay.overlay--start {
+	background-color: var(--night-900);
+	background-size: cover;
+	background-position: center;
+	backdrop-filter: none;
+	/* La carte arrive en fondu. */
+	animation: fade-in 0.8s ease;
+}
+
 .overlay {
 	position: fixed;
 	inset: 0;

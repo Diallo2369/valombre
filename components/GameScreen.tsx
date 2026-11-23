@@ -694,7 +694,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 						image={mapUrl}
 						to={media[stageImage!]}
 						ms={3000}
-						fadeIn={600}
+						fadeIn={0}
 						focus={mapFocus}
 						onDone={() => {
 							setStarted(true);
@@ -715,9 +715,11 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 				)
 			) : null}
 			{!started && !diving ? (
-				<div className="overlay">
+				// L'écran de départ : la carte du monde en plein écran (ou la nuit, tant qu'elle n'est pas illustrée) ;
+				// on ne voit pas la scène derrière, elle apparaîtra au bout du zoom dans la carte.
+				<div className="overlay overlay--start" style={mapUrl ? { backgroundImage: `url(${mapUrl})` } : undefined}>
 					<div className="start card">
-						<p className="start__eyebrow">{campaign.title}</p>
+						{adventureName !== campaign.title ? <p className="start__eyebrow">{campaign.title}</p> : null}
 						<h2>{adventureName}</h2>
 						<p>
 							{chapter ? `Chapitre ${chapter.n} — ${chapter.title}. ` : ''}
