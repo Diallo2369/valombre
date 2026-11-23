@@ -39,7 +39,7 @@ export type AbilityId =
 	// Guerrier
 	| 'frapper'
 	| 'coup-assommant'
-	| 'taillade'
+	| 'mur-boucliers'
 	| 'onde-de-choc'
 	| 'cri-de-rage'
 	| 'intervention'
@@ -123,6 +123,8 @@ export interface Ability {
 	regen?: { amount: number; turns: number };
 	/** Exécution : si elle achève sa cible, elle peut être relancée aussitôt, dans le même tour (sans bouger). */
 	chainOnKill?: boolean;
+	/** Mur de boucliers : jusqu'au prochain tour du héros, ses compagnons collés à lui prennent ce nombre de dégâts de moins par coup. */
+	wall?: number;
 	/** Multiplie la menace des dégâts (Revers sauvage : les créatures touchées enragent contre lui). */
 	threatMul?: number;
 	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
@@ -168,7 +170,16 @@ const A = (a: Ability) => a;
 
 export const ABILITIES: Record<AbilityId, Ability> = {
 	/* ---- Guerrier : le rempart ---- */
-	frapper: A({ id: 'frapper', range: 1, name: 'Frapper', icon: '⚔️', target: 'foe', stat: 'force', damage: 2, text: 'Un bon coup d’épée : 2 PV.' }),
+	frapper: A({
+		id: 'frapper', range: 1,
+		name: 'Coup de bouclier',
+		icon: '🛡️',
+		target: 'foe',
+		stat: 'force',
+		damage: 3,
+		threatMul: 2,
+		text: 'Un grand coup de bouclier : 3 PV, et la créature, vexée, ne pense plus qu’à toi (menace doublée).',
+	}),
 	'coup-assommant': A({
 		id: 'coup-assommant', range: 1,
 		name: 'Coup assommant',
@@ -180,16 +191,14 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: 'Un coup de pommeau sur le crâne : 2 PV, et la créature, sonnée, passe son prochain tour.',
 	}),
-	taillade: A({
-		id: 'taillade', range: 1,
-		name: 'Taillade',
-		icon: '🌙',
-		target: 'foes',
-		maxTargets: 3,
-		stat: 'force',
-		damage: 2,
+	'mur-boucliers': A({
+		id: 'mur-boucliers',
+		name: 'Mur de boucliers',
+		icon: '🧱',
+		target: 'none',
+		wall: 1,
 		every: 3,
-		text: 'Un grand revers d’épée : jusqu’à 3 créatures collées à toi perdent 2 PV.',
+		text: 'Tu plantes ton bouclier et tu couvres tes amis : jusqu’à ton prochain tour, chaque compagnon collé à toi prend 1 dégât de moins par coup.',
 	}),
 	'onde-de-choc': A({
 		id: 'onde-de-choc', range: 1,
@@ -603,7 +612,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 4,
 		threat: 1.5,
 		move: 2,
-		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'cri-de-rage', 'intervention', 'aura', 'encaisseur', 'oeil-pour-oeil'],
+		abilities: ['frapper', 'coup-assommant', 'mur-boucliers', 'onde-de-choc', 'cri-de-rage', 'intervention', 'aura', 'encaisseur', 'oeil-pour-oeil'],
 		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +3 PV et 4 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et se jette devant ses amis pour les protéger.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},

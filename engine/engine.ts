@@ -954,6 +954,12 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 	// Encaisseur : le guerrier absorbe une partie du choc (davantage s'il est endurant).
 	const soaked = blow > 0 && hasAbility(victim, 'encaisseur') ? Math.min(blow, victim.stats.endurance >= 8 ? 2 : 1) : 0;
 	blow -= soaked;
+	// Mur de boucliers : un guerrier collé à la victime (pas elle-même) qui a planté son bouclier arrête une partie du coup.
+	const wallBy = activeHeroes(game.party).find(
+		(c) => c.id !== victim.id && (combat.heroes[c.id]?.wall ?? 0) > 0 && distance(combat.pos[c.id], combat.pos[victim.id]) <= 1 && sameSide(combat, combat.pos[c.id], combat.pos[victim.id]),
+	);
+	const walled = wallBy && blow > 0 ? Math.min(blow, combat.heroes[wallBy.id].wall!) : 0;
+	blow -= walled;
 	const hs = heroState(combat, victim.id);
 	const shielded = Math.min(hs.shield ?? 0, blow);
 	blow -= shielded;
@@ -993,15 +999,17 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 		...(rage ? { rage } : {}),
 		...(parried ? { parried } : {}),
 		...(soaked ? { soaked } : {}),
+		...(walled ? { walled } : {}),
 	});
 	const parts = [
 		guarded ? `${victim.name} s’interpose devant ${target.name}.` : '',
 		parried ? `${victim.name} pare le coup !` : '',
 		soaked ? `${victim.name} encaisse le choc (−${soaked}).` : '',
+		walled && wallBy ? `Le bouclier de ${wallBy.name} arrête ${walled} dégât${walled > 1 ? 's' : ''}.` : '',
 		rage ? `Folle de rage, elle frappe ${Math.round((rage - 1) * 100)} % plus fort !` : '',
 		shielded ? `Le bouclier de lune encaisse ${shielded}.` : '',
 		absorbed ? `L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '',
-		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed && !parried && !soaked ? `${victim.name} ne perd rien.` : '',
+		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed && !parried && !soaked && !walled ? `${victim.name} ne perd rien.` : '',
 		afflict ? `${victim.name} souffre de ${afflict}.` : '',
 		stunned ? `${victim.name} est assommé·e et passera son tour.` : '',
 	].filter(Boolean);
@@ -1057,6 +1065,7 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 		}
 		const hs = combat.heroes[id];
 		if (hs?.guarding) delete hs.guarding;
+		if (hs?.wall) delete hs.wall;
 		if (hs?.stunned) {
 			delete hs.stunned;
 			events.push({ kind: 'hero-skip', heroId: id });
@@ -1365,6 +1374,11 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		combat.barriers = [...(combat.barriers ?? []).filter((b) => b.heroId !== hero.id), { heroId: hero.id, zone }];
 		events.push({ kind: 'support', heroId: hero.id, what: 'barrier' });
 		log(work.state, 'combat', `${hero.name} joue la Ronde enchantée : un mur de notes tourne autour de ${zone.length} cases. Rien ne passe jusqu’à son prochain tour !`);
+	}
+	if (ab.wall) {
+		heroState(combat, hero.id).wall = ab.wall;
+		events.push({ kind: 'support', heroId: hero.id, what: 'wall', targetId: hero.id });
+		log(work.state, 'combat', `${hero.name} plante son bouclier : ses compagnons collés à lui prendront ${ab.wall} dégât de moins par coup jusqu’à son prochain tour.`);
 	}
 	if (ab.rally) {
 		heroState(combat, hero.id).guarding = ab.rally;

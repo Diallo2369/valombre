@@ -683,14 +683,17 @@ const ABILITY_FX: Record<string, Fx> = {
 		if (c.success && c.foes[0]) dizzy(e, c.foes[0], t + 100);
 		return t;
 	},
-	taillade: (e, c) => {
-		let t = 0;
-		c.foes.forEach((f, i) => {
-			slash(e, f, c.success ? '#ffc76b' : '#9aa3b5', angleTo(c.from, f) + Math.PI / 2, i * 90, 1.1);
-			if (c.success) impact(e, f, STEEL, 0.9, i * 90 + 140);
-			t = i * 90 + 140;
+	'mur-boucliers': (e, c) => {
+		// Le bouclier planté : un arc doré autour du guerrier, puis un petit bouclier sur chaque compagnon collé à lui.
+		const at = c.from;
+		for (let i = 0; i < 2; i += 1) e.add({ x: at.x, y: at.y, life: 700, delay: i * 120, size: 30, sizeEnd: 150, color: '#ffc76b', shape: 'ring', neon: true });
+		impact(e, at, STEEL, 0.9, 60);
+		const near = c.allies.filter((a) => {
+			const d = Math.hypot(a.x - at.x, a.y - at.y);
+			return d > 5 && d < 130;
 		});
-		return t;
+		near.forEach((a, i) => bubble(e, a, 'rgb(255 199 107)', 200 + i * 80));
+		return 200;
 	},
 	intervention: (e, c) => {
 		const to = c.allies[0] ?? c.from;
@@ -1054,9 +1057,9 @@ const LINK: Record<string, string> = {
 
 /** Onomatopée et couleur de bulle de chaque compétence. */
 const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
-	frapper: { word: 'POW !', fill: '#ffd23f', melee: true },
+	frapper: { word: 'BONG !', fill: '#ffd23f', melee: true },
 	'coup-assommant': { word: 'BONK !', fill: '#ffd23f', melee: true },
-	taillade: { word: 'SHLAK !', fill: '#ffb03f', melee: true },
+	'mur-boucliers': { word: 'TCHONK !', fill: '#ffd23f' },
 	intervention: { word: 'HOP !', fill: '#ffe28a' },
 	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
 	'onde-de-choc': { word: 'BOOOM !', fill: '#e8e0d0', melee: true },
@@ -1159,7 +1162,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
 	let t: number;
-	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'tourbillon', 'deflagration', 'cri-de-rage'].includes(ability))) {
+	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'tourbillon', 'deflagration', 'cri-de-rage', 'mur-boucliers'].includes(ability))) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
 		t = 120;
 	} else t = fx(eng, c);
@@ -1269,4 +1272,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'revers-sauvage', 'fureur-ours', 'onde-de-choc', 'pieges', 'cri-de-rage']);
+export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'revers-sauvage', 'fureur-ours', 'onde-de-choc', 'pieges', 'cri-de-rage']);

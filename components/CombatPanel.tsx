@@ -241,6 +241,9 @@ export function CombatPanel(props: Props) {
 
 	const foeById = (id: string) => combat.foes.find((f) => f.id === id);
 	const heroById = (id: string) => party.find((c) => c.id === id);
+	/** Un guerrier collé à ce héros a planté son Mur de boucliers : le héros est couvert (halo doré). */
+	const walledBy = (id: string) =>
+		party.some((g) => g.id !== id && g.pv > 0 && (combat.heroes[g.id]?.wall ?? 0) > 0 && combat.pos[g.id] && combat.pos[id] && distance(combat.pos[g.id], combat.pos[id]) <= 1);
 	const nameOf = (id: string) => (id === 'enemy' ? def.enemy.name : heroById(id)?.name ?? foeById(id)?.name ?? '');
 	const hits = new Map(events.filter((e): e is Ev<'hit'> => e.kind === 'hit').map((e) => [e.foeId, e]));
 	const missedBy = events.find((e): e is Ev<'miss'> => e.kind === 'miss')?.heroId;
@@ -305,7 +308,7 @@ export function CombatPanel(props: Props) {
 				// Court : le détail se voit sur le plateau (chiffre de dégâts, bulle « CLANG ! » si l'armure encaisse).
 				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount && !e.stunned ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
 				const stun = e.stunned ? (e.spell ? ` 💤 ${victim} s’endort !` : ` 💫 ${victim} est assommé·e !`) : '';
-				const soak = e.soaked ? ` 🪨 ${victim} encaisse (−${e.soaked}).` : '';
+				const soak = `${e.soaked ? ` 🪨 ${victim} encaisse (−${e.soaked}).` : ''}${e.walled ? ` 🧱 Le mur de boucliers arrête ${e.walled}.` : ''}`;
 				const rage = e.rage ? ` 😡 Folle de rage : +${Math.round((e.rage - 1) * 100)} % !` : '';
 				const text = e.parried
 					? `🛡️ ${cap(e.name)} frappe ${victim}… PARÉ !`
@@ -663,6 +666,7 @@ export function CombatPanel(props: Props) {
 							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
 							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque +50 % !</span> : null}
 							{hs?.stunned ? <span className="is-bad">💫 assommé·e : passe son prochain tour</span> : null}
+							{hs?.wall ? <span className="is-hot">🧱 mur de boucliers : ses voisins prennent 1 dégât de moins</span> : null}
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
 						</p>
@@ -1007,7 +1011,7 @@ export function CombatPanel(props: Props) {
 									{/* Bouclier de lune : une bulle argentée qui miroite autour du héros ; défendu par le guerrier : un halo doré. */}
 									{st?.shield ? (
 										<span className="token__aura token__aura--moon" aria-hidden="true" />
-									) : st?.protectedBy || st?.guarding ? (
+									) : st?.protectedBy || st?.guarding || walledBy(c.id) ? (
 										<span className="token__aura token__aura--guard" aria-hidden="true" />
 									) : null}
 									<HeroPortrait className="token__img" character={c} media={media} />
@@ -1018,6 +1022,7 @@ export function CombatPanel(props: Props) {
 										{st?.fury ? '🔥' : ''}
 										{st?.stunned ? '💫' : ''}
 										{st?.guarding ? '📢' : ''}
+										{st?.wall ? '🧱' : ''}
 										{st?.afflict ? '🤒' : ''}
 									</span>
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />

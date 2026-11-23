@@ -443,6 +443,8 @@ export interface HeroCombatState {
 	stunned?: boolean;
 	/** Mélodie apaisante : PV repris au début de ses prochains tours. */
 	regen?: { amount: number; turns: number };
+	/** Mur de boucliers : jusqu'à son prochain tour, ses compagnons collés à lui prennent ce nombre de dégâts de moins. */
+	wall?: number;
 	/** Cri de rage : jusqu'à son prochain tour, il pare les coups (cette chance, 0-1). */
 	guarding?: number;
 	/** Le guerrier qui le protège (Intervention) jusqu'à son prochain tour. */
@@ -571,6 +573,8 @@ export type GameEvent =
 			parried?: boolean;
 			/** Encaisseur : dégâts que le guerrier a absorbés (avant son armure). */
 			soaked?: number;
+			/** Mur de boucliers : dégâts arrêtés par le bouclier du guerrier collé à lui. */
+			walled?: number;
 			/** Un sort, pas un coup (son nom). */
 			spell?: string;
 			/** Enragée par la Moquerie : multiplicateur des dégâts (1,25 à 2). */
@@ -610,7 +614,7 @@ export type GameEvent =
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
 	/** `targetIds` + `label` : un effet de passif sur plusieurs héros (Cœur vaillant, Mélodie…), raconté à part. */
-	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier' | 'rally' | 'regen'; targetId?: string; targetIds?: string[]; amount?: number; label?: string }
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier' | 'rally' | 'regen' | 'wall'; targetId?: string; targetIds?: string[]; amount?: number; label?: string }
 	/** Un passif se déclenche (bulle de BD) : Écho, Boule de neige, Folie… */
 	| { kind: 'proc'; heroId: string; name: string; icon: string; foeId?: string }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
