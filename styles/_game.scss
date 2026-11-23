@@ -399,6 +399,12 @@
 		rotate: -35deg;
 	}
 
+	/* Il vient de tomber : il saute, blanchit, puis s'éteint. */
+	&.is-dropping {
+		display: inline-block;
+		animation: heart-drop 0.7s ease-out;
+	}
+
 	/* Un demi-cœur : moitié rouge, moitié éteinte. */
 	&.is-half {
 		color: transparent;
@@ -407,6 +413,48 @@
 		background-clip: text;
 		-webkit-background-clip: text;
 	}
+}
+
+@keyframes hit-flash {
+	0% { filter: brightness(2.4) saturate(0.4); }
+	100% { filter: none; }
+}
+
+@keyframes crit-pop {
+	0% { scale: 1; }
+	30% { scale: 1.18; }
+	100% { scale: 1; }
+}
+
+@keyframes heart-fly {
+	0% { opacity: 0; transform: rotate(var(--a)) translateY(0) rotate(calc(-1 * var(--a))) scale(0.6); }
+	15% { opacity: 1; }
+	100% { opacity: 0; transform: rotate(var(--a)) translateY(-60px) rotate(calc(-1 * var(--a))) scale(1.2); }
+}
+
+@keyframes heart-drop {
+	0% { scale: 1; color: #fff; text-shadow: 0 0 10px #fff; }
+	25% { scale: 1.9; color: #fff; translate: 0 -4px; }
+	60% { scale: 0.9; translate: 0 3px; }
+	100% { scale: 1; translate: 0 0; }
+}
+
+/* Entrée en combat : le fondu brouillé (shader WebGL), plein écran, au-dessus de tout. */
+.combat-intro {
+	position: fixed;
+	inset: 0;
+	width: 100vw;
+	height: 100vh;
+	z-index: 80;
+	pointer-events: none;
+	animation: intro-life var(--intro, 1.7s) linear forwards;
+}
+
+@keyframes intro-life {
+	0% { opacity: 0; }
+	8% { opacity: 1; }
+	80% { opacity: 1; }
+	100% { opacity: 0; }
 }
 
 @keyframes foe-shake {
@@ -1232,7 +1280,9 @@
 
 /* ================= Le plateau de combat ================= */
 .board {
+	--tilt: 16deg;
 	position: relative;
+	perspective: 1400px;
 	width: min(100%, 760px);
 	justify-self: center;
 	border-radius: var(--radius-l);
@@ -1248,6 +1298,26 @@
 		inset: 0;
 		width: 100%;
 		height: 100%;
+	}
+
+	/* La table penchée, façon plateau vu de biais ; les jetons restent debout (voir .token). */
+	&__table {
+		position: absolute;
+		inset: 0;
+		transform: rotateX(var(--tilt));
+		transform-origin: 50% 60%;
+		transform-style: preserve-3d;
+	}
+
+	/* La couche d'effets animés, posée un peu au-dessus des jetons. */
+	&__fx {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 4;
+		pointer-events: none;
+		transform: translateZ(30px);
 	}
 
 	/* La phrase d'action, posée au milieu du plateau, entre les deux camps. */
@@ -1330,6 +1400,9 @@
 	position: absolute;
 	z-index: 2;
 	translate: -50% -50%;
+	/* Debout sur la table penchée. */
+	transform: rotateX(calc(-1 * var(--tilt, 0deg)));
+	transform-origin: 50% 85%;
 	aspect-ratio: 1;
 	padding: 0;
 	border: 0;
@@ -1493,7 +1566,31 @@
 	}
 
 	&.is-hit .token__img {
-		animation: foe-shake 0.5s ease-in-out;
+		animation: foe-shake 0.5s ease-in-out, hit-flash 0.45s ease-out;
+	}
+
+	&.is-crit .token__img {
+		animation: foe-shake 0.6s ease-in-out, hit-flash 0.6s ease-out, crit-pop 0.5s ease-out;
+	}
+
+	/* Les petits cœurs qui s'envolent du jeton touché. */
+	&__pop {
+		position: absolute;
+		left: 50%;
+		top: 40%;
+		pointer-events: none;
+
+		span {
+			--a: calc((var(--i) - (var(--n) - 1) / 2) * 38deg);
+			position: absolute;
+			translate: -50% -50%;
+			font-size: clamp(0.8rem, 2vw, 1.2rem);
+			color: #ff5a5a;
+			text-shadow: 0 0 8px rgb(255 80 80 / 90%), 0 1px 2px rgb(0 0 0 / 80%);
+			opacity: 0;
+			animation: heart-fly 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+			animation-delay: calc(var(--i) * 60ms);
+		}
 	}
 
 	&.is-spell .token__img {
@@ -1501,7 +1598,7 @@
 	}
 
 	&.is-hurt .token__img {
-		animation: foe-shake 0.5s ease-in-out;
+		animation: foe-shake 0.5s ease-in-out, hit-flash 0.45s ease-out;
 		border-color: #ff8a7a;
 	}
 
@@ -1737,7 +1834,15 @@
 	.hex.is-move,
 	.intent,
 	.token.is-target .token__img,
-	.token.is-aggro .token__img {
+	.token.is-aggro .token__img,
+	.token.is-hit .token__img,
+	.token.is-crit .token__img,
+	.heart.is-dropping {
 		animation: none;
+	}
+
+	.token__pop,
+	.combat-intro {
+		display: none;
 	}
 }

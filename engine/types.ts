@@ -465,6 +465,8 @@ export type GameEvent =
 	| { kind: 'hit'; heroId: string; foeId: string; amount: number; spell?: boolean; crit?: boolean; offhand?: boolean }
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
+	/** Une compétence part (pour les effets visuels) : qui, laquelle, vers qui, et si elle réussit. */
+	| { kind: 'ability'; heroId: string; ability: string; foeIds: string[]; allyId?: string; success: boolean; crit?: boolean }
 	/** Début du tour des monstres (l'attaque du groupe, racontée par le conteur). */
 	| { kind: 'enemy-turn'; name: string; attack: string }
 	/** Une créature attaque un héros. */

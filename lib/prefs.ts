@@ -11,9 +11,11 @@ export interface Prefs {
 	realDice: boolean;
 	/** Annoncer à chaque choix qui est le porte-parole du groupe. */
 	spokesperson: boolean;
+	/** Effets de combat : automatique (complets, sauf si l'appareil demande moins d'animations), complets, simples. */
+	fx: 'auto' | 'full' | 'simple';
 }
 
-export const DEFAULT_PREFS: Prefs = { audio: DEFAULT_AUDIO, voice: DEFAULT_VOICE, realDice: false, spokesperson: true };
+export const DEFAULT_PREFS: Prefs = { audio: DEFAULT_AUDIO, voice: DEFAULT_VOICE, realDice: false, spokesperson: true, fx: 'auto' };
 
 const KEY = 'valombre:prefs';
 
@@ -40,5 +42,15 @@ export function savePrefs(p: Prefs) {
 		window.dispatchEvent(new Event('valombre:prefs'));
 	} catch {
 		/* stockage indisponible : tant pis, on garde les réglages en mémoire */
+	}
+}
+
+/** Le niveau d'effets de combat à appliquer sur cet appareil. */
+export function fxLevel(p: Prefs): 'full' | 'simple' {
+	if (p.fx !== 'auto') return p.fx;
+	try {
+		return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'simple' : 'full';
+	} catch {
+		return 'full';
 	}
 }

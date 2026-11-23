@@ -244,6 +244,16 @@ export function SettingsContent({ prefs, onChange, speech }: { prefs: Prefs; onC
 					: 'Ce navigateur ne propose pas de synthèse vocale.',
 			)}
 
+			<h3>Combat</h3>
+			<label className="settings__range">
+				<span>Effets de combat</span>
+				<select value={prefs.fx} onChange={(e) => onChange({ ...prefs, fx: e.target.value as Prefs['fx'] })}>
+					<option value="auto">Automatique</option>
+					<option value="full">Complets (fondu, coups et sorts animés)</option>
+					<option value="simple">Simples (les jetons réagissent, sans animation)</option>
+				</select>
+			</label>
+
 			<h3>Table</h3>
 			{check('On lance de vrais dés', prefs.realDice, (realDice) => onChange({ ...prefs, realDice }), 'Vous saisissez le résultat au lieu de lancer à l’écran.')}
 			{check(

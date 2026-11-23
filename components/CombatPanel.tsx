@@ -7,6 +7,9 @@ import { availableAbilities, canUse, moveOptions, passiveAbilities, reclaimers, 
 import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, heartsText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
+import { CombatIntro } from './fx/CombatIntro';
+import { FxEngine } from './fx/fx-engine';
+import { playAbility, playFoeAttack, playPoison } from './fx/fx-library';
 import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
 
@@ -40,11 +43,20 @@ interface Props {
 	viewId?: string | null;
 	onView: (id: string | null) => void;
 	onSheet: (id: string) => void;
+	/** Effets de combat : complets (fondu, effets animés) ou simples (seulement les jetons qui réagissent). */
+	fx: 'full' | 'simple';
+	/** Images du fondu d'entrée en combat : la scène, puis le combat (URL). */
+	introFrom?: string;
+	introTo?: string;
 }
 
 /** Une étape de la mise en scène : bandeau plein écran, ou phrase d'action sur le plateau. */
 type Beat =
 	| { kind: 'wait'; ms: number }
+	/** Le fondu d'entrée en combat. */
+	| { kind: 'intro'; ms: number }
+	/** Une compétence part : effet animé, puis impact. */
+	| { kind: 'act'; ms: number; ev: Ev<'ability'> }
 	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe'; ms: number }
 	| {
 			kind: 'say';
@@ -56,6 +68,8 @@ type Beat =
 			move?: boolean;
 			/** Héros touché : ses PV baissent à ce moment-là. */
 			heroId?: string;
+			/** Le poison ronge la créature : ses cœurs baissent à ce moment-là. */
+			poison?: boolean;
 			amount?: number;
 			voice?: string;
 	  };
@@ -81,19 +95,38 @@ const STUN_ICON = { assomme: '💫', filet: '🕸️', sommeil: '😴' } as cons
 const STUN_TEXT = { assomme: 'est encore sonnée', filet: 'se débat dans le filet', sommeil: 'dort à poings fermés' } as const;
 
 /** Les cœurs d'une créature, avec les demi-cœurs. */
-function Hearts({ foe, small = false }: { foe: FoeState; small?: boolean }) {
+function Hearts({ foe, hp = foe.hp, small = false }: { foe: FoeState; hp?: number; small?: boolean }) {
 	const count = Math.ceil(foe.maxHp / 2);
+	// Les cœurs qui viennent de tomber sautent et s'éteignent (on garde l'ancien total jusqu'au prochain coup).
+	const track = useRef({ hp, from: hp });
+	if (track.current.hp !== hp) track.current = { hp, from: track.current.hp };
+	const from = track.current.from;
 	return (
-		<span className={`hearts${small ? ' hearts--small' : ''}`} aria-label={`${heartsText(Math.max(0, foe.hp))} sur ${heartsText(foe.maxHp)}`}>
+		<span className={`hearts${small ? ' hearts--small' : ''}`} aria-label={`${heartsText(Math.max(0, hp))} sur ${heartsText(foe.maxHp)}`}>
 			{Array.from({ length: count }, (_, i) => {
-				const left = foe.hp - i * 2;
+				const left = hp - i * 2;
+				const before = from - i * 2;
 				const cls = left >= 2 ? '' : left === 1 ? ' is-half' : ' is-lost';
+				const drop = before > left && before > 0 && left < 2 ? ' is-dropping' : '';
 				return (
-					<span key={i} className={`heart${cls}`} aria-hidden="true">
+					<span key={i} className={`heart${cls}${drop}`} aria-hidden="true">
 						♥
 					</span>
 				);
 			})}
+		</span>
+	);
+}
+
+/** Des petits cœurs qui s'envolent du jeton touché. */
+function HeartPop({ count }: { count: number }) {
+	return (
+		<span className="token__pop" aria-hidden="true">
+			{Array.from({ length: Math.max(1, Math.min(4, count)) }, (_, i) => (
+				<span key={i} style={{ '--i': i, '--n': Math.max(1, Math.min(4, count)) } as React.CSSProperties}>
+					♥
+				</span>
+			))}
 		</span>
 	);
 }
@@ -121,7 +154,32 @@ export function CombatPanel(props: Props) {
 	const [dmgLeft, setDmgLeft] = useState<Record<string, number>>({});
 	const [posFrom, setPosFrom] = useState<Record<string, Hex>>({});
 	const [hurtId, setHurtId] = useState<string | null>(null);
+	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
+	const [landed, setLanded] = useState(false);
+	const [shake, setShake] = useState(false);
 	const timers = useRef<number[]>([]);
+	const fxCanvas = useRef<HTMLCanvasElement>(null);
+	const fxEngine = useRef<FxEngine | null>(null);
+
+	// La couche d'effets, seulement en effets complets ; elle suit la taille du plateau.
+	useEffect(() => {
+		const canvas = fxCanvas.current;
+		if (props.fx !== 'full' || !canvas) return;
+		let eng: FxEngine;
+		try {
+			eng = new FxEngine(canvas, BOARD_W, BOARD_H);
+		} catch {
+			return;
+		}
+		fxEngine.current = eng;
+		const ro = new ResizeObserver(() => eng.resize());
+		ro.observe(canvas);
+		return () => {
+			ro.disconnect();
+			eng.clear();
+			fxEngine.current = null;
+		};
+	}, [props.fx]);
 
 	const foeById = (id: string) => combat.foes.find((f) => f.id === id);
 	const heroById = (id: string) => party.find((c) => c.id === id);
@@ -136,12 +194,15 @@ export function CombatPanel(props: Props) {
 		timers.current.forEach(clearTimeout);
 		timers.current = [];
 		setSelected(null);
+		setLanded(false);
+		setShake(false);
 		const beats: Beat[] = [];
 		const pending: Record<string, number> = {};
 		const from: Record<string, Hex> = {};
 		let acted = false;
 		for (const e of events) {
 			if (e.kind === 'initiative') {
+				if (props.fx === 'full') beats.push({ kind: 'intro', ms: 1700 });
 				beats.push({ kind: 'banner', title: 'Combat !', subtitle: def.enemy.name, tone: 'start', ms: 2400 });
 				beats.push({
 					kind: 'banner',
@@ -151,7 +212,11 @@ export function CombatPanel(props: Props) {
 					tone: 'start',
 					ms: 4200,
 				});
+			} else if (e.kind === 'ability') {
+				beats.push({ kind: 'act', ev: e, ms: 1900 });
+				acted = true;
 			} else if (e.kind === 'hit' || e.kind === 'miss' || e.kind === 'support' || e.kind === 'foe-status') {
+				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				if (!acted) beats.push({ kind: 'wait', ms: 1800 });
 				acted = true;
 			} else if (e.kind === 'reclaim') {
@@ -167,7 +232,8 @@ export function CombatPanel(props: Props) {
 				beats.push({ kind: 'banner', title: turnOf(e.name), subtitle: 'Attention…', tone: 'foe', ms: 2200 });
 				if (e.attack) beats.push({ kind: 'say', tone: 'foe', text: e.attack, voice: e.attack, ms: 3400 });
 			} else if (e.kind === 'foe-poison') {
-				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −½ ♥${e.dead ? ', elle s’effondre !' : '.'}` });
+				pending[e.foeId] = (pending[e.foeId] ?? 0) + 1;
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −½ ♥${e.dead ? ', elle s’effondre !' : '.'}` });
 			} else if (e.kind === 'foe-skip') {
 				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1900, text: `${STUN_ICON[e.reason]} ${cap(e.name)} ${STUN_TEXT[e.reason]} et passe son tour.` });
 			} else if (e.kind === 'foe-move') {
@@ -208,7 +274,33 @@ export function CombatPanel(props: Props) {
 			timers.current.push(
 				window.setTimeout(() => {
 					setBeat(b.kind === 'wait' ? null : b);
+					if (b.kind === 'act') {
+						const ev = b.ev;
+						const at = (id: string) => center(combat.pos[id]);
+						const allies = ev.allyId ? [at(ev.allyId)] : ev.foeIds.length ? [] : party.filter((c) => c.pv > 0).map((c) => at(c.id));
+						const eng = fxEngine.current;
+						const hitAt = eng
+							? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) })
+							: 350;
+						timers.current.push(
+							window.setTimeout(() => {
+								setLanded(true);
+								if (ev.crit) setShake(true);
+								setDmgLeft((d) => {
+									const next = { ...d };
+									for (const id of ev.foeIds) delete next[id];
+									return next;
+								});
+							}, hitAt),
+						);
+						return;
+					}
 					if (b.kind !== 'say') return;
+					if (b.poison && b.foeId) {
+						const id = b.foeId;
+						if (fxEngine.current) playPoison(fxEngine.current, center(combat.pos[id]));
+						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - 1) })), 300));
+					}
 					if (b.move && b.foeId) {
 						const id = b.foeId;
 						setPosFrom((p) => {
@@ -229,6 +321,13 @@ export function CombatPanel(props: Props) {
 						const id = b.heroId;
 						const amount = b.amount ?? 0;
 						if (b.foeId) onSfx('sfx-griffe');
+						const foe = b.foeId ? foeById(b.foeId) : undefined;
+						if (foe && fxEngine.current) {
+							const eng = fxEngine.current;
+							const from = center(combat.pos[foe.id]);
+							const to = center(combat.pos[id]);
+							timers.current.push(window.setTimeout(() => playFoeAttack(eng, foe.name, from, to, amount > 0), 520));
+						}
 						// Les PV baissent au moment où le coup tombe.
 						timers.current.push(
 							window.setTimeout(() => {
@@ -500,7 +599,7 @@ export function CombatPanel(props: Props) {
 	);
 
 	return (
-		<section className={`fight${say?.tone === 'foe' && say.heroId ? ' is-shaking' : ''}`} aria-labelledby="fight-title" aria-busy={busy}>
+		<section className={`fight${(say?.tone === 'foe' && say.heroId) || shake ? ' is-shaking' : ''}`} aria-labelledby="fight-title" aria-busy={busy}>
 			<h2 id="fight-title" className="visually-hidden">
 				Combat contre {def.enemy.name}
 			</h2>
@@ -523,149 +622,157 @@ export function CombatPanel(props: Props) {
 
 			{/* ---------- Le plateau ---------- */}
 			<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
-				<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
-					<defs>
-						<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-							<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
-						</marker>
-						<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-							<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
-						</marker>
-					</defs>
-					{Array.from({ length: BOARD.rows }, (_, r) =>
-						Array.from({ length: BOARD.cols }, (_, c) => {
-							const h = { c, r };
-							const k = hexKey(h);
-							const canMove = moveSet.has(k);
-							const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
+				{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
+				<div className="board__table">
+					<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
+						<defs>
+							<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+								<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
+							</marker>
+							<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+								<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
+							</marker>
+						</defs>
+						{Array.from({ length: BOARD.rows }, (_, r) =>
+							Array.from({ length: BOARD.cols }, (_, c) => {
+								const h = { c, r };
+								const k = hexKey(h);
+								const canMove = moveSet.has(k);
+								const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
+								return (
+									<polygon
+										key={k}
+										points={hexPoints(h)}
+										className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
+										onClick={canMove ? () => props.onMove(h) : undefined}
+										onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
+										tabIndex={canMove ? 0 : undefined}
+										role={canMove ? 'button' : undefined}
+										aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+									/>
+								);
+							}),
+						)}
+						{intents.map((i) => {
+							const a = posOf(i.foeId);
+							const b = combat.pos[i.heroId];
+							if (!a || !b) return null;
+							const p = center(a);
+							const q = center(b);
+							// On s'arrête au bord du jeton visé.
+							const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+							const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
+							const aggro = i.why !== 'near';
 							return (
-								<polygon
-									key={k}
-									points={hexPoints(h)}
-									className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
-									onClick={canMove ? () => props.onMove(h) : undefined}
-									onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
-									tabIndex={canMove ? 0 : undefined}
-									role={canMove ? 'button' : undefined}
-									aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+								<line
+									key={i.foeId}
+									className={`intent${aggro ? ' intent--aggro' : ''}`}
+									x1={p.x}
+									y1={p.y}
+									x2={end.x}
+									y2={end.y}
+									markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
 								/>
 							);
-						}),
-					)}
-					{intents.map((i) => {
-						const a = posOf(i.foeId);
-						const b = combat.pos[i.heroId];
-						if (!a || !b) return null;
-						const p = center(a);
-						const q = center(b);
-						// On s'arrête au bord du jeton visé.
-						const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
-						const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
-						const aggro = i.why !== 'near';
+						})}
+					</svg>
+
+					{combat.foes.map((f) => {
+						const hit = landed ? hits.get(f.id) : undefined;
+						const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
+						const targetable = targets.foes.some((t) => t.id === f.id);
+						const acting = say?.foeId === f.id;
+						const hp = f.hp + (dmgLeft[f.id] ?? 0);
 						return (
-							<line
-								key={i.foeId}
-								className={`intent${aggro ? ' intent--aggro' : ''}`}
-								x1={p.x}
-								y1={p.y}
-								x2={end.x}
-								y2={end.y}
-								markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
-							/>
+							<button
+								key={`${f.id}-${hit ? seq : 0}`}
+								type="button"
+								className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
+								style={place(posOf(f.id))}
+								disabled={!targetable}
+								onClick={() => ability && fire(ability, [f.id])}
+								aria-label={`${f.name} : ${heartsText(Math.max(0, hp))}${targetable ? ' — viser' : ''}`}
+								title={f.name}
+							>
+								<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
+								<span className="token__icons" aria-hidden="true">
+									{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
+									{f.poison ? '🧪' : ''}
+									{f.blind ? '🔆' : ''}
+									{f.taunt ? '😜' : ''}
+								</span>
+								<Hearts foe={f} hp={hp} small />
+								{hit ? <HeartPop count={Math.ceil(hit.amount / 2)} /> : null}
+								<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
+								{hit ? (
+									<span className="token__burst" aria-hidden="true">
+										{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
+									</span>
+								) : status?.failed ? (
+									<span className="token__burst token__burst--miss" aria-hidden="true">
+										Raté !
+									</span>
+								) : status ? (
+									<span className="token__burst token__burst--status" aria-hidden="true">
+										{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
+									</span>
+								) : null}
+							</button>
 						);
 					})}
-				</svg>
 
-				{combat.foes.map((f) => {
-					const hit = hits.get(f.id);
-					const status = statuses.find((s) => s.foeId === f.id);
-					const targetable = targets.foes.some((t) => t.id === f.id);
-					const acting = say?.foeId === f.id;
-					return (
-						<button
-							key={`${f.id}-${hit ? seq : 0}`}
-							type="button"
-							className={`token token--foe${f.hp <= 0 ? ' is-down' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
-							style={place(posOf(f.id))}
-							disabled={!targetable}
-							onClick={() => ability && fire(ability, [f.id])}
-							aria-label={`${f.name} : ${heartsText(Math.max(0, f.hp))}${targetable ? ' — viser' : ''}`}
-							title={f.name}
-						>
-							<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
-							<span className="token__icons" aria-hidden="true">
-								{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
-								{f.poison ? '🧪' : ''}
-								{f.blind ? '🔆' : ''}
-								{f.taunt ? '😜' : ''}
-							</span>
-							<Hearts foe={f} small />
-							<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
-							{hit ? (
-								<span className="token__burst" aria-hidden="true">
-									{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
+					{party.map((c) => {
+						const st = combat.heroes[c.id];
+						const pv = c.pv + (dmgLeft[c.id] ?? 0);
+						const targetable = targets.allies.some((a) => a.id === c.id);
+						const isTurn = c.id === actor.id && phase === 'hero' && !busy;
+						return (
+							<button
+								key={`${c.id}-${landed && (support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
+								type="button"
+								className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+								style={place(combat.pos[c.id])}
+								disabled={ability ? !targetable : false}
+								aria-pressed={!ability ? shown.id === c.id : undefined}
+								onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
+								aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ' — voir ses compétences'}`}
+								title={`${c.name} (${className(c)})`}
+							>
+								<HeroPortrait className="token__img" character={c} media={media} />
+								<span className="token__icons" aria-hidden="true">
+									{st?.protectedBy ? '🛡️' : ''}
+									{st?.shield ? '🌕' : ''}
+									{st?.fury ? '🔥' : ''}
+									{st?.afflict ? '🤒' : ''}
 								</span>
-							) : status?.failed ? (
-								<span className="token__burst token__burst--miss" aria-hidden="true">
-									Raté !
+								<span className="token__pv" aria-hidden="true">
+									<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
 								</span>
-							) : status ? (
-								<span className="token__burst token__burst--status" aria-hidden="true">
-									{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
-								</span>
-							) : null}
-						</button>
-					);
-				})}
+								<span className="token__name">{c.name}</span>
+								{hurtId === c.id && say?.amount ? <HeartPop count={Math.min(4, say.amount)} /> : null}
+								{hurtId === c.id && say?.amount ? (
+									<span className="token__burst token__burst--hurt" aria-hidden="true">
+										−{say.amount} PV
+									</span>
+								) : !landed ? null : missedBy === c.id && !statuses.some((x) => x.failed) ? (
+									<span className="token__burst token__burst--miss" aria-hidden="true">
+										Raté !
+									</span>
+								) : support?.what === 'heal' ? (
+									<span className="token__burst token__burst--heal" aria-hidden="true">
+										+{support.amount} PV
+									</span>
+								) : support?.targetId === c.id ? (
+									<span className="token__burst token__burst--heal" aria-hidden="true">
+										{support.what === 'shield' ? '🌕' : '🛡️'}
+									</span>
+								) : null}
+							</button>
+						);
+					})}
 
-				{party.map((c) => {
-					const st = combat.heroes[c.id];
-					const pv = c.pv + (dmgLeft[c.id] ?? 0);
-					const targetable = targets.allies.some((a) => a.id === c.id);
-					const isTurn = c.id === actor.id && phase === 'hero' && !busy;
-					return (
-						<button
-							key={`${c.id}-${support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id ? seq : 0}`}
-							type="button"
-							className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
-							style={place(combat.pos[c.id])}
-							disabled={ability ? !targetable : false}
-							aria-pressed={!ability ? shown.id === c.id : undefined}
-							onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
-							aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ' — voir ses compétences'}`}
-							title={`${c.name} (${className(c)})`}
-						>
-							<HeroPortrait className="token__img" character={c} media={media} />
-							<span className="token__icons" aria-hidden="true">
-								{st?.protectedBy ? '🛡️' : ''}
-								{st?.shield ? '🌕' : ''}
-								{st?.fury ? '🔥' : ''}
-								{st?.afflict ? '🤒' : ''}
-							</span>
-							<span className="token__pv" aria-hidden="true">
-								<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
-							</span>
-							<span className="token__name">{c.name}</span>
-							{hurtId === c.id && say?.amount ? (
-								<span className="token__burst token__burst--hurt" aria-hidden="true">
-									−{say.amount} PV
-								</span>
-							) : missedBy === c.id && !statuses.some((x) => x.failed) ? (
-								<span className="token__burst token__burst--miss" aria-hidden="true">
-									Raté !
-								</span>
-							) : support?.what === 'heal' ? (
-								<span className="token__burst token__burst--heal" aria-hidden="true">
-									+{support.amount} PV
-								</span>
-							) : support?.targetId === c.id ? (
-								<span className="token__burst token__burst--heal" aria-hidden="true">
-									{support.what === 'shield' ? '🌕' : '🛡️'}
-								</span>
-							) : null}
-						</button>
-					);
-				})}
+					{props.fx === 'full' ? <canvas ref={fxCanvas} className="board__fx" aria-hidden="true" /> : null}
+				</div>
 
 				{say ? (
 					<p className={`board__say board__say--${say.tone}`} role="status" aria-live="assertive" style={{ '--beat': `${say.ms}ms` } as React.CSSProperties}>
@@ -685,6 +792,8 @@ export function CombatPanel(props: Props) {
 			) : null}
 
 			{props.sideEl ? createPortal(side, props.sideEl) : side}
+
+			{beat?.kind === 'intro' ? <CombatIntro from={props.introFrom} to={props.introTo ?? props.introFrom} ms={beat.ms} /> : null}
 
 			{beat?.kind === 'banner' ? (
 				<div

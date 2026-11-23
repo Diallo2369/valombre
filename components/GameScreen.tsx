@@ -19,7 +19,7 @@ import { ABILITIES, CLASSES, DIFFICULTY, STAT_LABEL, type AbilityId, type RollRe
 import type { Campaign, Game, GameEvent, StatKey, StepResult } from '@/engine/types';
 import { AudioDirector } from '@/lib/audio';
 import { mediaVariants, type MediaMap } from '@/lib/media-types';
-import { DEFAULT_PREFS, loadPrefs, savePrefs, type Prefs } from '@/lib/prefs';
+import { DEFAULT_PREFS, fxLevel, loadPrefs, savePrefs, type Prefs } from '@/lib/prefs';
 import { VoicePlayer, speechSupported, type PlayerState, type VoiceItem } from '@/lib/voice';
 import { voiceHash, voiceIndex, voiceKey } from '@/engine/voices';
 import { CharacterSheet } from './CharacterSheet';
@@ -96,6 +96,9 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	/** Temps de respiration après l'arrivée dans une scène, avant que le conteur ne commence. */
 	const [settling, setSettling] = useState(false);
 	const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+	/** Niveau d'effets de combat, calculé après le montage (il dépend de l'appareil). */
+	const [fx, setFx] = useState<'full' | 'simple'>('full');
+	useEffect(() => setFx(fxLevel(prefs)), [prefs]);
 	/** Événements de la dernière étape, pour mettre en scène le combat (coups, tour du monstre, tour suivant). */
 	const [step, setStep] = useState<{ events: GameEvent[]; seq: number }>({ events: [], seq: 0 });
 	const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error' | 'stale'>('idle');
@@ -521,6 +524,9 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							viewId={viewId}
 							onView={setViewId}
 							onSheet={(id) => setPanel({ sheet: id })}
+							fx={fx}
+							introFrom={scene.media?.image ? media[scene.media.image] : undefined}
+							introTo={combatDef.enemy.image ? media[combatDef.enemy.image] : undefined}
 						/>
 					) : (
 						<section className="decide" aria-labelledby="decide-title">
