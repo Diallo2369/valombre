@@ -90,28 +90,28 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ Portrait — Danseuse de guerre
+### ⬜ Portrait — Virevolteuse
 
 Fichier : `classe-danseur-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
 ```
 Fichier : classe-danseur-f.webp
 
-Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Danseuse de guerre » : deux haches de guerre, une dans chaque main, croisées devant elle, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais elle sourit, confiante et chaleureuse, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
+Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Virevolteuse » : deux haches de guerre, une dans chaque main, croisées devant elle, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais elle sourit, confiante et chaleureuse, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
 Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 
 Format carré.
 ```
 
-### ⬜ Portrait — Danseur de guerre
+### ⬜ Portrait — Virevolteur
 
 Fichier : `classe-danseur-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
 ```
 Fichier : classe-danseur-m.webp
 
-Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Danseur de guerre » : deux haches de guerre, une dans chaque main, croisées devant lui, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais il sourit, confiant et chaleureux, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
+Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Virevolteur » : deux haches de guerre, une dans chaque main, croisées devant lui, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais il sourit, confiant et chaleureux, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
 Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 

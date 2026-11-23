@@ -165,7 +165,7 @@ function place(h: Hex) {
  * L'écran de combat, façon plateau : les créatures en haut, les aventuriers en bas, sur des hexagones.
  * Le héros dont c'est le tour voit sa carte (dans la colonne du groupe, ou sous le plateau) : il se déplace (cases lumineuses), puis choisit une action
  * et touche sa cible sur le plateau. Au tour des monstres, chacun annonce sa cible (flèche) : le guerrier ou
- * le danseur de guerre peuvent tenter de reprendre l'aggro avant qu'ils frappent.
+ * le virevolteur peuvent tenter de reprendre l'aggro avant qu'ils frappent.
  */
 /** Durée de lecture confortable d'un texte (lecture à voix haute en famille). */
 const readMs = (text: string) => 1100 + text.length * 40;
@@ -493,7 +493,7 @@ export function CombatPanel(props: Props) {
 
 	/* ---------- Tour des monstres : on voit leurs flèches, et on peut en provoquer un en touchant son jeton ---------- */
 	const intentOpen = phase === 'intent' && !busy;
-	// Les héros qui peuvent provoquer (guerrier, danseur de guerre), et le monstre que chacun peut attirer.
+	// Les héros qui peuvent provoquer (guerrier, virevolteur), et le monstre que chacun peut attirer.
 	// Chacun son tour, dans l'ordre d'initiative : le premier provoque (ou passe), puis le suivant.
 	const provokers = intentOpen
 		? [...new Map(combat.intents.flatMap((i) => reclaimers(combat, party, i)).map((c) => [c.id, c])).values()]

@@ -42,7 +42,7 @@ export type AbilityId =
 	| 'taillade'
 	| 'intervention'
 	| 'aura'
-	// Danseur de guerre
+	// Virevolteur
 	| 'double-attaque'
 	| 'moquerie'
 	| 'tourbillon'
@@ -166,7 +166,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		text: 'Les monstres ont bien du mal à résister à l’envie de t’attaquer, toi plutôt que tes amis (sauf ceux qu’on a provoqués).',
 	}),
 
-	/* ---- Danseur de guerre : deux haches, pas d'armure ---- */
+	/* ---- Virevolteur : deux haches, pas d'armure ---- */
 	'double-attaque': A({
 		id: 'double-attaque', range: 1,
 		name: 'Double attaque',
@@ -425,8 +425,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 	},
 	danseur: {
 		id: 'danseur',
-		name: 'Danseur·se de guerre',
-		names: { f: 'Danseuse de guerre', m: 'Danseur de guerre' },
+		name: 'Virevolteur·se',
+		names: { f: 'Virevolteuse', m: 'Virevolteur' },
 		tagline: 'Deux haches, un grand sourire, et la fureur au fond des yeux.',
 		stat: 'agilite',
 		bonus: { agilite: 2, initiative: 1 },

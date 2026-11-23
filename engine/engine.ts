@@ -601,7 +601,7 @@ function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
 	log(game.state, 'combat', `Initiative : ${rolls.map((r) => `${r.name} ${r.total}`).join(', ')}.`);
 }
 
-/** Héros qui peuvent tenter de détourner cette créature vers eux (guerrier, danseur de guerre). */
+/** Héros qui peuvent tenter de détourner cette créature vers eux (guerrier, virevolteur). */
 export function reclaimers(combat: CombatState | null, party: Character[], intent: Intent): Character[] {
 	if (!combat || intent.tried) return [];
 	return activeHeroes(party).filter((c) => CLASSES[c.classId].aggro && c.id !== intent.heroId && !combat.reclaimed.includes(c.id));

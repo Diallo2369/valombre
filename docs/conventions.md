@@ -101,14 +101,14 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 ### Les combats : le plateau
 
 - Un **plateau d’hexagones** (7 × 6) : les créatures en haut, les aventuriers en bas, chacun en jeton rond
-  (image du monstre, portrait du héros). Ceux qui combattent au contact (guerrier, danseur) commencent devant.
+  (image du monstre, portrait du héros). Ceux qui combattent au contact (guerrier, virevolteur) commencent devant.
 - Le **tour d’un héros** : sa carte s’affiche en bas (portrait, PV, armure, mouvement, états, passifs, actions).
   1. Il peut **se déplacer** : les cases atteignables s’allument (points de mouvement de sa classe).
   2. Il **choisit une action** : si plusieurs cibles sont à portée, elles brillent et on touche celle qu’on vise.
   3. Il lance le dé, avec le score à atteindre affiché (le dé n’est pas demandé pour une action sans dé).
 - Le **tour des monstres** : le poison les ronge, puis chacune **annonce sa cible** (flèche + phrase :
   « Le brumelin grincheux semble se diriger vers Rose Violette »). Les héros qui ont une **capacité d’aggro**
-  (guerrier : Force, danseur de guerre : Charme) s’allument et peuvent **tenter de l’attirer** (jet de dé, une
+  (guerrier : Force, virevolteur : Charme) s’allument et peuvent **tenter de l’attirer** (jet de dé, une
   tentative par héros et par créature). Puis chaque créature avance et frappe si elle atteint sa cible.
 - Cible d’une créature : celui qui l’a provoquée (Moquerie), sinon le guerrier si son **aura** l’emporte
   (jet caché : 4 chances sur 6), sinon le héros le plus proche.
@@ -135,7 +135,7 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 | Classe | Profil | Actions | Passifs |
 |---|---|---|---|
 | Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3, 👣 2 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Intervention (défend un compagnon au contact jusqu’à son prochain tour, −1 dégât) | Aura de bataille (les monstres l’attaquent) ; reprend l’aggro avec la Force |
-| Danseur·se de guerre (corps à corps) | +2 Agilité, +1 Initiative, +1 PV, aucune armure, 👣 4 | Double attaque (2 PV + 1 PV) · Lancer de hache (2 PV, jusqu’à 3 cases) · Moquerie (une créature l’attaquera, même contre l’aura) · Tourbillon (toutes les créatures au contact : 3 PV, 1 tour sur 3) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique) ; reprend l’aggro avec le Charme |
+| Virevolteur·se (corps à corps) | +2 Agilité, +1 Initiative, +1 PV, aucune armure, 👣 4 | Double attaque (2 PV + 1 PV) · Lancer de hache (2 PV, jusqu’à 3 cases) · Moquerie (une créature l’attaquera, même contre l’aura) · Tourbillon (toutes les créatures au contact : 3 PV, 1 tour sur 3) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique) ; reprend l’aggro avec le Charme |
 | Rôdeur·se (distance) | +1 Agilité, +1 Force, +2 Initiative, +1 PV, 🛡️ 1, 👣 3 | Tir à l’arc (portée 5) · Flèche visée (+2 de difficulté, critique : 4 PV) · Salve (3 cibles, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 4) · Flèche empoisonnée (2 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) | Seconde chance hors combat |
 | Mage | +2 Esprit, 👣 2 | Trait de lumière · Étincelle d’aube (sans dé, 4 PV contre la brume, 1 tour sur 3) · Pluie d’étoiles (une créature et ses voisines, 1 tour sur 3) · Chaîne d’éclairs (une créature puis 2 rebonds à 2 cases au plus, 2 PV chacune, 1 tour sur 3) · Lueur aveuglante (−1 dégât pendant 2 tours) | — |
 | Barde | +1 Charme, +1 Esprit, 👣 3 | Aucun sort de dégâts : Air de guérison (+5 PV à un compagnon ou à soi, 1 tour sur 2) · Bouclier de lune (absorbe 2 dégâts, 1 tour sur 3) · Berceuse (passe son tour, 1 tour sur 3) · Chant de courage (+2 PV au groupe, 1 tour sur 4) · Chant de délivrance (enlève poison, brûlure, froid) | — |
@@ -144,7 +144,7 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
   l’Endurance reçoivent leur Force à la place (`withStats`), pour garder les mêmes PV ; ceux créés avant l’Initiative
   reçoivent leur Agilité + l’ancien bonus de classe, pour garder le même ordre de jeu.
 - **Armure** : des points qui prennent les coups avant les PV, réparés au début de chaque combat.
-- **Initiative** : 6ᵉ caractéristique, tirée au dé comme les autres (+1 danseur, +2 rôdeur). En combat : dé + Initiative (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
+- **Initiative** : 6ᵉ caractéristique, tirée au dé comme les autres (+1 virevolteur, +2 rôdeur). En combat : dé + Initiative (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
   ordre ; les créatures agissent ensemble à leur place dans la file. La frise des tours reste affichée.
 - **Dégâts** en PV : un coup normal = 2 PV, le second coup de hache = 1 PV, un critique double.
 - **Délais** : les coups puissants se relancent « 1 tour sur 3 » (ou 4) ; les autres sont à volonté.

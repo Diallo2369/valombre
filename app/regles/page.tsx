@@ -61,7 +61,7 @@ export default function RulesPage() {
 						contact, une flèche, un sort… Si c’est réussi, la créature perd des points de vie (sa barre de vie se vide).
 					</p>
 					<p>
-						Au tour des monstres, chacun montre d’une flèche <strong>qui il va attaquer</strong>. Le guerrier et le danseur de guerre
+						Au tour des monstres, chacun montre d’une flèche <strong>qui il va attaquer</strong>. Le guerrier et le virevolteur
 						peuvent alors tenter de l’attirer vers eux, avec un jet de dé. L’<strong>armure</strong> prend les coups avant les points de
 						vie, et elle est réparée à chaque nouveau combat. On peut parfois parler ou s’enfuir au lieu de se battre.
 					</p>

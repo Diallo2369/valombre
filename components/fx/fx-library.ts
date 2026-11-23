@@ -669,7 +669,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		return t;
 	},
 
-	/* Danseur de guerre */
+	/* Virevolteur */
 	'double-attaque': (e, c) => {
 		const t = melee(e, c, FURY, 1, -0.5);
 		melee(e, { ...c, crit: false }, FURY, 0.75, 2.6, 200);
@@ -692,7 +692,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		return t;
 	},
 	tourbillon: (e, c) => {
-		// Un vortex bleuté : des bras de vent en spirale qui tournent autour du danseur et s'élargissent.
+		// Un vortex bleuté : des bras de vent en spirale qui tournent autour du virevolteur et s'élargissent.
 		const at = c.from;
 		const BLUES = ['#ffffff', '#bfefff', '#7fe3ff', '#4a8dff'];
 		e.draw({
@@ -1047,7 +1047,7 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const w = WORDS[ability];
 	if (!c.success && c.foes[0]) kapow(eng, c.foes[0], 'RATÉ !', '#c9ced8', t, 0.75);
 	if (!c.success || !w) return eng.real(t);
-	// La bulle sur la cible principale (le danseur pour le tourbillon, le barde pour un chant),
+	// La bulle sur la cible principale (le virevolteur pour le tourbillon, le barde pour un chant),
 	// et de plus petites sur les autres cibles.
 	const main = ability === 'tourbillon' || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
 	const word = c.crit ? w.word.replace(/ ?!*$/, ' !!!') : w.word;
