@@ -1489,14 +1489,18 @@
 			text-shadow: 0 0 10px rgb(150 170 255 / 80%), 0 2px 4px rgb(0 0 0 / 85%);
 		}
 
-		&--hurt {
-			color: #ff8a7a;
-		}
-
 		&--heal {
 			color: #8fe0a0;
 			text-shadow: 0 0 10px rgb(120 200 140 / 80%), 0 2px 4px rgb(0 0 0 / 85%);
 		}
+	}
+
+	.combat-num {
+		position: absolute;
+		bottom: 70%;
+		left: 50%;
+		translate: -50% 0;
+		z-index: 7;
 	}
 
 	&--foe .token__img {
@@ -1790,6 +1794,105 @@
 @keyframes target-pulse {
 	0%, 100% { scale: 1; }
 	50% { scale: 1.06; }
+}
+
+/* Les chiffres de combat (dégâts, soins), façon jeu de cartes. */
+.combat-num {
+	display: grid;
+	justify-items: center;
+	pointer-events: none;
+	white-space: nowrap;
+	font-family: 'Arial Black', Impact, var(--font-title), sans-serif;
+	font-weight: 900;
+	line-height: 0.9;
+	animation: num-pop 1.5s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+
+	&__value {
+		font-size: clamp(1.4rem, 4.2vw, 2.4rem);
+		letter-spacing: -0.02em;
+		-webkit-text-stroke: 5px #120c10;
+		paint-order: stroke fill;
+		filter: drop-shadow(0 3px 0 rgb(0 0 0 / 70%));
+	}
+
+	&__label {
+		margin-top: 2px;
+		font-size: clamp(0.7rem, 2vw, 1.05rem);
+		text-transform: uppercase;
+		color: #ffe14a;
+		-webkit-text-stroke: 4px #120c10;
+		paint-order: stroke fill;
+	}
+
+	&--dmg &__value {
+		color: #ff4a3a;
+		text-shadow: 0 0 14px rgb(255 60 40 / 70%);
+	}
+
+	&--dmg.is-crit {
+		animation-name: num-pop-crit;
+	}
+
+	&--dmg.is-crit &__value {
+		font-size: clamp(1.9rem, 5.6vw, 3.2rem);
+		color: #ff2d2d;
+	}
+
+	&--heal &__value {
+		color: #7dff5a;
+		text-shadow: 0 0 16px rgb(110 255 80 / 75%);
+	}
+
+	/* Les petites croix vertes du soin, qui s'envolent autour du chiffre. */
+	&__cross {
+		--x: calc((var(--i) - 1.5) * 26px);
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		font-size: clamp(0.9rem, 2.4vw, 1.4rem);
+		color: #7dff5a;
+		-webkit-text-stroke: 3px #0c2a0a;
+		paint-order: stroke fill;
+		text-shadow: 0 0 10px rgb(110 255 80 / 80%);
+		opacity: 0;
+		animation: cross-fly 1.2s ease-out forwards;
+		animation-delay: calc(var(--i) * 90ms);
+	}
+}
+
+@keyframes num-pop {
+	0% { opacity: 0; transform: translateY(14px) scale(0.3); }
+	14% { opacity: 1; transform: translateY(-4px) scale(1.35); }
+	26% { transform: translateY(0) scale(0.95); }
+	36% { transform: translateY(0) scale(1); }
+	75% { opacity: 1; transform: translateY(-14px) scale(1); }
+	100% { opacity: 0; transform: translateY(-30px) scale(0.9); }
+}
+
+@keyframes num-pop-crit {
+	0% { opacity: 0; transform: translateY(14px) rotate(-14deg) scale(0.3); }
+	12% { opacity: 1; transform: translateY(-6px) rotate(-8deg) scale(1.6); }
+	24% { transform: translateY(0) rotate(-8deg) scale(0.92); }
+	34% { transform: translateY(0) rotate(-8deg) scale(1); }
+	78% { opacity: 1; transform: translateY(-14px) rotate(-8deg) scale(1); }
+	100% { opacity: 0; transform: translateY(-30px) rotate(-8deg) scale(0.9); }
+}
+
+@keyframes cross-fly {
+	0% { opacity: 0; transform: translate(-50%, -50%) translate(var(--x), 10px) scale(0.4); }
+	20% { opacity: 1; }
+	100% { opacity: 0; transform: translate(-50%, -50%) translate(calc(var(--x) * 1.4), -46px) scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.combat-num,
+	.combat-num__cross {
+		animation: none;
+	}
+
+	.combat-num__cross {
+		display: none;
+	}
 }
 
 /*

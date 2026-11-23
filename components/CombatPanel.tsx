@@ -130,6 +130,31 @@ function HealthBar({ id, memo, value, max, tone, shield = 0 }: { id: string; mem
 	);
 }
 
+/**
+ * Les chiffres de combat, façon jeu de cartes : gros, épais, cernés de noir ; ils surgissent en grossissant,
+ * rebondissent puis montent en s'effaçant. Rouge pour les dégâts (plus gros et penché sur un critique),
+ * vert pour un soin, avec de petites croix qui s'envolent.
+ */
+function CombatNumber({ value, crit = false }: { value: number; crit?: boolean }) {
+	const heal = value > 0;
+	return (
+		<span className={`combat-num combat-num--${heal ? 'heal' : 'dmg'}${crit ? ' is-crit' : ''}`} aria-hidden="true">
+			<span className="combat-num__value">
+				{heal ? '+' : '−'}
+				{Math.abs(value)}
+			</span>
+			{crit ? <span className="combat-num__label">Critique !</span> : null}
+			{heal
+				? [0, 1, 2, 3].map((i) => (
+						<span key={i} className="combat-num__cross" style={{ '--i': i } as React.CSSProperties}>
+							+
+						</span>
+					))
+				: null}
+		</span>
+	);
+}
+
 /** Pourcentages pour poser un jeton au centre d'une case. */
 function place(h: Hex) {
 	const { x, y } = center(h);
@@ -768,9 +793,7 @@ export function CombatPanel(props: Props) {
 									<HealthBar id={f.id} memo={hpMemo.current} value={hp} max={f.maxHp} tone="foe" />
 									<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
 									{hit ? (
-										<span className="token__burst" aria-hidden="true">
-											{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
-										</span>
+										<CombatNumber value={-hit.amount} crit={hit.crit} />
 									) : status?.failed ? (
 										<span className="token__burst token__burst--miss" aria-hidden="true">
 											Raté !
@@ -811,17 +834,13 @@ export function CombatPanel(props: Props) {
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />
 									<span className="token__name">{c.name}</span>
 									{hurtId === c.id && say?.amount ? (
-										<span className="token__burst token__burst--hurt" aria-hidden="true">
-											−{say.amount} PV
-										</span>
+										<CombatNumber value={-say.amount} />
 									) : !landed ? null : missedBy === c.id && !statuses.some((x) => x.failed) ? (
 										<span className="token__burst token__burst--miss" aria-hidden="true">
 											Raté !
 										</span>
 									) : support?.what === 'heal' ? (
-										<span className="token__burst token__burst--heal" aria-hidden="true">
-											+{support.amount} PV
-										</span>
+										<CombatNumber value={support.amount ?? 0} />
 									) : support?.targetId === c.id ? (
 										<span className="token__burst token__burst--heal" aria-hidden="true">
 											{support.what === 'shield' ? '🌕' : '🛡️'}
