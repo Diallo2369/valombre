@@ -16,6 +16,7 @@ const DEFAULT_COLOR: Record<Light['kind'], string> = {
 	magie: '150,190,255',
 	brume: '200,208,222',
 	eclair: '235,240,255',
+	pluie: '190,205,225',
 };
 
 /** Bruit lisse et irrégulier (somme de sinus décalés) : un feu ne vacille jamais en rythme. */
@@ -24,6 +25,22 @@ const flicker = (t: number, seed: number, speed: number) =>
 	0.25 * Math.sin(t * 2.1 * speed + seed) +
 	0.15 * Math.sin(t * 5.3 * speed + seed * 2.7) +
 	0.1 * Math.sin(t * 11.7 * speed + seed * 5.1);
+
+/** Une goutte de pluie qui tombe, ou un petit éclat quand elle touche le sol. */
+interface Drop {
+	x: number;
+	y: number;
+	len: number;
+	speed: number;
+	/** Hauteur (0 à 1) où elle s'écrase : la pluie tombe sur toute l'image, pas seulement en bas. */
+	ground: number;
+}
+
+interface Splash {
+	x: number;
+	y: number;
+	life: number;
+}
 
 interface Ember {
 	x: number;
@@ -61,6 +78,18 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 		const mists = lights.some((l) => l.kind === 'brume')
 			? Array.from({ length: 5 }, (_, i) => ({ x: Math.random(), y: 0.35 + Math.random() * 0.55, r: 0.25 + Math.random() * 0.25, v: 0.004 + Math.random() * 0.006, seed: i * 1.7 }))
 			: [];
+		// Pluie : des traits fins qui tombent en biais, et de petits éclats là où les gouttes s'écrasent.
+		const rain = lights.find((l) => l.kind === 'pluie');
+		const drops: Drop[] = [];
+		const splashes: Splash[] = [];
+		const newDrop = (anywhere: boolean): Drop => ({
+			x: Math.random() * 1.2 - 0.1,
+			y: anywhere ? Math.random() : -0.05 - Math.random() * 0.1,
+			len: 0.025 + Math.random() * 0.035,
+			speed: 1.1 + Math.random() * 0.7,
+			ground: 0.55 + Math.random() * 0.45,
+		});
+		if (rain) for (let i = 0; i < Math.round(160 * (rain.intensity ?? 1)); i += 1) drops.push(newDrop(true));
 		let flash = 0;
 		let nextFlash = performance.now() + 3000 + Math.random() * 6000;
 
@@ -123,6 +152,42 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 				const k = lights.find((l) => l.kind === 'brume')?.intensity ?? 1;
 				const breath = still ? 0.7 : 0.6 + 0.4 * Math.sin(t * 0.3 + m.seed);
 				glow(m.x * w, m.y * h, m.r * w, DEFAULT_COLOR.brume, 0.1 * k * breath);
+			}
+
+			// La pluie.
+			if (rain && !still) {
+				const color = rain.color ?? DEFAULT_COLOR.pluie;
+				const wind = ((rain.x ?? 12) * Math.PI) / 180;
+				const dx = Math.sin(wind);
+				const dy = Math.cos(wind);
+				ctx.lineCap = 'round';
+				ctx.lineWidth = 1.1;
+				for (const d of drops) {
+					d.y += d.speed * dt * dy;
+					d.x += d.speed * dt * dx;
+					if (d.y > d.ground) {
+						if (Math.random() < 0.35) splashes.push({ x: d.x, y: d.y, life: 1 });
+						Object.assign(d, newDrop(false));
+						continue;
+					}
+					ctx.strokeStyle = `rgba(${color},${0.22 + 0.25 * (d.speed - 1.1)})`;
+					ctx.beginPath();
+					ctx.moveTo(d.x * w, d.y * h);
+					ctx.lineTo((d.x - dx * d.len) * w, (d.y - dy * d.len) * h);
+					ctx.stroke();
+				}
+				for (let j = splashes.length - 1; j >= 0; j--) {
+					const s = splashes[j];
+					s.life -= dt * 5;
+					if (s.life <= 0) {
+						splashes.splice(j, 1);
+						continue;
+					}
+					ctx.strokeStyle = `rgba(${color},${0.45 * s.life})`;
+					ctx.beginPath();
+					ctx.ellipse(s.x * w, s.y * h, (1 - s.life) * 7 + 1, (1 - s.life) * 2.2 + 0.5, 0, Math.PI, Math.PI * 2);
+					ctx.stroke();
+				}
 			}
 
 			// Braises qui montent du feu.

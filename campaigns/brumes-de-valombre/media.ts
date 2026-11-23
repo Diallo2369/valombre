@@ -509,6 +509,8 @@ export const LIGHTS: Record<string, Light[]> = {
 		{ kind: 'feu', x: 55, y: 57, size: 0.09, intensity: 0.8 },
 		{ kind: 'lanterne', x: 9, y: 43, size: 0.08, intensity: 0.6 },
 		{ kind: 'lanterne', x: 86, y: 51, size: 0.05, intensity: 0.5 },
+		// La pluie sur toute l'image, poussée par un léger vent (12°).
+		{ kind: 'pluie', x: 12, intensity: 1 },
 	],
 	'img-salle-commune': [{ kind: 'feu', x: 80, y: 58, size: 0.45 }],
 	'img-cuisine': [{ kind: 'feu', x: 25, y: 62, size: 0.4 }],

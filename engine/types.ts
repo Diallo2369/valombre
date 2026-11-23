@@ -287,7 +287,8 @@ export interface MediaAsset {
  * x, y : position du foyer en % de l'image ; size : rayon en fraction de la largeur ; intensity : 0 à 1,5.
  */
 export interface Light {
-	kind: 'feu' | 'lanterne' | 'magie' | 'brume' | 'eclair';
+	/** « pluie » : des gouttes qui tombent sur toute l'image (intensity : densité, x : vent en degrés). */
+	kind: 'feu' | 'lanterne' | 'magie' | 'brume' | 'eclair' | 'pluie';
 	x?: number;
 	y?: number;
 	size?: number;
