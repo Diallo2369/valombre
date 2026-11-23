@@ -18,7 +18,7 @@ export default function HomePage() {
 			<main className="home">
 				<section className="home__hero">
 					<div className="home__bg">
-						{/* L'image et ses lumières (bougies, lanterne, neige) dans une boîte au format de l'image, qui couvre le bandeau. */}
+						{/* L'image et ses lumières (bougies, lanterne) dans une boîte au format de l'image, qui couvre le bandeau. */}
 						<div className="home__art">
 							<MediaView className="home__img" media={media} image="img-portail" alt="" />
 							<LightLayer lights={PORTAL_LIGHTS} />

@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { Light } from '@/engine/types';
 
 /**
- * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie, yeux qui guettent, ronds dans les flaques, neige derrière une fenêtre,
+ * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie, yeux qui guettent, ronds dans les flaques,
  * brume qui glisse, éclairs, lueur magique qui respire. Un seul canevas, fusionné en « screen »
  * (il ne fait qu'éclairer l'image, jamais l'assombrir).
  * Avec « réduire les animations » activé dans le système, on dessine une lueur fixe, sans mouvement.
@@ -20,7 +20,6 @@ const DEFAULT_COLOR: Record<Light['kind'], string> = {
 	pluie: '190,205,225',
 	yeux: '140,190,255',
 	flaque: '200,212,230',
-	neige: '240,245,255',
 };
 
 /** Bruit lisse et irrégulier (somme de sinus décalés) : un feu ne vacille jamais en rythme. */
@@ -63,16 +62,6 @@ interface Eyes {
 	blinkUntil: number;
 	nextMove: number;
 	moveDx: number;
-}
-
-/** Un flocon de neige : il tombe lentement en se balançant. */
-interface Flake {
-	x: number;
-	y: number;
-	r: number;
-	speed: number;
-	sway: number;
-	phase: number;
 }
 
 interface Ember {
@@ -132,17 +121,6 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 				eyes.set(i, { dx: 0, alpha: 1, target: 1, nextBlink: now + 1500 + Math.random() * 3000, blinkUntil: 0, nextMove: now + 9000 + Math.random() * 6000, moveDx: 0 });
 			}
 		});
-		// Neige : des flocons qui tombent dans une zone (une fenêtre), en coordonnées 0-1 de cette zone.
-		const snow = lights.find((l) => l.kind === 'neige');
-		const newFlake = (anywhere: boolean): Flake => ({
-			x: Math.random(),
-			y: anywhere ? Math.random() : -0.05,
-			r: 0.8 + Math.random() * 1.8,
-			speed: 0.05 + Math.random() * 0.08,
-			sway: 0.01 + Math.random() * 0.025,
-			phase: Math.random() * Math.PI * 2,
-		});
-		const flakes: Flake[] = snow ? Array.from({ length: Math.round(70 * (snow.intensity ?? 1)) }, () => newFlake(true)) : [];
 		let flash = 0;
 		let nextFlash = performance.now() + 3000 + Math.random() * 6000;
 
@@ -223,8 +201,9 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 						ripples.push({ x: x + (Math.random() - 0.5) * span, y: y + (Math.random() - 0.5) * span * 0.15, life: 1, r: span * (0.08 + Math.random() * 0.08) });
 					}
 				} else if (l.kind === 'lanterne') {
-					const f = still ? 0.8 : flicker(t, i * 2.3, 0.9);
-					glow(x, y, radius * (0.95 + 0.06 * f), color, 0.34 * k * (0.75 + 0.25 * f));
+					// La flamme vacille derrière la vitre : plus calme qu'une bougie, mais bien vivante.
+					const f = still ? 0.8 : flicker(t, i * 2.3, 1.5) * (0.8 + 0.2 * flicker(t, i * 1.7, 0.4));
+					glow(x, y, radius * (0.88 + 0.16 * f), color, 0.36 * k * (0.5 + 0.5 * f));
 				} else if (l.kind === 'magie') {
 					const p = still ? 0.6 : 0.5 + 0.5 * Math.sin(t * 1.4 + i);
 					glow(x, y, radius * (0.85 + 0.2 * p), color, 0.3 * k * (0.5 + 0.5 * p));
@@ -285,33 +264,6 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 					ctx.ellipse(s.x * w, s.y * h, (1 - s.life) * 7 + 1, (1 - s.life) * 2.2 + 0.5, 0, Math.PI, Math.PI * 2);
 					ctx.stroke();
 				}
-			}
-
-			// La neige, découpée à sa zone (la fenêtre).
-			if (snow && flakes.length) {
-				const a = snow.area ?? { x: 0, y: 0, w: 100, h: 100 };
-				const ax = (a.x / 100) * w;
-				const ay = (a.y / 100) * h;
-				const aw = (a.w / 100) * w;
-				const ah = (a.h / 100) * h;
-				const color = snow.color ?? DEFAULT_COLOR.neige;
-				ctx.save();
-				ctx.beginPath();
-				ctx.rect(ax, ay, aw, ah);
-				ctx.clip();
-				for (const f of flakes) {
-					if (!still) {
-						f.y += f.speed * dt;
-						if (f.y > 1.05) Object.assign(f, newFlake(false));
-					}
-					const x = ax + (f.x + Math.sin(t * 0.9 + f.phase) * f.sway) * aw;
-					const y = ay + f.y * ah;
-					ctx.fillStyle = `rgba(${color},${0.55 + 0.35 * (f.r / 2.6)})`;
-					ctx.beginPath();
-					ctx.arc(x, y, f.r, 0, Math.PI * 2);
-					ctx.fill();
-				}
-				ctx.restore();
 			}
 
 			// Ronds dans les flaques.
