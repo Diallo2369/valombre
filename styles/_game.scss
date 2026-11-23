@@ -692,14 +692,41 @@
 }
 
 /* ---- Fenêtres ---- */
-/* L'écran de départ d'une aventure : la carte du monde en plein écran, opaque (la scène reste cachée derrière). */
+/*
+ * La carte du monde en plein écran, sur fond de nuit opaque (rien de la page ne se voit derrière).
+ * Au départ (choix des héros, .map-cover), elle arrive en fondu ; sur l'écran « Commencer l'aventure »
+ * (.overlay--start), elle est déjà là : pas de second fondu, rien ne saute entre les deux pages.
+ */
+.map-cover,
 .overlay.overlay--start {
-	background-color: var(--night-900);
-	background-size: cover;
-	background-position: center;
+	background: var(--night-900);
 	backdrop-filter: none;
-	/* La carte arrive en fondu. */
-	animation: fade-in 0.8s ease;
+	animation: none;
+
+	&::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: var(--map, none) center / cover no-repeat;
+	}
+
+	> * {
+		position: relative;
+	}
+}
+
+.start[hidden] {
+	display: none;
+}
+
+.map-cover {
+	position: fixed;
+	inset: 0;
+	z-index: 95;
+
+	&::before {
+		animation: fade-in 0.8s ease;
+	}
 }
 
 .overlay {

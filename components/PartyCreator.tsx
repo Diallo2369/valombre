@@ -17,6 +17,8 @@ interface Props {
 	campaignTitle: string;
 	existing: Character[];
 	media: MediaMap;
+	/** La carte du monde : elle apparaît dès qu'on part à l'aventure (écran de chargement). */
+	mapUrl?: string;
 }
 
 type Step = 'qui' | 'classe' | 'des' | 'resume';
@@ -55,7 +57,7 @@ function draftToCharacter(d: Draft): Character | null {
 }
 
 /** Création du groupe : héros existants à reprendre + nouveaux héros tirés aux dés. */
-export function PartyCreator({ campaignId, campaignTitle, existing, media }: Props) {
+export function PartyCreator({ campaignId, campaignTitle, existing, media, mapUrl }: Props) {
 	const [heroes, setHeroes] = useState<Character[]>([]);
 	const [reuse, setReuse] = useState<string[]>([]);
 	const [draft, setDraft] = useState<Draft | null>(existing.length ? null : { ...EMPTY });
@@ -103,16 +105,23 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 		setDraft(null);
 	};
 
+	/** Le départ : la carte du monde apparaît tout de suite, et reste jusqu'à l'écran « Commencer l'aventure ». */
+	const [leaving, setLeaving] = useState(false);
 	const launch = () => {
 		setError(null);
+		setLeaving(true);
 		startTransition(async () => {
 			const res = await createAdventureAction({ campaignId, name, newHeroes: heroes, reuseIds: reuse });
-			if (res?.error) setError(res.error);
+			if (res?.error) {
+				setError(res.error);
+				setLeaving(false);
+			}
 		});
 	};
 
 	return (
 		<div className="creator">
+			{leaving ? <div className="map-cover" style={mapUrl ? ({ '--map': `url(${mapUrl})` } as React.CSSProperties) : undefined} aria-hidden="true" /> : null}
 			{/* ---------- Héros déjà existants ---------- */}
 			{existing.length ? (
 				<section className="card creator__block">

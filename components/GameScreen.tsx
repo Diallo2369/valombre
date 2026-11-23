@@ -714,11 +714,11 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 					/>
 				)
 			) : null}
-			{!started && !diving ? (
-				// L'écran de départ : la carte du monde en plein écran (ou la nuit, tant qu'elle n'est pas illustrée) ;
-				// on ne voit pas la scène derrière, elle apparaîtra au bout du zoom dans la carte.
-				<div className="overlay overlay--start" style={mapUrl ? { backgroundImage: `url(${mapUrl})` } : undefined}>
-					<div className="start card">
+			{!started ? (
+				// L'écran de départ : la carte du monde en plein écran, tout de suite (ou la nuit, tant qu'elle n'est pas
+				// illustrée) ; on ne voit pas la scène derrière. Elle reste sous le zoom jusqu'au bout : rien ne saute.
+				<div className="overlay overlay--start" style={mapUrl ? ({ '--map': `url(${mapUrl})` } as React.CSSProperties) : undefined}>
+					<div className="start card" hidden={diving}>
 						{adventureName !== campaign.title ? <p className="start__eyebrow">{campaign.title}</p> : null}
 						<h2>{adventureName}</h2>
 						<p>

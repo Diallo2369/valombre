@@ -100,8 +100,9 @@ export function DiveTransition({ image, to, ms = 1300, fadeIn = 180, focus = [0.
 			if (!alive) return;
 			if (!a || (to && !b)) return onDone();
 			const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-			canvas.width = Math.round(window.innerWidth * dpr);
-			canvas.height = Math.round(window.innerHeight * dpr);
+			// La taille affichée du canevas (comme la carte dessous, sans la barre de défilement) : l'image tombe pile dessus.
+			canvas.width = Math.round(canvas.clientWidth * dpr);
+			canvas.height = Math.round(canvas.clientHeight * dpr);
 			gl.viewport(0, 0, canvas.width, canvas.height);
 			const sh = (type: number, src: string) => {
 				const s = gl.createShader(type)!;

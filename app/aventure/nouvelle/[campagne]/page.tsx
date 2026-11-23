@@ -29,6 +29,7 @@ export default function NewAdventurePage({ params }: { params: { campagne: strin
 					campaignTitle={campaign.title}
 					existing={listCharacters(user.id)}
 					media={scanMedia('commun', COMMON_MEDIA)}
+					mapUrl={campaign.map ? scanMedia(campaign.id, campaign.media)[campaign.map.image] : undefined}
 				/>
 			</main>
 		</>
