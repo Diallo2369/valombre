@@ -305,7 +305,8 @@
 }
 
 /* Derrière l'écran d'entrée, les animations de la page attendent qu'on entre. */
-.is-gated main * {
+.is-gated main *,
+.is-gated .site-header {
 	animation-play-state: paused !important;
 }
 

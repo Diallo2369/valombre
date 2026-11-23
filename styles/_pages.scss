@@ -153,8 +153,17 @@
 	animation: fade-in 0.18s ease;
 }
 
-/* « Réduire les animations » : on garde les effets doux (flou, fondus, écriture du titre), sans mouvement. */
+/* Sur l'accueil, l'en-tête du site arrive lui aussi en fondu, avec l'image. */
+body:has(.home) .site-header {
+	animation: home-fade 1.2s ease 0.3s both;
+}
+
+/* « Réduire les animations » : on garde les effets doux (flou, fondus, apparition du titre), sans mouvement. */
 @media (prefers-reduced-motion: reduce) {
+	.home__features .card {
+		animation-name: home-fade;
+	}
+
 	/* Le titre apparaît en fondu, sans grossir ni se resserrer. */
 	.legend-title__word {
 		animation-name: home-fade;
@@ -267,6 +276,23 @@
 
 	&__cta {
 		animation-delay: 2.9s;
+	}
+
+	/* Les encarts du bas arrivent après le titre, l'un après l'autre. */
+	&__features .card {
+		animation: home-rise 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+
+		&:nth-child(1) {
+			animation-delay: 3.3s;
+		}
+
+		&:nth-child(2) {
+			animation-delay: 3.5s;
+		}
+
+		&:nth-child(3) {
+			animation-delay: 3.7s;
+		}
 	}
 
 	&__cta {
