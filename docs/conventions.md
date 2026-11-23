@@ -131,7 +131,10 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
     il part à son tour suivant, à la place de son attaque. Bâillonnée, assommée, prise au filet ou endormie entre-temps : il s’éteint.
 - Les PV écrits sont multipliés par `SOLID` (1,5) et les coups par `HIT` (1,5) (engine.ts) : les héros encaissent, se soignent et contrôlent beaucoup, les monstres doivent rester dangereux.
 - Une créature seule est écrite **pour 4 héros** : le moteur ajuste ses PV et la force de ses coups à la taille du
-  groupe (`foeScale` dans engine.ts).
+  groupe (`foeScale` dans engine.ts). Au-delà de 4 héros, ses coups grossissent à peine : elle gagne plutôt
+  **une attaque de plus par tour** (à partir de 5 héros) et un peu de PV.
+- **Plafond d'un coup** (`maxHit`) : la moitié des PV d'un héros moyen du groupe. Personne n'est mis KO d'un seul coup
+  en pleine forme ; seuls la rage de la Moquerie et les coups qui s'enchaînent (2 attaques, balayage) peuvent le dépasser.
 - Une bande (`foes`) est écrite **pour une table de 6** : avec moins de héros, on ne garde que les premières de la
   liste (4 sur 6 à 4 héros) ; mettre les plus importantes en tête. Ses PV totaux suivent la même règle.
 - Réglage visé (simulation par classe, 4 héros) : ~15 % de PV perdus contre Pff, ~25 % au rappel des brumelins, ~40 %

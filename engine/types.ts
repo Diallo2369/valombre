@@ -401,6 +401,8 @@ export interface FoeState {
 	cleave?: boolean;
 	attacks?: number;
 	stun?: number;
+	/** Plafond d'un coup (la moitié des PV d'un héros moyen du groupe) : personne n'est mis KO d'un seul coup. */
+	maxHit?: number;
 	spell?: FoeSpell;
 	/** Tour à partir duquel son sort est de nouveau prêt. */
 	spellReady?: number;

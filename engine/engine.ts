@@ -504,7 +504,10 @@ const epuise = (c: Character) => (c.gender === 'm' ? 'épuisé' : c.gender === '
  *   On garde les premières de la liste ; leurs PV sont ajustés pour que le total suive la même règle.
  */
 export function foeScale(partySize: number) {
-	return { hp: (partySize * partySize + 4 * partySize) / 32, damage: 0.1 + partySize * 0.225 };
+	// Au-delà de 4 héros, les coups grossissent à peine : c'est le nombre de créatures et leurs PV qui suivent.
+	const damage = partySize <= 4 ? 0.1 + partySize * 0.225 : 1 + (partySize - 4) * 0.15;
+	const extra = partySize > 4 ? 1 + (partySize - 4) * 0.1 : 1;
+	return { hp: ((partySize * partySize + 4 * partySize) / 32) * extra, damage };
 }
 
 /** Nombre de créatures d'une bande écrite pour 6 héros, pour un groupe de `partySize`. */
@@ -521,8 +524,11 @@ function spellOf(sp: FoeSpell | undefined, mul: number): { spell?: FoeSpell } {
 	return { spell: sp.damage && sp.kind !== 'rally' ? { ...sp, damage: Math.max(1, Math.round(sp.damage * mul)) } : sp };
 }
 
-function foesOf(def: CombatDef, partySize: number): FoeState[] {
+function foesOf(def: CombatDef, party: Character[]): FoeState[] {
+	const partySize = party.length;
 	const { hp: scale, damage: hit } = foeScale(partySize);
+	// Un coup ne met jamais KO d'un seul coup un héros en pleine forme : au plus la moitié des PV d'un héros moyen du groupe.
+	const maxHit = Math.max(2, Math.round((0.5 * party.reduce((a, c) => a + c.pvMax, 0)) / Math.max(1, partySize)));
 	const band = Boolean(def.foes && def.foes.length > 1);
 	const all = def.foes?.length ? def.foes : [{ name: def.enemy.name, hearts: def.enemy.hearts }];
 	const list = band ? all.slice(0, bandSize(all.length, partySize)) : all;
@@ -542,9 +548,11 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 			image: ('image' in f && f.image) || def.enemy.image,
 			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * dmgMul * HIT)),
 			move: ('move' in f && f.move) || def.enemy.move || 2,
+			maxHit,
 			range: ('range' in f && f.range) || def.enemy.range || 1,
 			...(('cleave' in f && f.cleave) || (!band && def.enemy.cleave) ? { cleave: true } : {}),
-			...(!band && def.enemy.attacks ? { attacks: def.enemy.attacks } : {}),
+			// Un monstre seul face à 5 héros ou plus : une attaque de plus par tour (pas des coups plus gros).
+			...(!band && (def.enemy.attacks || partySize >= 5) ? { attacks: (def.enemy.attacks ?? 1) + (partySize >= 5 ? 1 : 0) } : {}),
 			...((('stun' in f && f.stun) || (!band && def.enemy.stun)) ? { stun: ('stun' in f && f.stun) || def.enemy.stun } : {}),
 			...spellOf(('spell' in f && f.spell) || (!band ? def.enemy.spell : undefined), dmgMul * HIT),
 			...(afflict ? { afflict } : {}),
@@ -606,7 +614,7 @@ function nearestHero(heroes: Character[], combat: CombatState, from: Hex): Chara
  * puis initiative : dé + Agilité + bonus de classe ; les créatures : dé + bonus de difficulté.
  */
 function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
-	const foes = foesOf(def, game.party.length);
+	const foes = foesOf(def, game.party);
 	const rolls = [
 		...game.party.map((c) => ({ id: c.id, name: c.name, bonus: initiativeOf(c) })),
 		{ id: 'enemy', name: def.enemy.name, bonus: ENEMY_INITIATIVE[def.enemy.difficulty] },
@@ -930,7 +938,8 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 	// Cri de rage : le guerrier pare presque tout.
 	const guardChance = combat.heroes[victim.id]?.guarding ?? 0;
 	const parried = guardChance > 0 && Math.random() < guardChance;
-	let base = parried ? 0 : (o.damage ?? foe.damage) + (o.spell ? 0 : (foe.rallied ?? 0));
+	// Plafonné (personne n'est mis KO d'un coup) ; la rage de la Moquerie, elle, peut le dépasser.
+	let base = parried ? 0 : Math.min(foe.maxHit ?? Infinity, (o.damage ?? foe.damage) + (o.spell ? 0 : (foe.rallied ?? 0)));
 	const rage = o.rage && victim.id === target.id ? RAGE[Math.floor(Math.random() * RAGE.length)] : undefined;
 	if (rage) base = Math.round(base * rage);
 	let blow = Math.max(0, base - (guarded ? 1 : 0));
