@@ -924,6 +924,71 @@ body:has(.home) .site-header {
 	}
 }
 
+/* La fiche en onglets (volet du jeu) : des intercalaires de parchemin. */
+.sheet {
+	&__tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		border-bottom: 2px solid rgb(34 29 24 / 25%);
+	}
+
+	&__tab {
+		padding: 8px 14px;
+		border: 0;
+		border-radius: 10px 10px 0 0;
+		background: rgb(34 29 24 / 8%);
+		color: rgb(34 29 24 / 75%);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+		margin-bottom: -2px;
+		border-bottom: 2px solid transparent;
+
+		&:hover {
+			background: rgb(34 29 24 / 14%);
+			color: var(--ink-900);
+		}
+
+		&:focus-visible {
+			outline: 3px solid #8a4b16;
+			outline-offset: 2px;
+		}
+
+		&.is-active {
+			background: rgb(255 250 238 / 70%);
+			color: var(--ink-900);
+			border-bottom-color: #8a4b16;
+		}
+	}
+
+	&__panel {
+		display: grid;
+		gap: 14px;
+		outline: none;
+
+		&:focus-visible {
+			outline: 3px solid #8a4b16;
+			outline-offset: 4px;
+			border-radius: 6px;
+		}
+	}
+
+	&__kit {
+		margin: 0;
+		padding-left: 1.2em;
+		display: grid;
+		gap: 4px;
+	}
+}
+
+/* Le retour au groupe, au-dessus de la fiche (dans le volet). */
+.sheet-back {
+	justify-self: start;
+	margin-bottom: 10px;
+}
+
+
 .sheets-page {
 	padding: 24px var(--gutter) 60px;
 

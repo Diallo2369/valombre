@@ -425,14 +425,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			activeId={actor?.id}
 			viewedId={fighting ? viewId ?? undefined : undefined}
 			spokesId={prefs.spokesperson && !combat ? spokes?.id : undefined}
-			openLabel={fighting ? 'Compétences de' : 'Fiche de'}
-			onOpenSheet={(id) => {
-				// En combat : on regarde ses compétences sur la carte du héros (le volet se ferme). Sinon : sa fiche.
-				if (fighting) {
-					setViewId(id === actor?.id ? null : id);
-					setPanel(null);
-				} else setPanel({ sheet: id });
-			}}
+			onOpenSheet={(id) => setPanel({ sheet: id })}
 			onBardSong={(id) => apply(bardSong(game, id))}
 		/>
 	);
@@ -720,7 +713,11 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			) : null}
 			{sheetHero ? (
 				<Drawer title={`Fiche de ${sheetHero.name}`} onClose={() => setPanel(null)}>
-					<CharacterSheet character={sheetHero} media={media}>
+					<button type="button" className="btn btn--small btn--ghost sheet-back" onClick={() => setPanel('groupe')}>
+						← Le groupe
+					</button>
+					{/* Une fiche par héros (la clé) : on rouvre sur le premier onglet ; en combat, sur ses compétences. */}
+					<CharacterSheet key={sheetHero.id} character={sheetHero} media={media} tabs initialTab={fighting ? 'competences' : 'carac'}>
 						<NotesField
 							key={sheetHero.id}
 							initial={sheetHero.notes}
