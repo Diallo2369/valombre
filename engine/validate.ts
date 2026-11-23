@@ -84,7 +84,8 @@ export function validateCampaign(campaign: Campaign, common: MediaAsset[]): stri
 		if (s.combat) {
 			need(!s.combat.enemy.image || media.has(s.combat.enemy.image), `${w} : image d’ennemi inconnue`);
 			for (const f of s.combat.foes ?? []) need(!f.image || media.has(f.image), `${w} : image inconnue pour ${f.name}`);
-			need(!s.combat.foes || s.combat.foes.length <= 6, `${w} : 6 créatures au plus sur le plateau`);
+			// Une bande est écrite pour une table de 6 ; les créatures partent des deux rangées du haut (14 cases).
+			need(!s.combat.foes || s.combat.foes.length <= 12, `${w} : 12 créatures au plus dans une bande`);
 			for (const o of [s.combat.victory, s.combat.defeat, s.combat.talk?.outcome, s.combat.flee?.outcome]) {
 				if (!o) continue;
 				checkTo(w, o.to);

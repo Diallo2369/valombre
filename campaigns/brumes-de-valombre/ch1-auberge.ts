@@ -139,7 +139,7 @@ export const CH1_AUBERGE: Scene[] = [
 		chapter: 1,
 		zone: 'auberge',
 		media: { image: 'img-salle-commune', video: 'vid-aubin-entre', music: 'mus-auberge', ambience: 'amb-taverne', sfx: ['sfx-porte'] },
-		note: 'Scène d’exposition : présente tous les PNJ du pivot puis lance la quête principale.',
+		note: 'Scène d’exposition : présente tous les PNJ du pivot, lance la quête principale et pose la règle de la Grise (elle endort ceux dont elle connaît le nom ; les héros, venus d’ailleurs, sont les seuls à pouvoir sortir, mais pas indéfiniment).',
 		lines: [
 			{
 				who: 'narrateur',
@@ -151,16 +151,23 @@ export const CH1_AUBERGE: Scene[] = [
 			},
 			{ who: 'berthe', text: 'Moi c’est Berthe. Asseyez-vous. Une soupe pour chacun, c’est la maison qui offre : par ce temps, on ne fait pas payer les gens perdus.' },
 			{ who: 'narrateur', text: 'BLAM ! La porte s’ouvre violemment. La pluie et la brume s’engouffrent. Un homme couvert de farine, une torche à la main, crie :' },
-			{ who: 'aubin', text: 'Lisette ! Ma Lisette a disparu ! Quelqu’un a vu ma fille ? Elle était dans son lit, et maintenant sa fenêtre est ouverte !' },
-			{ who: 'brac', text: 'Aubin, calme-toi. Personne ne sort cette nuit : c’est le couvre-feu. La Grise est trop épaisse. On cherchera à l’aube.' },
-			{ who: 'aubin', text: 'À l’aube ? Mais elle a dix ans, Brac ! Dix ans !' },
-			{ who: 'narrateur', text: 'Le meunier repart en courant dans la nuit. Un silence tombe sur la salle. Puis tous les regards se tournent… vers vous.' },
-			{ who: 'berthe', text: 'Vous avez des épées et des bâtons, vous. Des têtes d’aventuriers. Vous allez l’aider, hein ?' },
+			{ who: 'aubin', text: 'Lisette ! Ma Lisette a disparu ! Sa fenêtre est grande ouverte… et dehors, il y a des lumières bleues partout dans la brume !' },
+			{ who: 'narrateur', text: 'Au même instant, DONG ! DONG ! DONG ! La cloche de l’église sonne l’alarme. Des cris dans la rue. Des villageois se ruent dans l’auberge, une mère serre deux petits contre elle.' },
+			{ who: 'brac', text: 'La Grise descend dans les rues ! Fermez cette porte ! Les tables, les bancs, tout ce que vous trouvez !' },
+			{ who: 'narrateur', text: 'On pousse les tables contre la porte. Deux hommes portent un garde du guet. Il dort, la tête ballante, avec un drôle de petit sourire. On a beau le secouer, l’appeler… il ne se réveille pas.' },
+			{ who: 'brac', text: 'Mathis est sorti chercher la petite il y a une heure. On l’a trouvé couché au milieu de la rue. C’est la Grise : elle endort tous ceux qui entrent dedans.' },
+			{ who: 'aubin', text: 'Je m’en moque ! Ma fille est dehors ! Elle a dix ans ! Laissez-moi passer !' },
+			{ who: 'narrateur', text: 'Brac et deux hommes le retiennent de force. Sous la porte barricadée, un filet de brume se glisse et rampe sur le plancher. Les bougies faiblissent. Une vieille femme, tout près, bâille… et chancelle. Berthe la tire en arrière.' },
+			{ who: 'ossian', text: 'Écoutez-moi. La Grise retient les noms. Elle connaît le mien, celui de Berthe, celui de la petite. Elle endort tous ceux qu’elle connaît.' },
+			{ who: 'ossian', text: 'Mais vous… vous venez d’ailleurs, et vous avez traversé la Grise ce soir sans fermer l’œil. Elle ne vous connaît pas. Pas encore.' },
+			{ who: 'ossian', text: 'Plus vous resterez dans la vallée, plus elle apprendra qui vous êtes. À l’aube, elle saura vos noms. Alors ne les dites jamais dans la brume… et faites vite.' },
+			{ who: 'narrateur', text: 'Un silence tombe sur la salle. Puis tous les regards se tournent… vers vous.' },
+			{ who: 'berthe', text: 'Vous êtes les seuls qui puissent sortir. Je vous en supplie… ramenez-la.' },
 		],
-		onEnter: [{ quest: 'q-lisette', status: 'active' }],
+		onEnter: [{ quest: 'q-lisette', status: 'active' }, { setFlag: 'regle-des-noms' }, { setFlag: 'mathis-endormi' }],
 		choices: [
-			{ label: '« Bien sûr ! On va retrouver Lisette. »', to: 'salle-commune', effects: [{ setFlag: 'promesse-berthe' }] },
-			{ label: '« D’abord la soupe… ensuite on aide ! »', to: 'salle-commune', effects: [{ heal: 'full' }] },
+			{ label: '« On va la retrouver. On vous le promet. »', to: 'salle-commune', effects: [{ setFlag: 'promesse-berthe' }] },
+			{ label: 'Avaler la soupe en vitesse, puis se mettre en route', to: 'salle-commune', effects: [{ heal: 'full' }] },
 		],
 	},
 
@@ -175,7 +182,7 @@ export const CH1_AUBERGE: Scene[] = [
 		media: { image: 'img-salle-commune', video: 'vid-salle-commune', music: 'mus-auberge', ambience: 'amb-taverne' },
 		note: 'PIVOT DU CHAPITRE 1. Les lignes s’adaptent à ce que le groupe sait déjà.',
 		lines: [
-			{ who: 'narrateur', text: 'La salle commune du Chaudron Fêlé. Le feu crépite, la pluie frappe les carreaux.' },
+			{ who: 'narrateur', text: 'La salle commune du Chaudron Fêlé. La porte est barricadée, les villageois réfugiés se serrent autour du feu. Dehors, la pluie frappe les carreaux.' },
 			{
 				who: 'narrateur',
 				text: 'Pour retrouver Lisette, il faudrait des indices. Les gens d’ici savent peut-être quelque chose… et dehors, il y a la cour, le village, la forêt.',
@@ -186,7 +193,7 @@ export const CH1_AUBERGE: Scene[] = [
 				text: 'Vous avez un premier indice. Encore un, et vous saurez où chercher.',
 				if: [{ min: 1, of: CLUES }, { notFlag: 'pret-a-partir' }],
 			},
-			{ who: 'berthe', text: 'Vous en savez assez maintenant, non ? Moi, je dis qu’il faut y aller dès que le jour se lève.', if: [{ flag: 'pret-a-partir' }] },
+			{ who: 'berthe', text: 'Vous en savez assez maintenant. Allez-y, vite… avant que la Grise n’apprenne vos noms.', if: [{ flag: 'pret-a-partir' }] },
 		],
 		onEnter: [{ setFlag: 'pret-a-partir', if: [{ min: 2, of: CLUES }] }],
 		choices: [
@@ -194,6 +201,7 @@ export const CH1_AUBERGE: Scene[] = [
 			{ label: 'S’asseoir près du vieil homme aveugle', to: 'ossian' },
 			{ label: 'Regarder l’étal du colporteur', to: 'gaspard', if: [{ notFlag: 'gaspard-parti' }] },
 			{ label: 'Saluer le soldat grisonnant', to: 'brac' },
+			{ label: 'Aller voir Aubin, effondré près de la porte barricadée', to: 'aubin' },
 			{ label: 'Pousser la porte de la cuisine', to: 'cuisine' },
 			{ label: 'Sortir dans la cour de l’auberge', to: 'cour' },
 			{ label: 'Aller sur la place du village', to: 'place' },
@@ -261,7 +269,7 @@ export const CH1_AUBERGE: Scene[] = [
 		lines: [
 			{
 				who: 'berthe',
-				text: 'La Grise ? Elle a toujours été là, au fond des ravins. Mais depuis sept nuits, elle monte, elle monte… Chaque soir, quelque chose disparaît : une poule, un mouton, les lanternes qui s’éteignent toutes seules.',
+				text: 'La Grise ? Elle a toujours été là, au fond des ravins. Mais depuis sept nuits, elle monte, elle monte… Les lanternes s’éteignent toutes seules, les bêtes s’endorment dans les prés. Et ce soir, pour la première fois, elle est descendue jusque dans les rues.',
 			},
 			{ who: 'berthe', text: 'Le vieil Ossian, là, près du feu, il dit que c’est à cause d’une vieille légende. Moi je dis que c’est à cause d’une mauvaise humeur du ciel.' },
 		],
@@ -476,6 +484,7 @@ export const CH1_AUBERGE: Scene[] = [
 		lines: [
 			{ who: 'gaspard', text: 'D’accord, d’accord ! Je l’ai prise, cette pierre. Elle était si belle… Je me disais qu’un riche seigneur me l’achèterait une fortune.' },
 			{ who: 'gaspard', text: 'Mais depuis, je fais des cauchemars. Une dame toute grise qui pleure. Tenez, prenez-la. Je n’en veux plus. Et… dites à la petite que je suis désolé.' },
+			{ who: 'gaspard', text: 'Et ce n’est pas tout. J’ai crié mon nom dans la brume, au sanctuaire, pour me donner du courage. Depuis deux jours, je n’arrive plus à garder les yeux ouverts… Elle me connaît, maintenant.', if: [{ flag: 'regle-des-noms' }] },
 			{ who: 'narrateur', text: 'Il vous tend un petit coffret. Dedans, une pierre dorée, tiède comme une main, qui bat tout doucement. Le Cœur de l’Aube.' },
 		],
 		onEnter: [
@@ -510,7 +519,8 @@ export const CH1_AUBERGE: Scene[] = [
 		zone: 'auberge',
 		media: { image: 'img-salle-commune', music: 'mus-auberge', ambience: 'amb-taverne' },
 		lines: [
-			{ who: 'brac', text: 'Hmpf. Des aventuriers. Écoutez-moi bien : personne ne va dans le Bois-Noir cette nuit. La cour et la place, à la rigueur. Mais si je vous attrape à la lisière, je vous ramène par les oreilles.' },
+			{ who: 'brac', text: 'Hmpf. Des étrangers que la Grise laisse tranquilles… J’aurais donné ma moustache pour être à votre place. Moi, je ne peux même pas passer cette porte.' },
+			{ who: 'brac', text: 'Écoutez un vieux soldat : la cour et la place, allez-y. Mais ne traînez pas dehors. Chaque minute dans la brume, elle apprend un peu mieux qui vous êtes. Revenez souffler ici entre deux sorties.' },
 			{
 				who: 'brac',
 				text: 'Quoi, des cailloux peints ? Ce Gaspard… Je l’ai à l’œil depuis qu’il est arrivé. Mais un caillou peint, ce n’est pas un crime. Trouvez-moi mieux que ça.',
@@ -532,7 +542,7 @@ export const CH1_AUBERGE: Scene[] = [
 		media: { image: 'img-salle-commune', music: 'mus-mystere', ambience: 'amb-taverne' },
 		lines: [
 			{ who: 'brac', text: 'Quand j’étais gamin, mon petit frère a suivi une lumière bleue dans la forêt. On l’a retrouvé le lendemain, endormi au pied d’un arbre, en pleine forme. Il disait qu’une dame triste lui avait chanté des chansons.' },
-			{ who: 'brac', text: 'C’est pour ça que je veux attendre l’aube. Mais… si vous trouvez quelque chose de sûr, je ne vous retiendrai pas.' },
+			{ who: 'brac', text: 'Il dormait comme Mathis ce soir, avec le même sourire. Le lendemain, la brume est redescendue et il s’est réveillé. Mais cette fois… elle ne redescend pas. Trouvez où elle a emmené la petite.' },
 		],
 		next: AUTOUR,
 	},
@@ -543,15 +553,48 @@ export const CH1_AUBERGE: Scene[] = [
 		chapter: 1,
 		zone: 'auberge',
 		media: { image: 'img-salle-commune', music: 'mus-mystere', ambience: 'amb-taverne' },
-		note: 'Fil de la berceuse : relie le puits, le frère de Brac et la Dame Grise. Brac devient un allié (il ne vous retiendra plus de force).',
+		note: 'Fil de la berceuse : relie le puits, le frère de Brac et la Dame Grise. Brac devient un allié (il ne vous rappellera plus à l’auberge).',
 		lines: [
 			{ who: 'narrateur', text: 'Vous fredonnez les quelques notes entendues au fond du puits. Le sergent repose lentement sa cuillère.' },
 			{ who: 'brac', text: 'Cette chanson… Mon petit frère la chantonnait encore des semaines après. Celle de la dame triste, dans la forêt.' },
 			{ who: 'brac', text: 'Si elle chante de nouveau, c’est qu’elle a pris la petite. Et qu’elle ne lui fera pas de mal. Mon frère est revenu, lui.' },
-			{ who: 'brac', text: 'Bon. Je ne vais pas vous retenir de force. Mais ne vous perdez pas dans la Grise : elle endort ceux qui traînent.' },
+			{ who: 'brac', text: 'Allez-y quand vous voudrez, je garderai la porte. Mais ne vous perdez pas dans la Grise : plus vous y traînez, plus elle vous connaît.' },
 		],
 		onEnter: [{ setFlag: 'brac-allie' }, { xp: 1 }],
 		choices: [{ label: '« Merci, sergent. On fera attention. »', to: 'salle-commune' }],
+		next: AUTOUR,
+	},
+
+	{
+		id: 'aubin',
+		place: 'salle-commune',
+		title: 'Aubin le meunier',
+		chapter: 1,
+		zone: 'auberge',
+		media: { image: 'img-salle-commune', music: 'mus-mystere', ambience: 'amb-taverne' },
+		lines: [
+			{ who: 'narrateur', text: 'Aubin est assis par terre, le dos contre la porte barricadée, sa torche éteinte entre les mains. Il sursaute quand vous approchez.', if: [{ firstVisit: true }] },
+			{ who: 'aubin', text: 'Vous allez la chercher ? Merci… merci. Lisette a des nattes brunes et une écharpe rouge, elle ne la quitte jamais.' },
+			{ who: 'aubin', text: 'Ces derniers jours, elle parlait de lumières bleues dans la forêt. Je croyais que c’étaient des histoires…' },
+			{ who: 'aubin', text: 'Prenez ma corde. Elle vient du moulin, elle est solide. Moi, je ne peux même pas sortir la chercher… Avec la Grise, on ne sait jamais où on va devoir grimper.', if: [{ firstVisit: true }] },
+		],
+		onEnter: [{ addItem: 'corde', if: [{ firstVisit: true }] }],
+		choices: [
+			{
+				label: 'Le réconforter',
+				once: true,
+				check: {
+					stat: 'charme',
+					difficulty: 'facile',
+					success: {
+						to: 'salle-commune',
+						text: 'Aubin respire un grand coup et sourit un peu. « Vous avez raison. Elle est maligne, ma Lisette. »',
+						effects: [{ xp: 1 }],
+					},
+					failure: { to: 'salle-commune', text: 'Aubin hoche la tête sans vous entendre vraiment. Il se remet à fixer la porte, comme s’il pouvait voir au travers.' },
+				},
+			},
+		],
 		next: AUTOUR,
 	},
 

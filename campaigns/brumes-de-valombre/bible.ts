@@ -333,7 +333,6 @@ export const PLACES: Record<string, Place> = {
 		leave: { '*': 'Vous vous éloignez de la roulotte, l’air de rien.' },
 	},
 	place: { name: 'La place du village' },
-	aubin: { name: 'Le meunier, sur la place', arrive: { '*': 'Vous rejoignez le meunier au milieu de la place. Sa torche tremble dans sa main.' } },
 	moulin: {
 		name: 'Le moulin',
 		arrive: { '*': 'Vous suivez le ruisseau jusqu’au moulin, dont la grande roue tourne lentement dans la nuit. Une échelle grimpe le long du mur.' },

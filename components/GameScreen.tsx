@@ -584,13 +584,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 					) : (
 						<section className="decide" aria-labelledby="decide-title">
 							<h2 id="decide-title" className="decide__title">
-								{prefs.spokesperson && spokes && party.length > 1 ? (
-									<>
-										🗣 <strong>{spokes.player || spokes.name}</strong>, à toi de décider pour le groupe :
-									</>
-								) : (
-									'Que faites-vous ?'
-								)}
+								{/* On s'adresse à la table, sans nommer personne : « vous » à plusieurs, « toi » seul. */}
+								{party.length > 1 ? 'À vous de choisir :' : 'À toi de choisir :'}
 							</h2>
 							{[ownChoices, aroundChoices].map((group, g) =>
 								group.length ? (
