@@ -1,4 +1,4 @@
-import { BOARD, approach, distance, hexKey, neighbors, reachable, sameHex, startPositions, type Hex } from './board';
+import { BOARD, approach, distance, hexKey, inBoard, neighbors, reachable, sameHex, startPositions, type Hex } from './board';
 import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, initiativeOf, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
 import { voiceHash } from './voices';
 import type {
@@ -915,7 +915,10 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 		log(game.state, 'combat', `${capitalize(foe.name)}, aveuglée, frappe à côté de ${victim.name} !`);
 		return victim.id;
 	}
-	let base = (o.damage ?? foe.damage) + (o.spell ? 0 : (foe.rallied ?? 0));
+	// Cri de rage : le guerrier pare presque tout.
+	const guardChance = combat.heroes[victim.id]?.guarding ?? 0;
+	const parried = guardChance > 0 && Math.random() < guardChance;
+	let base = parried ? 0 : (o.damage ?? foe.damage) + (o.spell ? 0 : (foe.rallied ?? 0));
 	const rage = o.rage && victim.id === target.id ? RAGE[Math.floor(Math.random() * RAGE.length)] : undefined;
 	if (rage) base = Math.round(base * rage);
 	let blow = Math.max(0, base - (guarded ? 1 : 0));
@@ -956,13 +959,15 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 		stunned,
 		...(o.spell ? { spell: o.spell } : {}),
 		...(rage ? { rage } : {}),
+		...(parried ? { parried } : {}),
 	});
 	const parts = [
 		guarded ? `${victim.name} s’interpose devant ${target.name}.` : '',
+		parried ? `${victim.name} pare le coup !` : '',
 		rage ? `Folle de rage, elle frappe ${Math.round((rage - 1) * 100)} % plus fort !` : '',
 		shielded ? `Le bouclier de lune encaisse ${shielded}.` : '',
 		absorbed ? `L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '',
-		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed ? `${victim.name} ne perd rien.` : '',
+		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed && !parried ? `${victim.name} ne perd rien.` : '',
 		afflict ? `${victim.name} souffre de ${afflict}.` : '',
 		stunned ? `${victim.name} est assommé·e et passera son tour.` : '',
 	].filter(Boolean);
@@ -1017,6 +1022,7 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 			if (!combat.barriers.length) delete combat.barriers;
 		}
 		const hs = combat.heroes[id];
+		if (hs?.guarding) delete hs.guarding;
 		if (hs?.stunned) {
 			delete hs.stunned;
 			events.push({ kind: 'hero-skip', heroId: id });
@@ -1024,16 +1030,31 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 			continue;
 		}
 		if (hs?.afflict) {
-			const amount = Math.min(hs.afflict.damage, hero.pv);
+			// Le Bouclier de lune absorbe aussi les maux (poison, brûlure, froid).
+			const shielded = Math.min(hs.shield ?? 0, hs.afflict.damage);
+			if (hs.shield) {
+				hs.shield -= shielded;
+				if (!hs.shield) delete hs.shield;
+			}
+			const amount = Math.min(hs.afflict.damage - shielded, hero.pv);
 			hero.pv -= amount;
-			events.push({ kind: 'affliction', heroId: id, name: hs.afflict.name, amount });
-			log(game.state, 'combat', `${capitalize(hs.afflict.name)} : ${hero.name} perd ${amount} PV.`);
+			events.push({ kind: 'affliction', heroId: id, name: hs.afflict.name, amount, ...(shielded ? { shielded } : {}) });
+			log(game.state, 'combat', `${capitalize(hs.afflict.name)} : ${shielded ? `le bouclier de lune en encaisse ${shielded}, ` : ''}${hero.name} perd ${amount} PV.`);
 			hs.afflict.turns -= 1;
 			if (hs.afflict.turns <= 0) delete hs.afflict;
 			if (hero.pv === 0) {
 				log(game.state, 'combat', `${hero.name} tombe, ${epuise(hero)} !`);
 				if (!activeHeroes(game.party).length) return 'defeat';
 				continue;
+			}
+		}
+		// Mélodie apaisante (barde) : lui et ses compagnons proches reprennent 1 PV.
+		if (hasAbility(hero, 'melodie')) {
+			const near = activeHeroes(game.party).filter((c) => c.pv < c.pvMax && distance(combat.pos[id], combat.pos[c.id]) <= 2 && sameSide(combat, combat.pos[id], combat.pos[c.id]));
+			for (const c of near) c.pv += 1;
+			if (near.length) {
+				events.push({ kind: 'support', heroId: id, what: 'heal', targetIds: near.map((c) => c.id), amount: 1 });
+				log(game.state, 'combat', `Mélodie apaisante : ${near.map((c) => c.name).join(', ')} +1 PV.`);
 			}
 		}
 		combat.actor = idx;
@@ -1079,7 +1100,7 @@ export function targetsFor(combat: CombatState, party: Character[], hero: Charac
 		: [];
 	const allies =
 		ab.target === 'ally'
-			? activeHeroes(party).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range && across(combat.pos[c.id])))
+			? (ab.revive ? party : activeHeroes(party)).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range && across(combat.pos[c.id])))
 			: [];
 	return { foes: foes.sort((a, b) => distance(here, combat.pos[a.id]) - distance(here, combat.pos[b.id])), allies };
 }
@@ -1107,7 +1128,7 @@ function pushAway(combat: CombatState, from: Hex, foe: FoeState): Hex | undefine
 /** Une action peut-elle être lancée maintenant (quelqu'un à portée) ? */
 export function canUse(combat: CombatState, party: Character[], hero: Character, ab: Ability): boolean {
 	if (cooldownLeft(combat, hero, ab)) return false;
-	if (ab.target === 'party' || ab.target === 'none') return true;
+	if (ab.target === 'party' || ab.target === 'none' || ab.target === 'hex') return true;
 	const t = targetsFor(combat, party, hero, ab);
 	return ab.target === 'ally' ? t.allies.length > 0 : t.foes.length > 0;
 }
@@ -1158,6 +1179,14 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const chosen = inRange.foes.filter((f) => action.targets?.includes(f.id));
 		foes = (chosen.length ? chosen : inRange.foes).slice(0, ab.maxTargets ?? 3);
 	} else if (ab.target === 'all') foes = inRange.foes;
+	else if (ab.rally) foes = livingFoes(combat).filter((f) => sameSide(combat, combat.pos[hero.id], combat.pos[f.id]));
+	// Une case (Ronde enchantée) : à portée, sur le plateau.
+	let at: Hex | undefined;
+	if (ab.target === 'hex') {
+		const [c, r] = (action.targets?.[0] ?? '').split(',').map(Number);
+		at = { c, r };
+		if (!Number.isInteger(c) || !Number.isInteger(r) || !inBoard(at) || distance(combat.pos[hero.id], at) > (ab.range ?? Infinity)) throw new Error('Case hors de portée');
+	}
 	if (['foe', 'foes', 'all'].includes(ab.target) && !foes.length) throw new Error('Personne à portée');
 	const ally = ab.target === 'ally' ? inRange.allies.find((c) => c.id === action.targets?.[0]) : undefined;
 	if (ab.target === 'ally' && !ally) throw new Error('Compagnon hors de portée');
@@ -1177,7 +1206,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 	}
 	const success = !ab.stat || Boolean(action.roll?.success);
-	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && Boolean(ab.crit) });
+	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && Boolean(ab.crit), ...(at ? { at } : {}) });
 	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
 	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
 
@@ -1275,12 +1304,22 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		log(work.state, 'combat', `${hero.name} (${how}) ${what} ${names(foes)} !`);
 	}
 
-	if (ab.barrier && foes[0]) {
-		const at = combat.pos[foes[0].id];
+	if (ab.barrier && at) {
 		const zone = [at, ...neighbors(at)];
 		combat.barriers = [...(combat.barriers ?? []).filter((b) => b.heroId !== hero.id), { heroId: hero.id, zone }];
-		events.push({ kind: 'support', heroId: hero.id, what: 'barrier', targetId: foes[0].id });
-		log(work.state, 'combat', `${hero.name} joue la Ronde enchantée : un mur de notes tourne autour de ${foes[0].name}. Rien ne passe jusqu’à son prochain tour !`);
+		events.push({ kind: 'support', heroId: hero.id, what: 'barrier' });
+		log(work.state, 'combat', `${hero.name} joue la Ronde enchantée : un mur de notes tourne autour de ${zone.length} cases. Rien ne passe jusqu’à son prochain tour !`);
+	}
+	if (ab.rally) {
+		heroState(combat, hero.id).guarding = ab.rally;
+		for (const foe of foes) {
+			foe.taunt = hero.id;
+			const top = Math.max(0, ...Object.values(foe.threat ?? {}));
+			foe.threat = { ...foe.threat, [hero.id]: top + 5 };
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'provoque' });
+		}
+		events.push({ kind: 'support', heroId: hero.id, what: 'rally', targetId: hero.id });
+		log(work.state, 'combat', `${hero.name} pousse un Cri de rage ! Toutes les créatures se tournent vers ${hero.name}, qui lève son bouclier.`);
 	}
 	if (ab.protect && ally) {
 		heroState(combat, ally.id).protectedBy = hero.id;
@@ -1296,7 +1335,9 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	}
 	if (ab.heal && ally) {
 		const amount = Math.min(ab.heal, ally.pvMax - ally.pv);
+		const revived = ally.pv <= 0 && amount > 0;
 		ally.pv += amount;
+		if (revived) log(work.state, 'combat', `${ally.name} se relève !`);
 		// Soigner attire un peu l'attention de toutes les créatures.
 		for (const f of livingFoes(combat)) addThreat(f, hero, amount / 2);
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
@@ -1337,8 +1378,15 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	const rollText = (r: RollResult) => `${r.die} + ${r.stat} = ${r.total}`;
 
 	/** Le combat se termine : on garde une photo du plateau pour en jouer la fin à l'écran. */
-	const ended = (result: 'victory' | 'defeat' | 'peace' | 'escape') =>
+	const ended = (result: 'victory' | 'defeat' | 'peace' | 'escape') => {
 		events.push({ kind: 'combat-end', result, name: def.enemy.name, combat: clone(work.state.combat!) });
+		// Personne ne meurt à Valombre : les héros KO se relèvent, sonnés, avec 1 PV.
+		for (const c of work.party.filter((h) => h.pv <= 0)) {
+			c.pv = 1;
+			events.push({ kind: 'wake', heroId: c.id });
+			log(work.state, 'combat', `${c.name}, qui était KO, se relève avec 1 PV.`);
+		}
+	};
 	const finish = (result: 'hero' | 'intent' | 'defeat' | 'victory'): StepResult => {
 		if (result === 'victory' || result === 'defeat') ended(result);
 		if (result === 'victory') {

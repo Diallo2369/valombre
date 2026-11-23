@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
+import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, neighbors, type Hex } from '@/engine/board';
 import { availableAbilities, canUse, cooldownLeft, interveners, moveOptions, passiveAbilities, targetsFor } from '@/engine/engine';
 import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent } from '@/engine/types';
@@ -128,7 +128,9 @@ function HealthBar({ id, memo, value, max, tone, shield = 0 }: { id: string; mem
 			window.clearTimeout(t);
 		};
 	}, [id, memo, value]);
-	const pct = (n: number) => `${Math.max(0, Math.min(1, n / max)) * 100}%`;
+	// Le bouclier s'ajoute aux PV : la barre s'allonge pour le montrer, même quand les PV sont pleins.
+	const total = Math.max(max, fill + shield);
+	const pct = (n: number) => `${Math.max(0, Math.min(1, n / total)) * 100}%`;
 	// Une graduation tous les 2 points (un cœur), toutes les 4 si la barre est très longue.
 	const step = max > 24 ? 4 : 2;
 	const ticks = Math.max(0, Math.ceil(max / step) - 1);
@@ -137,7 +139,7 @@ function HealthBar({ id, memo, value, max, tone, shield = 0 }: { id: string; mem
 			<span className="hp-bar__trail" style={{ width: pct(Math.max(trail, fill)) }} />
 			<span className="hp-bar__fill" style={{ width: pct(fill) }} />
 			{shield > 0 ? <span className="hp-bar__shield" style={{ left: pct(fill), width: pct(shield) }} /> : null}
-			{ticks ? <span className="hp-bar__ticks" style={{ '--ticks': Math.ceil(max / step) } as React.CSSProperties} /> : null}
+			{ticks ? <span className="hp-bar__ticks" style={{ '--ticks': Math.ceil(total / step) } as React.CSSProperties} /> : null}
 		</span>
 	);
 }
@@ -243,7 +245,8 @@ export function CombatPanel(props: Props) {
 	const hits = new Map(events.filter((e): e is Ev<'hit'> => e.kind === 'hit').map((e) => [e.foeId, e]));
 	const missedBy = events.find((e): e is Ev<'miss'> => e.kind === 'miss')?.heroId;
 	const statuses = events.filter((e): e is Ev<'foe-status'> => e.kind === 'foe-status');
-	const support = events.find((e): e is Ev<'support'> => e.kind === 'support');
+	// Le soin ou la protection de l'action jouée (la Mélodie apaisante, qui touche plusieurs héros, a sa propre phrase).
+	const support = events.find((e): e is Ev<'support'> => e.kind === 'support' && !e.targetIds);
 
 	// À chaque étape : on compose la séquence (ouverture, action du héros, tour des monstres, tour suivant) et on la joue.
 	useEffect(() => {
@@ -271,7 +274,7 @@ export function CombatPanel(props: Props) {
 			} else if (e.kind === 'ability') {
 				beats.push({ kind: 'act', ev: e, ms: 2900 });
 				acted = true;
-			} else if (e.kind === 'hit' || e.kind === 'miss' || e.kind === 'support' || e.kind === 'foe-status') {
+			} else if (e.kind === 'hit' || e.kind === 'miss' || (e.kind === 'support' && !e.targetIds) || e.kind === 'foe-status') {
 				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				if (!acted) beats.push({ kind: 'wait', ms: 1800 });
 				acted = true;
@@ -303,7 +306,9 @@ export function CombatPanel(props: Props) {
 				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount && !e.stunned ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
 				const stun = e.stunned ? (e.spell ? ` 💤 ${victim} s’endort !` : ` 💫 ${victim} est assommé·e !`) : '';
 				const rage = e.rage ? ` 😡 Folle de rage : +${Math.round((e.rage - 1) * 100)} % !` : '';
-				const text = e.missed
+				const text = e.parried
+					? `🛡️ ${cap(e.name)} frappe ${victim}… PARÉ !`
+					: e.missed
 					? `🌫️ ${cap(e.name)}, aveuglée, frappe à côté de ${victim} !`
 					: e.spell
 						? `${cap(e.spell)} touche ${victim} !${e.amount ? '' : stun ? '' : ' Aucun dégât !'}${e.afflict ? ` 🔥 ${cap(e.afflict)} !` : ''}${stun}`
@@ -317,7 +322,11 @@ export function CombatPanel(props: Props) {
 				beats.push({ kind: 'say', tone: 'foe', ms: 1900, text: `💫 ${nameOf(e.heroId)}, encore sonné·e, passe son tour.` });
 			} else if (e.kind === 'affliction') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
-				beats.push({ kind: 'say', tone: 'foe', heroId: e.heroId, amount: e.amount, ms: 2000, text: `🔥 ${cap(e.name)} : ${nameOf(e.heroId)} perd ${e.amount} PV.` });
+				beats.push({ kind: 'say', tone: 'foe', heroId: e.heroId, amount: e.amount, ms: 2000, text: `🔥 ${cap(e.name)} : ${e.shielded ? `le bouclier de lune en encaisse ${e.shielded}, ` : ''}${nameOf(e.heroId)} perd ${e.amount} PV.` });
+			} else if (e.kind === 'wake') {
+				beats.push({ kind: 'say', tone: 'hero', ms: 1800, text: `💤 ${nameOf(e.heroId)}, qui était KO, se relève avec 1 PV.` });
+			} else if (e.kind === 'support' && e.targetIds) {
+				beats.push({ kind: 'say', tone: 'hero', ms: 1800, text: `🎵 Mélodie apaisante : ${e.targetIds.map(nameOf).join(', ')} +${e.amount ?? 1} PV.` });
 			} else if (e.kind === 'combat-end') {
 				const end = {
 					victory: { title: 'Victoire !', subtitle: `${cap(e.name)} ${/^les\s/i.test(e.name) ? 'sont vaincus' : 'est vaincu'} !`, tone: 'win' as const },
@@ -373,7 +382,9 @@ export function CombatPanel(props: Props) {
 						timers.current.push(
 							window.setTimeout(() => {
 								const eng = fxEngine.current;
-								const hitAt = eng ? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) }) : 350;
+								// Une case visée (Ronde enchantée) : l'effet se pose sur elle.
+								const foes = ev.at ? [center(ev.at)] : ev.foeIds.map(at);
+								const hitAt = eng ? playAbility(eng, ev.ability, { from: at(ev.heroId), foes, allies: ev.at ? [] : allies, success: ev.success, crit: Boolean(ev.crit) }) : 350;
 								timers.current.push(window.setTimeout(land, hitAt));
 							}, WINDUP),
 						);
@@ -465,6 +476,30 @@ export function CombatPanel(props: Props) {
 	const say = beat?.kind === 'say' ? beat : null;
 	const ability = selected ? availableAbilities(combat, actor).find((a) => a.id === selected) : undefined;
 	const targets = ability ? targetsFor(combat, party, actor, ability) : { foes: [], allies: [] };
+	/** Ronde enchantée : on vise une case (à portée) ; la zone s'affiche sous le pointeur avant de valider. */
+	const hexMode = ability?.target === 'hex';
+	const aimHexes = new Set(
+		hexMode ? Array.from({ length: BOARD.rows * BOARD.cols }, (_, i) => ({ c: i % BOARD.cols, r: Math.floor(i / BOARD.cols) })).filter((h) => distance(combat.pos[actor.id], h) <= (ability!.range ?? 99)).map(hexKey) : [],
+	);
+	const [hoverHex, setHoverHex] = useState<string | null>(null);
+	const preview = new Set(
+		hexMode && hoverHex && aimHexes.has(hoverHex)
+			? (() => {
+					const [c, r] = hoverHex.split(',').map(Number);
+					return [{ c, r }, ...neighbors({ c, r })].map(hexKey);
+				})()
+			: [],
+	);
+	/** Salve, Taillade : on choisit jusqu'à `maxTargets` créatures, puis on tire. */
+	const multi = ability?.target === 'foes';
+	const [picks, setPicks] = useState<string[]>([]);
+	const maxPicks = Math.min(ability?.maxTargets ?? 3, targets.foes.length);
+	const togglePick = (id: string) => {
+		if (!ability) return;
+		const next = picks.includes(id) ? picks.filter((x) => x !== id) : [...picks, id];
+		if (next.length >= maxPicks) return fire(ability, next);
+		setPicks(next);
+	};
 	const moves = useMemo(() => (busy || selected || phase !== 'hero' ? [] : moveOptions(combat, actor)), [busy, selected, phase, combat, actor]);
 	const moveSet = new Set(moves.map(hexKey));
 	/** Aller sur une case : le jeton s'y pose en rebondissant. */
@@ -516,12 +551,15 @@ export function CombatPanel(props: Props) {
 
 	const fire = (ab: Ability, ids?: string[]) => {
 		setSelected(null);
+		setPicks([]);
+		setHoverHex(null);
 		props.onAbility(ab.id, ids);
 	};
 	const pickAbility = (ab: Ability) => {
-		// Une compétence à une seule cible attend toujours qu'on touche le jeton visé, même s'il n'y en a qu'un :
-		// on choisit qui on frappe (ou qui on aide), rien ne part tout seul.
-		if (ab.target === 'foe' || ab.target === 'ally') setSelected(ab.id);
+		// Une compétence qui vise attend toujours qu'on touche le jeton (ou la case) visé, même s'il n'y en a qu'un :
+		// on choisit qui on frappe (ou qui on aide), rien ne part tout seul. Salve et Taillade : plusieurs cibles au choix.
+		setPicks([]);
+		if (ab.target === 'foe' || ab.target === 'ally' || ab.target === 'hex' || ab.target === 'foes') setSelected(ab.id);
 		else fire(ab);
 	};
 
@@ -665,7 +703,11 @@ export function CombatPanel(props: Props) {
 								: ability
 								? ability.target === 'ally'
 									? `Touche sur le plateau le compagnon à aider (il brille).`
-									: `Touche sur le plateau la créature à viser (elle brille).`
+									: ability.target === 'hex'
+										? `Touche la case où poser la ronde : la zone s’affiche en doré sous ton doigt.`
+										: ability.target === 'foes'
+											? `Touche jusqu’à ${maxPicks} créature${maxPicks > 1 ? 's' : ''} (${picks.length}/${maxPicks}), puis tire.`
+											: `Touche sur le plateau la créature à viser (elle brille).`
 								: !combat.moved
 									? `Tu peux d’abord te déplacer : touche une case lumineuse. Puis choisis ton action.`
 									: `Choisis ton action.`}
@@ -674,7 +716,19 @@ export function CombatPanel(props: Props) {
 
 					{ability && mine ? (
 						<div className="hero-card__actions">
-							<button type="button" className="btn btn--ghost" onClick={() => setSelected(null)}>
+							{multi && picks.length ? (
+								<button type="button" className="btn" onClick={() => fire(ability, picks)}>
+									{ability.icon} {ability.name} : {picks.length === 1 ? 'sur cette créature' : `sur ces ${picks.length} créatures`}
+								</button>
+							) : null}
+							<button
+								type="button"
+								className="btn btn--ghost"
+								onClick={() => {
+									setSelected(null);
+									setPicks([]);
+								}}
+							>
 								← Choisir une autre action
 							</button>
 						</div>
@@ -788,13 +842,27 @@ export function CombatPanel(props: Props) {
 										<polygon
 											key={k}
 											points={hexPoints(h)}
-											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}${danger.has(k) ? ' is-danger' : ''}${inRonde.has(k) ? ' is-ronde' : ''}`}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}${danger.has(k) ? ' is-danger' : ''}${inRonde.has(k) ? ' is-ronde' : ''}${aimHexes.has(k) ? ' is-aim' : ''}${preview.has(k) ? ' is-preview' : ''}`}
 											data-hex={k}
-											onClick={canMove ? () => moveTo(h) : undefined}
-											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h) : undefined}
-											tabIndex={canMove ? 0 : undefined}
-											role={canMove ? 'button' : undefined}
-											aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+											onClick={canMove ? () => moveTo(h) : aimHexes.has(k) && ability ? () => fire(ability, [k]) : undefined}
+											onPointerEnter={aimHexes.has(k) ? () => setHoverHex(k) : undefined}
+											onFocus={aimHexes.has(k) ? () => setHoverHex(k) : undefined}
+											onKeyDown={
+												canMove
+													? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h)
+													: aimHexes.has(k) && ability
+														? (e) => (e.key === 'Enter' || e.key === ' ') && fire(ability, [k])
+														: undefined
+											}
+											tabIndex={canMove || aimHexes.has(k) ? 0 : undefined}
+											role={canMove || aimHexes.has(k) ? 'button' : undefined}
+											aria-label={
+												canMove
+													? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})`
+													: aimHexes.has(k)
+														? `Poser la ronde ici`
+														: undefined
+											}
 										/>
 									);
 								}),
@@ -841,17 +909,21 @@ export function CombatPanel(props: Props) {
 						{combat.foes.map((f) => {
 							const hit = landed ? hits.get(f.id) : undefined;
 							const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
-							const targetable = targets.foes.some((t) => t.id === f.id);
+							const fhex = hexKey(posOf(f.id));
+							const targetable = hexMode ? aimHexes.has(fhex) : targets.foes.some((t) => t.id === f.id);
+							const picked = picks.includes(f.id);
 							const acting = say?.foeId === f.id;
 							const hp = f.hp + (dmgLeft[f.id] ?? 0);
 							return (
 								<button
 									key={`${f.id}-${hit ? seq : 0}`}
 									type="button"
-									className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
+									className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}${picked ? ' is-picked' : ''}`}
 									style={place(posOf(f.id))}
 									disabled={!targetable}
-									onClick={() => (ability ? fire(ability, [f.id]) : undefined)}
+									aria-pressed={multi ? picked : undefined}
+									onPointerEnter={hexMode ? () => setHoverHex(fhex) : undefined}
+									onClick={() => (!ability ? undefined : hexMode ? fire(ability, [fhex]) : multi ? togglePick(f.id) : fire(ability, [f.id]))}
 									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${f.charging && f.spell ? ` — prépare ${f.spell.name}` : ''}${targetable ? ' — viser' : ''}`}
 									title={f.name}
 								>
@@ -885,7 +957,8 @@ export function CombatPanel(props: Props) {
 							const st = combat.heroes[c.id];
 							const pv = c.pv + (dmgLeft[c.id] ?? 0);
 							const guardable = !ability && protectable.has(c.id);
-							const targetable = targets.allies.some((a) => a.id === c.id) || guardable;
+							const chex = hexKey(combat.pos[c.id]);
+							const targetable = (hexMode ? aimHexes.has(chex) : targets.allies.some((a) => a.id === c.id)) || guardable;
 							const isTurn = c.id === actor.id && phase === 'hero' && !busy;
 							return (
 								<button
@@ -903,12 +976,17 @@ export function CombatPanel(props: Props) {
 									data-tuto={c.id === actor.id ? 'actif' : undefined}
 									disabled={ability ? !targetable : false}
 									aria-pressed={!ability ? shown.id === c.id : undefined}
-									onClick={() => (ability ? fire(ability, [c.id]) : guardable && guard ? props.onIntervene(guard.id, c.id) : props.onView(c.id === actor.id ? null : c.id))}
+									onPointerEnter={hexMode ? () => setHoverHex(chex) : undefined}
+									onClick={() => (ability ? fire(ability, [hexMode ? chex : c.id]) : guardable && guard ? props.onIntervene(guard.id, c.id) : props.onView(c.id === actor.id ? null : c.id))}
 									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${guardable && guard ? ` — ${guard.name} se jette devant` : targetable ? ' — choisir' : ' — voir ses compétences'}`}
 									title={`${c.name} (${className(c)})`}
 								>
 									{/* Bouclier de lune : une bulle argentée qui miroite autour du héros ; défendu par le guerrier : un halo doré. */}
-									{st?.shield ? <span className="token__aura token__aura--moon" aria-hidden="true" /> : st?.protectedBy ? <span className="token__aura token__aura--guard" aria-hidden="true" /> : null}
+									{st?.shield ? (
+										<span className="token__aura token__aura--moon" aria-hidden="true" />
+									) : st?.protectedBy || st?.guarding ? (
+										<span className="token__aura token__aura--guard" aria-hidden="true" />
+									) : null}
 									<HeroPortrait className="token__img" character={c} media={media} />
 									<span className="token__icons" aria-hidden="true">
 										{CLASSES[c.classId].abilities.includes('oeil-pour-oeil') ? <span className="token__passive" title="Œil pour œil : renvoie les coups reçus au contact">👁️</span> : null}
@@ -916,6 +994,7 @@ export function CombatPanel(props: Props) {
 										{st?.shield ? '🌕' : ''}
 										{st?.fury ? '🔥' : ''}
 										{st?.stunned ? '💫' : ''}
+										{st?.guarding ? '📢' : ''}
 										{st?.afflict ? '🤒' : ''}
 									</span>
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />

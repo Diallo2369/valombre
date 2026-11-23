@@ -1571,7 +1571,8 @@
 		height: 100%;
 		pointer-events: none;
 
-		.hex.is-move {
+		.hex.is-move,
+		.hex.is-aim {
 			pointer-events: auto;
 		}
 	}
@@ -1660,6 +1661,25 @@
 		fill: rgb(127 179 138 / 55%);
 		stroke: #c8ffd4;
 		stroke-width: 4;
+	}
+
+	/* Ronde enchantée : les cases où on peut la poser, et la zone qu'elle couvrira (sous le pointeur). */
+	&.is-aim {
+		fill: rgb(255 210 122 / 7%);
+		stroke: rgb(255 210 122 / 35%);
+		cursor: pointer;
+
+		&:focus-visible {
+			outline: none;
+			stroke: #ffe28a;
+			stroke-width: 4;
+		}
+	}
+
+	&.is-preview {
+		fill: rgb(255 210 122 / 38%);
+		stroke: #ffe28a;
+		stroke-width: 3;
 	}
 
 	/* Sous une Ronde enchantée : rien n'y entre, rien n'en sort. */
@@ -1833,6 +1853,22 @@
 		font-family: var(--font-ui);
 		font-weight: 600;
 		line-height: 1;
+		filter: drop-shadow(0 1px 2px rgb(0 0 0 / 80%));
+	}
+
+	/* Salve, Taillade : une créature choisie (on en choisit plusieurs, puis on tire). */
+	&.is-picked .token__img {
+		border-color: #ff7a5c;
+		box-shadow: 0 0 0 5px #ff7a5c, 0 0 26px rgb(255 122 92 / 70%);
+	}
+
+	&.is-picked::after {
+		content: '🎯';
+		position: absolute;
+		left: -10px;
+		top: -8px;
+		z-index: 3;
+		font-size: 1.3em;
 		filter: drop-shadow(0 1px 2px rgb(0 0 0 / 80%));
 	}
 

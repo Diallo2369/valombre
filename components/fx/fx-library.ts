@@ -701,27 +701,57 @@ const ABILITY_FX: Record<string, Fx> = {
 
 
 	'onde-de-choc': (e, c) => {
-		// Le coup de bouclier : un éventail d'onde dorée qui part devant le guerrier, vers la créature visée.
+		// Le coup de bouclier soulève une onde de poussière et de fumée qui roule devant le guerrier, en éventail.
 		const to = c.foes[0] ?? c.from;
 		const a = angleTo(c.from, to);
+		impact(e, c.from, STEEL, 0.7, 40);
+		for (let i = 0; i < 26; i += 1) {
+			const spread = (Math.random() - 0.5) * 1.1;
+			const v = 260 + Math.random() * 220;
+			e.add({
+				x: c.from.x + Math.cos(a) * 20,
+				y: c.from.y + Math.sin(a) * 20,
+				vx: Math.cos(a + spread) * v,
+				vy: Math.sin(a + spread) * v,
+				life: 750 + Math.random() * 350,
+				delay: 60 + Math.random() * 120,
+				size: 14 + Math.random() * 10,
+				sizeEnd: 46 + Math.random() * 20,
+				color: ['#cfc6b8', '#a89f92', '#8a8378', '#e8e0d0'][i % 4],
+				alpha: 0.75,
+				drag: 2.2,
+			});
+		}
+		// Le front de l'onde : un arc de poussière claire qui s'élargit.
 		e.draw({
-			life: 600,
+			life: 520,
 			delay: 80,
 			draw(ctx, t) {
-				const r = 30 + 170 * ease.out(t);
-				ctx.globalAlpha = 1 - t;
-				for (let k = 0; k < 3; k += 1) {
-					const rr = r - k * 26;
-					if (rr <= 10) continue;
-					ctx.beginPath();
-					ctx.arc(c.from.x, c.from.y, rr, a - 0.55, a + 0.55);
-					glowStroke(ctx, k ? '#ffe28a' : '#fff6dc', 9 - k * 2.5, 2.5);
-				}
+				const r = 30 + 160 * ease.out(t);
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.globalAlpha = (1 - t) * 0.8;
+				ctx.beginPath();
+				ctx.arc(c.from.x, c.from.y, r, a - 0.6, a + 0.6);
+				ctx.lineCap = 'round';
+				ctx.lineWidth = 16 * (1 - t) + 4;
+				ctx.strokeStyle = '#e8e0d0';
+				ctx.stroke();
 			},
 		});
-		impact(e, c.from, STEEL, 0.8, 60);
-		c.foes.forEach((f, i) => (c.success ? impact(e, f, STEEL, i ? 1 : 1.4, 220 + i * 80) : puff(e, f, 220)));
-		return 220;
+		c.foes.forEach((f, i) => (c.success ? impact(e, f, ['#fff6dc', '#cfc6b8', '#8a8378'], i ? 1 : 1.3, 240 + i * 80) : puff(e, f, 240)));
+		return 240;
+	},
+	'cri-de-rage': (e, c) => {
+		// Le cri : des ondes rouges et dorées partent du guerrier, un « ! » file sur chaque créature, et son bouclier s'allume.
+		const at = c.from;
+		for (let i = 0; i < 4; i += 1) e.add({ x: at.x, y: at.y, life: 700, delay: i * 110, size: 20, sizeEnd: 220, color: i % 2 ? '#ffc76b' : '#ff5a3c', shape: 'ring', neon: true });
+		e.burst(at, 18, { speed: 320, life: 600, size: 5, color: ['#ffd2a8', '#ff6a3c'], shape: 'spark', drag: 1.5, neon: true });
+		c.foes.forEach((f, i) => {
+			const t = projectile(e, at, f, { color: '#ff7a3c', head: 'glyph', glyph: '!', speed: 900, arc: 30, size: 9, delay: 200 + i * 60 });
+			rising(e, f, ['!'], '#ff6a3c', 3, t, 22);
+		});
+		bubble(e, at, 'rgb(255 199 107)', 300);
+		return 300;
 	},
 
 	/* Cœur-sauvage */
@@ -1026,7 +1056,8 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	taillade: { word: 'SHLAK !', fill: '#ffb03f', melee: true },
 	intervention: { word: 'HOP !', fill: '#ffe28a' },
 	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
-	'onde-de-choc': { word: 'BOOOM !', fill: '#ffd23f', melee: true },
+	'onde-de-choc': { word: 'BOOOM !', fill: '#e8e0d0', melee: true },
+	'cri-de-rage': { word: 'RAAAAH !', fill: '#ff7a4a' },
 	bond: { word: 'HOP-TCHAK !', fill: '#ff9a5a', melee: true },
 	'fureur-ours': { word: 'GRAOU !', fill: '#ff7a4a', melee: true },
 	moquerie: { word: 'NANANÈRE !', fill: '#ff9a4a' },
@@ -1124,7 +1155,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
 	let t: number;
-	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'tourbillon', 'deflagration'].includes(ability))) {
+	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'tourbillon', 'deflagration', 'cri-de-rage'].includes(ability))) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
 		t = 120;
 	} else t = fx(eng, c);
@@ -1136,11 +1167,11 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	if (!c.success || !w) return eng.real(t);
 	// La bulle sur la cible principale (le cœur-sauvage pour le tourbillon, le barde pour un chant),
 	// et de plus petites sur les autres cibles.
-	const main = ['tourbillon', 'deflagration'].includes(ability) || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
+	const main = ['tourbillon', 'deflagration', 'cri-de-rage'].includes(ability) || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
 	const word = c.crit ? w.word.replace(/ ?!*$/, ' !!!') : w.word;
 	kapow(eng, main, word, c.crit ? '#ff5a3c' : w.fill, t, c.crit ? 1.25 : 1);
 	if (w.melee) for (const f of c.foes.slice(0, 3)) speedLines(eng, f, t);
-	for (const f of c.foes.slice(['tourbillon', 'deflagration'].includes(ability) ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
+	if (ability !== 'cri-de-rage') for (const f of c.foes.slice(['tourbillon', 'deflagration'].includes(ability) ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
 	return eng.real(t);
 }
 
@@ -1234,4 +1265,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'onde-de-choc', 'fleche-visee']);
+export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'onde-de-choc', 'fleche-visee', 'cri-de-rage']);

@@ -499,7 +499,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							onMove={(to) => apply(combatTurn(campaign, game, { kind: 'move', to }))}
 							onWait={() => apply(combatTurn(campaign, game, { kind: 'wait' }))}
 							onIntervene={(heroId, allyId) => apply(combatTurn(campaign, game, { kind: 'intervene', heroId, allyId }))}
-							tutorial={tutorial}
+							// Pas par-dessus l'écran de départ ni pendant la plongée dans la carte : le tutoriel attend qu'on y soit.
+							tutorial={tutorial && started && !diving}
 							onTutorialDone={() => {
 								setTutorial(false);
 								// En test (atelier), rien n'est retenu sur le compte.

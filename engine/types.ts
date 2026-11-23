@@ -437,6 +437,8 @@ export interface HeroCombatState {
 	fury?: boolean;
 	/** Assommé par un gros coup : il passe son prochain tour. */
 	stunned?: boolean;
+	/** Cri de rage : jusqu'à son prochain tour, il pare les coups (cette chance, 0-1). */
+	guarding?: number;
 	/** Le guerrier qui le protège (Intervention) jusqu'à son prochain tour. */
 	protectedBy?: string;
 	afflict?: Affliction;
@@ -527,7 +529,7 @@ export type GameEvent =
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
 	/** Une compétence part (pour les effets visuels) : qui, laquelle, vers qui, et si elle réussit. */
-	| { kind: 'ability'; heroId: string; ability: string; foeIds: string[]; allyId?: string; success: boolean; crit?: boolean }
+	| { kind: 'ability'; heroId: string; ability: string; foeIds: string[]; allyId?: string; success: boolean; crit?: boolean; at?: Hex }
 	/** Fin du combat (victoire, défaite, paix ou fuite), avec le plateau tel qu'il était au dernier coup. */
 	| { kind: 'combat-end'; result: 'victory' | 'defeat' | 'peace' | 'escape'; name: string; combat: CombatState }
 	/** Début du tour des monstres (l'attaque du groupe, racontée par le conteur). */
@@ -555,6 +557,8 @@ export type GameEvent =
 			missed?: boolean;
 			/** Gros coup : le héros est assommé (ou endormi, par un sort). */
 			stunned?: boolean;
+			/** Paré (Cri de rage du guerrier) : rien ne passe. */
+			parried?: boolean;
 			/** Un sort, pas un coup (son nom). */
 			spell?: string;
 			/** Enragée par la Moquerie : multiplicateur des dégâts (1,25 à 2). */
@@ -581,7 +585,9 @@ export type GameEvent =
 	/** Un état posé sur une créature par un héros (ou raté). */
 	| { kind: 'foe-status'; foeId: string; heroId: string; what: StunKind | 'poison' | 'aveugle' | 'provoque' | 'muet'; failed?: boolean }
 	/** Un mal ronge un héros au début de son tour. */
-	| { kind: 'affliction'; heroId: string; name: string; amount: number }
+	| { kind: 'affliction'; heroId: string; name: string; amount: number; shielded?: number }
+	/** Le héros KO se relève à la fin du combat. */
+	| { kind: 'wake'; heroId: string }
 	/** Déplacements sur le plateau. */
 	| { kind: 'hero-move'; heroId: string; from: Hex; to: Hex }
 	/** `pushed` : repoussée par un héros (Déflagration runique), pas un déplacement à elle. */
@@ -591,7 +597,7 @@ export type GameEvent =
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
-	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier'; targetId?: string; amount?: number }
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier' | 'rally'; targetId?: string; targetIds?: string[]; amount?: number }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

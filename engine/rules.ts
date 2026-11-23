@@ -41,6 +41,7 @@ export type AbilityId =
 	| 'coup-assommant'
 	| 'taillade'
 	| 'onde-de-choc'
+	| 'cri-de-rage'
 	| 'intervention'
 	| 'aura'
 	| 'oeil-pour-oeil'
@@ -71,10 +72,11 @@ export type AbilityId =
 	| 'berceuse'
 	| 'air-guerison'
 	| 'chant'
-	| 'ronde';
+	| 'ronde'
+	| 'melodie';
 
-/** Qui l'action vise : une créature, plusieurs, toutes ; un compagnon ; le groupe ; personne. */
-export type AbilityTarget = 'foe' | 'foes' | 'all' | 'ally' | 'party' | 'none';
+/** Qui l'action vise : une créature, plusieurs, toutes ; un compagnon ; le groupe ; personne ; une case (Ronde enchantée). */
+export type AbilityTarget = 'foe' | 'foes' | 'all' | 'ally' | 'party' | 'none' | 'hex';
 
 export interface Ability {
 	id: AbilityId;
@@ -96,6 +98,10 @@ export interface Ability {
 	maxTargets?: number;
 	/** Pour `ally` : le héros peut se choisir lui-même. */
 	self?: boolean;
+	/** Pour `ally` : peut relever un compagnon KO (Air de guérison). */
+	revive?: boolean;
+	/** Cri de rage : toutes les créatures l'attaquent, et il pare les coups avec cette chance jusqu'à son prochain tour. */
+	rally?: number;
 	/** Caractéristique du jet ; sans `stat`, pas de dé (ça marche à tous les coups). */
 	stat?: StatKey;
 	/** Plus dur à réussir : s'ajoute au score à atteindre. */
@@ -184,7 +190,16 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'force',
 		damage: 3,
 		every: 3,
-		text: 'Un grand coup de bouclier : une onde de force part devant toi. La créature collée à toi et celles juste derrière elle perdent 3 PV et reculent d’une case.',
+		text: 'Un grand coup de bouclier : une onde de poussière et de force part devant toi. La créature collée à toi et celles juste derrière elle perdent 3 PV et reculent d’une case.',
+	}),
+	'cri-de-rage': A({
+		id: 'cri-de-rage',
+		name: 'Cri de rage',
+		icon: '📢',
+		target: 'none',
+		rally: 0.9,
+		every: 4,
+		text: 'Ton coup ultime : tu frappes ton bouclier en hurlant. Toutes les créatures qui peuvent t’atteindre ne pensent plus qu’à toi… mais jusqu’à ton prochain tour, tu pares 9 coups sur 10 (et Œil pour œil les leur renvoie) !',
 	}),
 	intervention: A({
 		id: 'intervention',
@@ -441,9 +456,10 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'ally',
 		self: true,
 		heal: 5,
+		revive: true,
 		spell: true,
 		every: 2,
-		text: 'Une mélodie douce referme les blessures d’un compagnon (ou les tiennes) : +5 PV.',
+		text: 'Une mélodie douce referme les blessures d’un compagnon (ou les tiennes) : +5 PV. Elle relève même un compagnon KO !',
 	}),
 	chant: A({
 		id: 'chant',
@@ -456,15 +472,23 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 4,
 		text: 'Tout le groupe récupère 2 PV, et la mélodie claire chasse les maux : poison, brûlure et froid s’en vont.',
 	}),
+	melodie: A({
+		id: 'melodie',
+		name: 'Mélodie apaisante',
+		icon: '🎵',
+		passive: true,
+		target: 'none',
+		text: 'Ta musique ne s’arrête jamais vraiment : au début de chacun de tes tours, toi et tes compagnons à 2 cases ou moins reprenez 1 PV.',
+	}),
 	ronde: A({
 		id: 'ronde', range: 4,
 		name: 'Ronde enchantée',
 		icon: '💫',
-		target: 'foe',
+		target: 'hex',
 		barrier: true,
 		spell: true,
 		every: 4,
-		text: 'Tu joues un air de danse : des notes dorées tournent autour d’une créature et des 6 cases voisines, de plus en plus vite, jusqu’à former un mur. Jusqu’à ton prochain tour, rien ne le traverse : ni les pas, ni les coups, ni les sorts. Ceux qui sont dedans y restent, ceux de dehors sont à l’abri.',
+		text: 'Tu joues un air de danse : des notes dorées tournent autour de la case choisie et des 6 cases voisines, de plus en plus vite, jusqu’à former un mur. Jusqu’à ton prochain tour, rien ne le traverse : ni les pas, ni les coups, ni les sorts. Ceux qui sont dedans y restent, ceux de dehors sont à l’abri.',
 	}),
 };
 
@@ -508,7 +532,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 4,
 		threat: 1.5,
 		move: 2,
-		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'intervention', 'aura', 'oeil-pour-oeil'],
+		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'cri-de-rage', 'intervention', 'aura', 'oeil-pour-oeil'],
 		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +3 PV et 4 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et se jette devant ses amis pour les protéger.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},
@@ -565,7 +589,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 0,
 		armor: 0,
 		move: 3,
-		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'ronde'],
+		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'ronde', 'melodie'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
 	},
