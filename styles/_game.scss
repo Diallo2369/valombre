@@ -708,12 +708,7 @@
 		padding: 0;
 	}
 
-	/* Panneau en bas de l'écran, sans voile : le plateau et les flèches des monstres restent bien visibles. */
-	&--bottom {
-		place-items: end center;
-		background: none;
-		backdrop-filter: none;
-	}
+
 }
 
 .start {
@@ -1831,83 +1826,37 @@
 }
 
 /* Tour des monstres : leurs intentions, et qui peut tenter de reprendre l'aggro. */
-.intent-panel {
-	display: grid;
-	gap: 12px;
-	width: min(620px, 100%);
-	max-height: calc(60vh - 32px);
-	overflow: auto;
-	padding: 18px 20px;
+/* Tour des monstres : un bandeau en bas de l'écran (on provoque en touchant le jeton du monstre). */
+.intent-bar {
+	position: fixed;
+	left: 50%;
+	bottom: 16px;
+	z-index: 45;
+	translate: -50% 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 10px 16px;
+	width: min(760px, calc(100vw - 32px));
+	padding: 14px 18px;
 	border-color: rgb(232 87 74 / 55%);
-	box-shadow: 0 0 0 1px rgb(232 87 74 / 35%), 0 20px 60px rgb(0 0 0 / 65%);
-	animation: popin 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+	box-shadow: 0 0 0 1px rgb(232 87 74 / 35%), 0 16px 40px rgb(0 0 0 / 60%);
+	animation: popin 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 
-	h3 {
+	&__text {
+		flex: 1 1 320px;
 		margin: 0;
-		font-size: clamp(1.3rem, 3.5vw, 1.7rem);
-		color: #ffb3a6;
-		text-align: center;
-	}
+		font-size: 1.05rem;
 
-	&__note {
-		margin: -6px 0 0;
-		text-align: center;
-		font-size: 0.9rem;
-		color: var(--parchment-300);
-	}
-
-	&__picks {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-		gap: 10px;
-	}
-
-	/* Un gros bouton par provocation possible : qui attire quel monstre, et ses chances. */
-	&__pick {
-		display: grid;
-		justify-items: center;
-		gap: 2px;
-		padding: 14px 12px;
-		border-radius: var(--radius-m);
-		border: 2px solid var(--ember-400);
-		background: linear-gradient(180deg, rgb(240 164 87 / 22%), rgb(240 164 87 / 6%));
-		color: var(--parchment-100);
-		font: inherit;
-		cursor: pointer;
-		transition: transform 0.15s ease, background 0.15s ease;
-
-		&:hover,
-		&:focus-visible {
-			transform: translateY(-2px);
-			background: linear-gradient(180deg, rgb(240 164 87 / 36%), rgb(240 164 87 / 12%));
+		small {
+			color: #bcdaf3;
 		}
 	}
 
-	&__who,
-	&__foe {
-		font-family: var(--font-title);
-		font-size: 1.2rem;
-	}
-
-	&__verb {
-		font-size: 0.85rem;
-		color: var(--parchment-300);
-	}
-
-	&__foe {
-		color: #ffb3a6;
-	}
-
-	&__chance {
-		margin-top: 4px;
-		font-size: 0.8rem;
-		color: #bcdaf3;
-	}
-
-	&__go {
-		justify-self: center;
-		font-size: 1.1rem;
-		padding: 12px 26px;
+	&__who {
+		display: flex;
+		gap: 6px;
 	}
 }
 
@@ -2106,7 +2055,7 @@
 	.token.is-acting .token__img,
 	.token.is-casting .token__img,
 	.token.is-landing .token__img,
-	.intent-panel {
+	.intent-bar {
 		animation: none;
 	}
 

@@ -193,7 +193,8 @@ export function CombatPanel(props: Props) {
 	const [landId, setLandId] = useState<string | null>(null);
 	/** Dernière valeur de chaque barre de vie (voir HealthBar). */
 	const hpMemo = useRef<Record<string, number>>({});
-	const intentRef = useRef<HTMLElement>(null);
+	/** Pendant le tour des monstres : le héros qui provoque (s'il y en a plusieurs). */
+	const [provokerId, setProvokerId] = useState<string | null>(null);
 	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
 	const [landed, setLanded] = useState(false);
 	const [shake, setShake] = useState(false);
@@ -491,60 +492,43 @@ export function CombatPanel(props: Props) {
 	const hs = combat.heroes[shown.id];
 	const cls = CLASSES[shown.classId];
 
-	// La fenêtre des monstres prend le focus à l'ouverture, et le garde tant qu'elle est ouverte.
+	/* ---------- Tour des monstres : on voit leurs flèches, et on peut en provoquer un en touchant son jeton ---------- */
 	const intentOpen = phase === 'intent' && !busy;
-	useEffect(() => {
-		if (intentOpen) intentRef.current?.querySelector<HTMLElement>('button')?.focus();
-	}, [intentOpen]);
-	const trapFocus = (e: React.KeyboardEvent) => {
-		if (e.key !== 'Tab' || !intentRef.current) return;
-		const items = [...intentRef.current.querySelectorAll<HTMLElement>('button')];
-		const first = items[0];
-		const last = items[items.length - 1];
-		if (e.shiftKey && document.activeElement === first) {
-			e.preventDefault();
-			last.focus();
-		} else if (!e.shiftKey && document.activeElement === last) {
-			e.preventDefault();
-			first.focus();
-		}
+	// Les héros qui peuvent provoquer (guerrier, danseur de guerre), et le monstre que chacun peut attirer.
+	const provokers = intentOpen ? [...new Map(combat.intents.flatMap((i) => reclaimers(combat, party, i)).map((c) => [c.id, c])).values()] : [];
+	const provoker = provokers.find((c) => c.id === provokerId) ?? provokers[0];
+	const provokable = new Set(provoker ? combat.intents.filter((i) => reclaimers(combat, party, i).some((c) => c.id === provoker.id)).map((i) => i.foeId) : []);
+	const provokeText = (c: Character) => {
+		const stat = CLASSES[c.classId].aggro!;
+		const how = c.classId === 'danseur' ? 'peut utiliser Moquerie pour provoquer un monstre' : 'peut défier un monstre avec son Aura de bataille';
+		return { how, chance: `${STAT_LABEL[stat]} ${c.stats[stat]} : ${need(c.stats[stat], difficulty)}` };
 	};
-
-	/* ---------- Tour des monstres : une fenêtre par-dessus le plateau, on peut tenter de reprendre l'aggro ---------- */
-	// Toutes les provocations possibles : tel héros tente d'attirer tel monstre.
-	const provokes = phase === 'intent' ? combat.intents.flatMap((i) => reclaimers(combat, party, i).map((c) => ({ intent: i, hero: c }))) : [];
-	const intentPopin =
-		phase === 'intent' && !busy ? (
-			<div className="overlay overlay--bottom" role="presentation">
-				<section className="intent-panel card" role="dialog" aria-modal="true" aria-labelledby="intent-title" ref={intentRef} onKeyDown={trapFocus}>
-					<h3 id="intent-title">{provokes.length ? 'Provoquer un monstre ?' : 'Les monstres attaquent !'}</h3>
-					<p className="intent-panel__note">Les flèches rouges montrent qui ils visent.</p>
-					{provokes.length ? (
-						<div className="intent-panel__picks">
-							{provokes.map(({ intent, hero }) => {
-								const stat = CLASSES[hero.classId].aggro!;
-								const foe = foeById(intent.foeId);
-								return (
-									<button key={`${hero.id}-${intent.foeId}`} type="button" className="intent-panel__pick" onClick={() => props.onReclaim(intent.foeId, hero.id)}>
-										<span className="intent-panel__who">
-											{hero.classId === 'danseur' ? '😜' : '🔱'} {hero.name}
-										</span>
-										<span className="intent-panel__verb">attire</span>
-										<span className="intent-panel__foe">{foe ? cap(foe.name) : ''}</span>
-										<span className="intent-panel__chance">
-											{STAT_LABEL[stat]} {hero.stats[stat]} : {need(hero.stats[stat], difficulty)}
-										</span>
-									</button>
-								);
-							})}
+	const intentBar = intentOpen ? (
+		<div className="intent-bar card" role="region" aria-label="Tour des monstres">
+			{provoker ? (
+				<>
+					<p className="intent-bar__text">
+						{provoker.classId === 'danseur' ? '😜' : '🔱'} <strong>{provoker.name}</strong> {provokeText(provoker).how} : touche celui qui brille.
+						<small> ({provokeText(provoker).chance})</small>
+					</p>
+					{provokers.length > 1 ? (
+						<div className="intent-bar__who" role="group" aria-label="Qui provoque">
+							{provokers.map((c) => (
+								<button key={c.id} type="button" className={`btn btn--small${c.id === provoker.id ? '' : ' btn--ghost'}`} aria-pressed={c.id === provoker.id} onClick={() => setProvokerId(c.id)}>
+									{c.name}
+								</button>
+							))}
 						</div>
 					) : null}
-					<button type="button" className="btn intent-panel__go" onClick={props.onResolve}>
-						⚔️ Laisser les monstres attaquer
-					</button>
-				</section>
-			</div>
-		) : null;
+				</>
+			) : (
+				<p className="intent-bar__text">Les flèches rouges montrent qui les monstres vont attaquer.</p>
+			)}
+			<button type="button" className="btn intent-bar__go" onClick={props.onResolve}>
+				⚔️ Laisser les monstres attaquer
+			</button>
+		</div>
+	) : null;
 
 	const side = (
 		<>
@@ -733,7 +717,7 @@ export function CombatPanel(props: Props) {
 			{/* ---------- Le plateau ---------- */}
 			{/* Le texte d'action est posé hors du plateau penché : en 3D, les jetons et les effets passeraient devant lui. */}
 			<div className="board-wrap">
-				<div className={`board${ability && mine ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+				<div className={`board${(ability && mine) || provokable.size ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
 					{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
 					<div className="board__table">
 						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
@@ -793,7 +777,8 @@ export function CombatPanel(props: Props) {
 						{combat.foes.map((f) => {
 							const hit = landed ? hits.get(f.id) : undefined;
 							const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
-							const targetable = targets.foes.some((t) => t.id === f.id);
+							const canProvoke = Boolean(provoker) && provokable.has(f.id);
+							const targetable = targets.foes.some((t) => t.id === f.id) || canProvoke;
 							const acting = say?.foeId === f.id;
 							const hp = f.hp + (dmgLeft[f.id] ?? 0);
 							return (
@@ -803,8 +788,8 @@ export function CombatPanel(props: Props) {
 									className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
 									style={place(posOf(f.id))}
 									disabled={!targetable}
-									onClick={() => ability && fire(ability, [f.id])}
-									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${targetable ? ' — viser' : ''}`}
+									onClick={() => (ability ? fire(ability, [f.id]) : canProvoke && provoker ? props.onReclaim(f.id, provoker.id) : undefined)}
+									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${canProvoke && provoker ? ` — ${provoker.name} le provoque` : targetable ? ' — viser' : ''}`}
 									title={f.name}
 								>
 									<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
@@ -897,7 +882,7 @@ export function CombatPanel(props: Props) {
 			) : null}
 
 			{props.sideEl ? createPortal(side, props.sideEl) : side}
-			{intentPopin && typeof document !== 'undefined' ? createPortal(intentPopin, document.body) : null}
+			{intentBar && typeof document !== 'undefined' ? createPortal(intentBar, document.body) : null}
 
 			{beat?.kind === 'intro' ? <CombatIntro from={props.introFrom} to={props.introTo ?? props.introFrom} ms={beat.ms} /> : null}
 
