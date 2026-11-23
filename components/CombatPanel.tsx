@@ -467,7 +467,6 @@ export function CombatPanel(props: Props) {
 		},
 	};
 	const intents = phase === 'intent' && !busy ? combat.intents : [];
-	const aggroHeroes = new Set(intents.flatMap((i) => reclaimers(combat, party, i).map((c) => c.id)));
 	const posOf = (id: string) => posFrom[id] ?? combat.pos[id];
 
 	const fire = (ab: Ability, ids?: string[]) => {
@@ -830,7 +829,7 @@ export function CombatPanel(props: Props) {
 								<button
 									key={`${c.id}-${landed && ((support?.what === 'heal' && !support.targetId) || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
-									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${provoker?.id === c.id ? ' is-aggro' : ''}`}
 									style={c.id === actor.id && drag ? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties) : place(combat.pos[c.id])}
 									{...(c.id === actor.id ? dragHandlers : {})}
 									disabled={ability ? !targetable : false}
@@ -847,6 +846,11 @@ export function CombatPanel(props: Props) {
 										{st?.afflict ? '🤒' : ''}
 									</span>
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />
+									{provoker?.id === c.id ? (
+										<span className="token__badge" aria-hidden="true">
+											{c.classId === 'danseur' ? '😜 Moquerie' : '🔱 Aura de bataille'}
+										</span>
+									) : null}
 									<span className="token__name">{c.name}</span>
 									{hurtId === c.id && say?.amount ? (
 										<CombatNumber value={-say.amount} />

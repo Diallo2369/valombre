@@ -1369,7 +1369,8 @@
 	}
 
 	/* On vise avec un sort : seuls les jetons qu'on peut toucher restent vifs, les autres s'effacent. */
-	&.is-aiming .token:not(.is-target) {
+	/* (sauf le héros qui provoque : il brille avec les monstres qu'il peut attirer.) */
+	&.is-aiming .token:not(.is-target):not(.is-aggro) {
 		opacity: 0.4;
 		filter: grayscale(0.6);
 	}
@@ -1656,6 +1657,25 @@
 	}
 
 	/* Il a une capacité d'aggro : il peut tenter d'attirer le monstre. */
+	/* Au-dessus du héros qui provoque : sa capacité, pour comprendre que c'est lui qui peut attirer. */
+	&__badge {
+		position: absolute;
+		bottom: calc(100% + 20px);
+		left: 50%;
+		translate: -50% 0;
+		z-index: 6;
+		padding: 2px 10px;
+		border-radius: 999px;
+		white-space: nowrap;
+		font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+		font-weight: 700;
+		color: #1a1206;
+		background: var(--ember-400);
+		box-shadow: 0 0 16px rgb(240 164 87 / 70%);
+		pointer-events: none;
+		animation: target-pulse 1.4s ease-in-out infinite;
+	}
+
 	&.is-aggro .token__img {
 		border-color: var(--ember-400);
 		box-shadow: 0 0 0 3px rgb(240 164 87 / 55%), 0 0 30px rgb(240 164 87 / 65%);
