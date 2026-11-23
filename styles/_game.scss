@@ -1341,13 +1341,21 @@
 		filter: grayscale(0.6);
 	}
 
-	/* La table penchée, façon plateau vu de biais ; les jetons restent debout (voir .token). */
+	/*
+	 * La table penchée, façon plateau vu de biais ; les jetons restent debout (voir .token). Elle laisse passer les clics : en 3D, le bas des jetons (debout) passe « derrière »
+	 * le plan de la table, qui volerait sinon le clic ; seuls les jetons et les cases où l'on peut aller le reçoivent.
+	 */
 	&__table {
 		position: absolute;
 		inset: 0;
 		transform: rotateX(var(--tilt));
 		transform-origin: 50% 60%;
 		transform-style: preserve-3d;
+		pointer-events: none;
+
+		.token {
+			pointer-events: auto;
+		}
 	}
 
 	/* La couche d'effets animés, posée un peu au-dessus des jetons. */
