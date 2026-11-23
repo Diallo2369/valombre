@@ -54,7 +54,6 @@ interface Toast {
 type PendingRoll =
 	| { kind: 'check'; choiceIndex: number; request: RollRequest }
 	| { kind: 'ability'; ability: AbilityId; targets?: string[]; request: RollRequest }
-	| { kind: 'reclaim'; foeId: string; heroId: string; request: RollRequest }
 	| { kind: 'talk'; request: RollRequest }
 	| { kind: 'flee'; request: RollRequest };
 
@@ -341,7 +340,6 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const resolveWith = (p: PendingRoll, heroId: string, roll: RollResult, rerollBy?: string) => {
 		if (p.kind === 'check') apply(resolveCheck(campaign, game, p.choiceIndex, heroId, roll, rerollBy));
 		else if (p.kind === 'ability') apply(combatTurn(campaign, game, { kind: 'ability', ability: p.ability, targets: p.targets, roll, rerollBy }));
-		else if (p.kind === 'reclaim') apply(combatTurn(campaign, game, { kind: 'reclaim', foeId: p.foeId, heroId: p.heroId, roll, rerollBy }));
 		else if (p.kind === 'talk') apply(combatTurn(campaign, game, { kind: 'talk', roll, rerollBy }));
 		else if (p.kind === 'flee') apply(combatTurn(campaign, game, { kind: 'flee', roll, rerollBy }));
 	};
@@ -363,25 +361,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		});
 	};
 
-	/** Pendant le tour des monstres : un héros tente de détourner une créature vers lui. */
-	const reclaim = (foeId: string, heroId: string) => {
-		const hero = party.find((c) => c.id === heroId);
-		const stat = hero && CLASSES[hero.classId].aggro;
-		if (!hero || !stat || !combatDef || !combat) return;
-		const foe = combat.foes.find((f) => f.id === foeId);
-		askRoll({
-			kind: 'reclaim',
-			foeId,
-			heroId,
-			request: {
-				title: `${hero.name} tente d’attirer ${foe?.name ?? 'la créature'}`,
-				stat,
-				difficulty: combatDef.enemy.difficulty,
-				heroId,
-				cancellable: true,
-			},
-		});
-	};
+
 
 	/* ---------------- Raccourcis clavier (1 à 9) ---------------- */
 	useEffect(() => {
@@ -559,7 +539,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							onAbility={useAbility}
 							onMove={(to) => apply(combatTurn(campaign, game, { kind: 'move', to }))}
 							onWait={() => apply(combatTurn(campaign, game, { kind: 'wait' }))}
-							onReclaim={reclaim}
+							onIntervene={(heroId, allyId) => apply(combatTurn(campaign, game, { kind: 'intervene', heroId, allyId }))}
 							onResolve={() => apply(combatTurn(campaign, game, { kind: 'resolve' }))}
 							onTalk={() =>
 								askRoll({

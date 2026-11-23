@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
-import { availableAbilities, canUse, cooldownLeft, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
+import { availableAbilities, canUse, cooldownLeft, interveners, moveOptions, passiveAbilities, targetsFor } from '@/engine/engine';
 import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
-import { BIG_FX, celebrate, playAbility, playFoeAttack, playPoison, playRiposte } from './fx/fx-library';
+import { BIG_FX, celebrate, playAbility, playFoeAttack, playFoeSpell, playPoison, playRally, playRiposte } from './fx/fx-library';
 import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
 
@@ -33,7 +33,8 @@ interface Props {
 	onAbility: (id: AbilityId, targets?: string[]) => void;
 	onMove: (to: Hex) => void;
 	onWait: () => void;
-	onReclaim: (foeId: string, heroId: string) => void;
+	/** Intervention : le guerrier se jette devant un compagnon visé. */
+	onIntervene: (heroId: string, allyId: string) => void;
 	onResolve: () => void;
 	onTalk: () => void;
 	onFlee: () => void;
@@ -74,6 +75,10 @@ type Beat =
 			poison?: boolean;
 			/** Œil pour œil : la créature reçoit ces PV en retour, à ce moment-là. */
 			riposte?: number;
+			/** Le coup est un sort de la créature (effet magique, pas de griffes). */
+			spell?: boolean;
+			/** Une créature lance son sort (pour un sort sans cible : le cri de ralliement). */
+			cast?: string;
 			amount?: number;
 			voice?: string;
 	  };
@@ -166,8 +171,8 @@ function place(h: Hex) {
 /**
  * L'écran de combat, façon plateau : les créatures en haut, les aventuriers en bas, sur des hexagones.
  * Le héros dont c'est le tour voit sa carte (dans la colonne du groupe, ou sous le plateau) : il se déplace (cases lumineuses), puis choisit une action
- * et touche sa cible sur le plateau. Au tour des monstres, chacun annonce sa cible (flèche) : le guerrier ou
- * le virevolteur peuvent tenter de reprendre l'aggro avant qu'ils frappent.
+ * et touche sa cible sur le plateau. Au tour des monstres, chacun annonce sa cible (flèche) ou son sort :
+ * le guerrier peut se jeter devant un compagnon visé (Intervention) avant qu'ils frappent.
  */
 /** Durée de lecture confortable d'un texte (lecture à voix haute en famille). */
 const readMs = (text: string) => 1100 + text.length * 40;
@@ -263,15 +268,14 @@ export function CombatPanel(props: Props) {
 				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				if (!acted) beats.push({ kind: 'wait', ms: 1800 });
 				acted = true;
-			} else if (e.kind === 'reclaim') {
-				const hero = nameOf(e.heroId);
-				const foe = nameOf(e.foeId);
-				beats.push({
-					kind: 'say',
-					tone: 'hero',
-					ms: 2400,
-					text: e.success ? `${hero} attire ${foe} : elle change de cible !` : `${hero} tente d’attirer ${foe}… elle ne se laisse pas distraire.`,
-				});
+			} else if (e.kind === 'intervene') {
+				beats.push({ kind: 'say', tone: 'hero', ms: 2200, text: `🛡️ ${nameOf(e.heroId)} se jette devant ${nameOf(e.allyId)} : les coups seront pour lui !` });
+			} else if (e.kind === 'foe-charge') {
+				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, ms: 2600, text: `${e.icon} ${cap(e.name)} ${e.text}` });
+			} else if (e.kind === 'foe-cast') {
+				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, cast: e.spellKind, ms: 1900, text: `${e.icon} ${cap(e.name)} lance ${e.spell} !` });
+			} else if (e.kind === 'foe-fizzle') {
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 2200, text: `${e.why === 'muet' ? '🤐' : '💫'} ${cap(e.name)} ${e.why === 'muet' ? 'est bâillonnée' : 'est sonnée'} : ${e.spell} s’éteint !` });
 			} else if (e.kind === 'enemy-turn') {
 				// Le bandeau annonce le tour et raconte l'attaque (lue par le Conteur) : une seule chose à lire.
 				beats.push({ kind: 'banner', title: turnOf(e.name), subtitle: e.attack ?? 'Attention…', voice: e.attack, tone: 'foe', ms: 2200 });
@@ -288,9 +292,14 @@ export function CombatPanel(props: Props) {
 				const victim = nameOf(e.heroId);
 				// Court : le détail se voit sur le plateau (chiffre de dégâts, bulle « CLANG ! » si l'armure encaisse).
 				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount && !e.stunned ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
-				const stun = e.stunned ? ` 💫 ${victim} est assommé·e !` : '';
-				const text = e.missed ? `🌫️ ${cap(e.name)}, aveuglée, frappe à côté de ${victim} !` : `${cap(e.name)} ${e.cleave ? 'balaie aussi' : 'frappe'} ${victim} !${extra}${stun}`;
-				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.missed ? undefined : e.heroId, amount: e.amount, ms: 2000, text });
+				const stun = e.stunned ? (e.spell ? ` 💤 ${victim} s’endort !` : ` 💫 ${victim} est assommé·e !`) : '';
+				const rage = e.rage ? ` 😡 Folle de rage : +${Math.round((e.rage - 1) * 100)} % !` : '';
+				const text = e.missed
+					? `🌫️ ${cap(e.name)}, aveuglée, frappe à côté de ${victim} !`
+					: e.spell
+						? `${cap(e.spell)} touche ${victim} !${e.amount ? '' : stun ? '' : ' Aucun dégât !'}${e.afflict ? ` 🔥 ${cap(e.afflict)} !` : ''}${stun}`
+						: `${cap(e.name)} ${e.cleave ? 'balaie aussi' : 'frappe'} ${victim} !${rage}${extra}${stun}`;
+				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.missed ? undefined : e.heroId, amount: e.amount, spell: Boolean(e.spell), ms: 2000, text });
 			} else if (e.kind === 'riposte') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				const after = e.dead ? ', elle s’effondre !' : e.stunned ? ' 💫 Assommée !' : '';
@@ -377,6 +386,7 @@ export function CombatPanel(props: Props) {
 						const hurtAt = fxEngine.current ? playPoison(fxEngine.current, center(combat.pos[id])) : 300;
 						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - 1) })), hurtAt));
 					}
+					if (b.cast === 'rally' && b.foeId && fxEngine.current) playRally(fxEngine.current, center(combat.pos[b.foeId]));
 					if (b.riposte && b.foeId) {
 						const id = b.foeId;
 						const amount = b.riposte;
@@ -409,7 +419,7 @@ export function CombatPanel(props: Props) {
 							// Le monstre prend son élan (voir .token.is-acting), puis frappe.
 							timers.current.push(
 								window.setTimeout(() => {
-									timers.current.push(window.setTimeout(hurt, playFoeAttack(eng, foe.name, from, to, amount > 0)));
+									timers.current.push(window.setTimeout(hurt, b.spell ? playFoeSpell(eng, foe.name, from, to, amount > 0) : playFoeAttack(eng, foe.name, from, to, amount > 0)));
 								}, 120),
 							);
 						} else timers.current.push(window.setTimeout(hurt, 300));
@@ -507,37 +517,32 @@ export function CombatPanel(props: Props) {
 	const hs = combat.heroes[shown.id];
 	const cls = CLASSES[shown.classId];
 
-	/* ---------- Tour des monstres : on voit leurs flèches, et on peut en provoquer un en touchant son jeton ---------- */
+	/* ---------- Tour des monstres : on voit leurs flèches ; le guerrier peut se jeter devant un compagnon visé ---------- */
 	const intentOpen = phase === 'intent' && !busy;
-	// Les héros qui peuvent provoquer (guerrier, virevolteur), et le monstre que chacun peut attirer.
-	// Chacun son tour, dans l'ordre d'initiative : le premier provoque (ou passe), puis le suivant.
-	const provokers = intentOpen
-		? [...new Map(combat.intents.flatMap((i) => reclaimers(combat, party, i)).map((c) => [c.id, c])).values()]
+	// Les guerriers qui peuvent s'interposer, dans l'ordre d'initiative : le premier choisit (ou passe), puis le suivant.
+	const guards = intentOpen
+		? [...new Map(combat.intents.flatMap((i) => interveners(combat, party, i)).map((c) => [c.id, c])).values()]
 				.filter((c) => !passed.includes(c.id))
 				.sort((a, b) => combat.order.indexOf(a.id) - combat.order.indexOf(b.id))
 		: [];
-	const provoker = provokers[0];
-	const provokable = new Set(provoker ? combat.intents.filter((i) => reclaimers(combat, party, i).some((c) => c.id === provoker.id)).map((i) => i.foeId) : []);
+	const guard = guards[0];
+	/** Les compagnons visés devant qui il peut se jeter. */
+	const protectable = new Set(guard ? combat.intents.filter((i) => interveners(combat, party, i).some((c) => c.id === guard.id)).map((i) => i.heroId) : []);
 	// Nouveau tour des monstres : personne n'a encore passé.
 	useEffect(() => {
 		if (!intentOpen) setPassed([]);
 	}, [intentOpen]);
-	const provokeText = (c: Character) => {
-		const stat = CLASSES[c.classId].aggro!;
-		const how = c.classId === 'danseur' ? 'peut utiliser Moquerie pour provoquer un monstre' : 'peut défier un monstre avec son Aura de bataille';
-		return { how, chance: `${STAT_LABEL[stat]} ${c.stats[stat]} : ${need(c.stats[stat], difficulty)}` };
-	};
 	const intentBar = intentOpen ? (
 		<div className="intent-bar card" role="region" aria-label="Tour des monstres">
-			{provoker ? (
+			{guard ? (
 				<>
 					<p className="intent-bar__text">
-						{provoker.classId === 'danseur' ? '😜' : '🔱'} <strong>{provoker.name}</strong> {provokeText(provoker).how} : touche celui qui brille.
-						<small> ({provokeText(provoker).chance})</small>
+						🛡️ <strong>{guard.name}</strong> peut se jeter devant un compagnon visé (Intervention) : touche celui qui brille.
+						<small> (il prendra ses coups, avec 1 dégât de moins)</small>
 					</p>
-					{provokers.length > 1 ? (
-						<button type="button" className="btn btn--ghost" onClick={() => setPassed((p) => [...p, provoker.id])}>
-							Passer → à {provokers[1].name}
+					{guards.length > 1 ? (
+						<button type="button" className="btn btn--ghost" onClick={() => setPassed((p) => [...p, guard.id])}>
+							Passer → à {guards[1].name}
 						</button>
 					) : null}
 				</>
@@ -549,6 +554,8 @@ export function CombatPanel(props: Props) {
 			</button>
 		</div>
 	) : null;
+	/** Les cases où va tomber un sort de zone préparé (on peut encore s'en écarter). */
+	const danger = new Set(combat.foes.filter((f) => f.hp > 0 && f.charging?.zone).flatMap((f) => f.charging!.zone!.map(hexKey)));
 
 	const side = (
 		<>
@@ -583,7 +590,6 @@ export function CombatPanel(props: Props) {
 							<span>👣 {mine && combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
 							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
 							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque critique !</span> : null}
-							{hs?.riposte ? <span className="is-hot">👁️ œil pour œil : renvoie les coups jusqu’à son tour</span> : null}
 							{hs?.stunned ? <span className="is-bad">💫 assommé·e : passe son prochain tour</span> : null}
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
@@ -739,7 +745,7 @@ export function CombatPanel(props: Props) {
 			{/* ---------- Le plateau ---------- */}
 			{/* Le texte d'action est posé hors du plateau penché : en 3D, les jetons et les effets passeraient devant lui. */}
 			<div className="board-wrap">
-				<div className={`board${(ability && mine) || provokable.size ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+				<div className={`board${(ability && mine) || protectable.size ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
 					{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
 					<div className="board__table">
 						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
@@ -761,7 +767,7 @@ export function CombatPanel(props: Props) {
 										<polygon
 											key={k}
 											points={hexPoints(h)}
-											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}`}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}${danger.has(k) ? ' is-danger' : ''}`}
 											data-hex={k}
 											onClick={canMove ? () => moveTo(h) : undefined}
 											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h) : undefined}
@@ -781,11 +787,11 @@ export function CombatPanel(props: Props) {
 								// On s'arrête au bord du jeton visé.
 								const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
 								const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
-								const aggro = i.why !== 'near';
+								const aggro = i.why === 'taunt';
 								return (
 									<line
 										key={i.foeId}
-										className={`intent${aggro ? ' intent--aggro' : ''}`}
+										className={`intent${aggro ? ' intent--aggro' : ''}${i.why === 'spell' ? ' intent--spell' : ''}`}
 										x1={p.x}
 										y1={p.y}
 										x2={end.x}
@@ -799,8 +805,7 @@ export function CombatPanel(props: Props) {
 						{combat.foes.map((f) => {
 							const hit = landed ? hits.get(f.id) : undefined;
 							const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
-							const canProvoke = Boolean(provoker) && provokable.has(f.id);
-							const targetable = targets.foes.some((t) => t.id === f.id) || canProvoke;
+							const targetable = targets.foes.some((t) => t.id === f.id);
 							const acting = say?.foeId === f.id;
 							const hp = f.hp + (dmgLeft[f.id] ?? 0);
 							return (
@@ -810,8 +815,8 @@ export function CombatPanel(props: Props) {
 									className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
 									style={place(posOf(f.id))}
 									disabled={!targetable}
-									onClick={() => (ability ? fire(ability, [f.id]) : canProvoke && provoker ? props.onReclaim(f.id, provoker.id) : undefined)}
-									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${canProvoke && provoker ? ` — ${provoker.name} le provoque` : targetable ? ' — viser' : ''}`}
+									onClick={() => (ability ? fire(ability, [f.id]) : undefined)}
+									aria-label={`${f.name} : ${Math.max(0, hp)} PV sur ${f.maxHp}${f.charging && f.spell ? ` — prépare ${f.spell.name}` : ''}${targetable ? ' — viser' : ''}`}
 									title={f.name}
 								>
 									<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
@@ -819,7 +824,9 @@ export function CombatPanel(props: Props) {
 										{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
 										{f.poison ? '🧪' : ''}
 										{f.blind ? '🌫️' : ''}
-										{f.taunt ? '😜' : ''}
+										{f.silenced ? '🤐' : ''}
+										{f.charging && f.spell ? f.spell.icon : ''}
+										{f.enraged ? '😡' : f.taunt ? '😜' : ''}
 									</span>
 									<HealthBar id={f.id} memo={hpMemo.current} value={hp} max={f.maxHp} tone="foe" />
 									<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
@@ -831,7 +838,7 @@ export function CombatPanel(props: Props) {
 										</span>
 									) : status ? (
 										<span className="token__burst token__burst--status" aria-hidden="true">
-											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🌫️ Aveuglée' : `${STUN_ICON[status.what]}`}
+											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🌫️ Aveuglée' : status.what === 'muet' ? '🤐 Bâillonnée' : `${STUN_ICON[status.what]}`}
 										</span>
 									) : null}
 								</button>
@@ -841,19 +848,20 @@ export function CombatPanel(props: Props) {
 						{party.map((c) => {
 							const st = combat.heroes[c.id];
 							const pv = c.pv + (dmgLeft[c.id] ?? 0);
-							const targetable = targets.allies.some((a) => a.id === c.id);
+							const guardable = !ability && protectable.has(c.id);
+							const targetable = targets.allies.some((a) => a.id === c.id) || guardable;
 							const isTurn = c.id === actor.id && phase === 'hero' && !busy;
 							return (
 								<button
 									key={`${c.id}-${landed && ((support?.what === 'heal' && !support.targetId) || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
-									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${provoker?.id === c.id ? ' is-aggro' : ''}`}
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${guard?.id === c.id ? ' is-aggro' : ''}`}
 									style={c.id === actor.id && drag ? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties) : place(combat.pos[c.id])}
 									{...(c.id === actor.id ? dragHandlers : {})}
 									disabled={ability ? !targetable : false}
 									aria-pressed={!ability ? shown.id === c.id : undefined}
-									onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
-									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ' — voir ses compétences'}`}
+									onClick={() => (ability ? fire(ability, [c.id]) : guardable && guard ? props.onIntervene(guard.id, c.id) : props.onView(c.id === actor.id ? null : c.id))}
+									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${guardable && guard ? ` — ${guard.name} se jette devant` : targetable ? ' — choisir' : ' — voir ses compétences'}`}
 									title={`${c.name} (${className(c)})`}
 								>
 									<HeroPortrait className="token__img" character={c} media={media} />
@@ -861,14 +869,13 @@ export function CombatPanel(props: Props) {
 										{st?.protectedBy ? '🛡️' : ''}
 										{st?.shield ? '🌕' : ''}
 										{st?.fury ? '🔥' : ''}
-										{st?.riposte ? '👁️' : ''}
 										{st?.stunned ? '💫' : ''}
 										{st?.afflict ? '🤒' : ''}
 									</span>
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />
-									{provoker?.id === c.id ? (
+									{guard?.id === c.id ? (
 										<span className="token__badge" aria-hidden="true">
-											{c.classId === 'danseur' ? '😜 Moquerie' : '🔱 Aura de bataille'}
+											🛡️ Intervention
 										</span>
 									) : null}
 									<span className="token__name">{c.name}</span>

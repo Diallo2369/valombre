@@ -126,22 +126,40 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 - Capacités des gros monstres (sur `enemy`, ou sur une créature de `foes`) :
   - `cleave` : coup balayé, sa (première) attaque frappe aussi les autres héros collés à elle ;
   - `attacks` : nombre d’attaques par tour (le Loup : 2 ; la même cible, ou le plus proche si elle tombe) ;
-  - `stun` : gros coup, chance (0-1) qu’un coup qui porte (même sur l’armure) assomme le héros, qui passe son prochain tour.
+  - `stun` : gros coup, chance (0-1) qu’un coup qui porte (même sur l’armure) assomme le héros, qui passe son prochain tour ;
+  - `spell` : un sort (`FoeSpell` : sommeil, trait à distance, souffle sur une zone, cri de ralliement), 1 tour sur `every`.
+    La créature l’annonce à la fin de son attaque (« prend une grande inspiration… », zone en rouge pour un souffle), et
+    il part à son tour suivant, à la place de son attaque. Bâillonnée, assommée, prise au filet ou endormie entre-temps : il s’éteint.
+- Les PV écrits sont multipliés par `SOLID` (1,4, engine.ts) : les monstres encaissent sans qu’un gros coup les abatte d’un coup.
 - Une créature seule est écrite **pour 4 héros** : le moteur ajuste ses PV et la force de ses coups à la taille du
   groupe (`foeScale` dans engine.ts).
 - Une bande (`foes`) est écrite **pour une table de 6** : avec moins de héros, on ne garde que les premières de la
   liste (4 sur 6 à 4 héros) ; mettre les plus importantes en tête. Ses PV totaux suivent la même règle.
-- Réglage visé (simulation `balance`, 4 héros) : les monstres font mal. ~15 % de PV perdus contre Pff, ~25 % au rappel
-  des brumelins, la moitié et un héros épuisé à la clairière ; contre le Loup de Cendre (2 attaques dont un coup
-  balayé, gros coups qui assomment), ~45 % de PV perdus, un héros épuisé, ~8 victoires sur 10.
+- Réglage visé (simulation par classe, 4 héros) : ~15 % de PV perdus contre Pff, ~25 % au rappel des brumelins, ~40 %
+  à la clairière ; contre le Loup de Cendre (2 attaques dont un coup balayé, gros coups qui assomment, Souffle de braise),
+  ~40 % de PV perdus, un héros épuisé, 5 à 7 tours, 8 à 9 victoires sur 10.
+  Par classe : le virevolteur fait le plus de dégâts et tombe aussi souvent que le guerrier, qui prend 2 à 3 fois plus
+  de coups ; le rôdeur fait mal sans risque ; le mage brille contre les groupes ; le barde soigne.
+
+### La menace (l’aggro)
+
+- Chaque créature retient la menace de chaque héros (`FoeState.threat`) : 1 par PV infligé (×2 sur un coup critique),
+  +2 pour un contrôle (assommer, filet, berceuse, aveugler, poison, bâillon), la moitié des PV soignés ou du bouclier
+  posé (sur toutes les créatures). L’Aura de bataille du guerrier multiplie sa menace par 1,5 (et il en a un peu dès le début).
+- Elle attaque la plus forte menace parmi les héros qu’elle peut atteindre ce tour-ci (sinon la plus forte tout court,
+  sinon le plus proche). La menace baisse d’un quart à chaque tour.
+- Moquerie : la créature est provoquée (elle attaque le moqueur, en tête de sa menace) et enragée : ce coup fait +25 %,
+  +50 %, +75 % ou +100 % (au hasard).
+- Intervention (réaction du guerrier, pendant le tour des monstres, une fois par tour) : il se jette devant un compagnon
+  visé à 2 cases au plus et prend ses coups jusqu’à son prochain tour, avec 1 dégât de moins. Plus de jet « reprendre l’aggro ».
 
 ### Les classes et le combat
 
 | Classe | Profil | Actions | Passifs |
 |---|---|---|---|
-| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3, 👣 2 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Intervention (défend un compagnon au contact jusqu’à son prochain tour, −1 dégât) · Œil pour œil (provoque les créatures à 2 cases ; jusqu’à son tour, chaque coup reçu est renvoyé : 2 PV, 1 chance sur 4 d’assommer ; 1 tour sur 3) | Aura de bataille (les monstres l’attaquent) ; reprend l’aggro avec la Force |
-| Virevolteur·se (corps à corps) | +2 Agilité, +1 Initiative, +1 PV, aucune armure, 👣 4 | Double attaque (2 + 2 PV) · Bond sauvage (saute sur une créature jusqu’à 3 cases, 2 + 2 PV, 1 tour sur 2) · Fureur de l’ours (2 + 2 PV et +3 PV pour lui, 1 tour sur 2) · Tourbillon (toutes les créatures au contact : 2 + 2 PV, 1 tour sur 2) · Moquerie (une créature l’attaquera, même contre l’aura ; 1 tour sur 3, à manier avec prudence sans armure) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique, les deux haches doublées, Tourbillon compris) ; reprend l’aggro avec le Charme |
-| Rôdeur·se (distance) | +1 Agilité, +1 Force, +2 Initiative, +1 PV, 🛡️ 1, 👣 3 | Tir à l’arc (portée 5) · Salve (3 cibles, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 3) · Flèche empoisonnée (2 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) · Flèche aveuglante (1 PV, rate un coup sur deux pendant 2 tours, + 1 PV de poison pendant 2 tours, 1 tour sur 3) | Seconde chance hors combat |
+| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +3 PV, 🛡️ 4, 👣 2 | Frapper · Coup assommant (2 PV + la créature passe son tour, 1 tour sur 3) · Taillade (jusqu’à 3 créatures au contact, 1 tour sur 3) · Onde de choc (cône devant lui : la créature collée et celles juste derrière, 3 PV et repoussées, 1 tour sur 3) | Aura de bataille (menace ×1,5) · Œil pour œil (chaque coup reçu au contact : 1 PV renvoyé, 1 chance sur 4 d’assommer) · Intervention (réaction, voir la menace) |
+| Virevolteur·se (corps à corps) | +2 Agilité, +1 Initiative, +1 PV, aucune armure, 👣 4 | Double attaque (2 + 2 PV) · Bond sauvage (saute sur une créature jusqu’à 3 cases, 2 + 2 PV, 1 tour sur 2) · Fureur de l’ours (2 + 2 PV et +3 PV pour lui, 1 tour sur 2) · Tourbillon (toutes les créatures au contact : 2 + 2 PV, 1 tour sur 2) · Moquerie (une créature l’attaquera, enragée : +25 à +100 % de dégâts ; 1 tour sur 2) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique, les deux haches doublées, Tourbillon compris)  |
+| Rôdeur·se (distance) | +1 Agilité, +1 Force, +2 Initiative, +1 PV, 🛡️ 1, 👣 3 | Tir à l’arc (3 PV, portée 5) · Flèche visée (+2 de difficulté, critique : 6 PV, bâillonne 2 tours) · Salve (3 cibles, 1 tour sur 3) · Filet (2 tours bloquée, 1 tour sur 3) · Flèche empoisonnée (2 PV + 1 PV par tour pendant 3 tours, 1 tour sur 3) | Pointes trempées (chaque flèche qui touche : 1 chance sur 4 d’aveugler, 1 sur 4 de bâillonner) · Seconde chance hors combat |
 | Mage (magie des runes) | +2 Esprit, 👣 2 | Projectiles runiques (2 PV) · Rune d’éclat (sans dé, 4 PV contre la brume, 1 tour sur 3) · Rune ricochet (une créature puis 2 rebonds à 2 cases au plus, 2 PV chacune, 1 tour sur 3) · Orbe runique (une créature et ses voisines, 1 tour sur 3) · Déflagration runique (créatures au contact : 2 PV et repoussées d’une case, 1 tour sur 2) | — |
 | Barde | +1 Charme, +1 Esprit, 👣 3 | Aucun sort de dégâts : Air de guérison (+5 PV à un compagnon ou à soi, 1 tour sur 2) · Bouclier de lune (absorbe 2 dégâts, 1 tour sur 3) · Berceuse (passe son tour, 1 tour sur 3) · Chant de courage (+2 PV au groupe, 1 tour sur 4) · Chant de délivrance (enlève poison, brûlure, froid) | — |
 
@@ -152,8 +170,8 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 - **Initiative** : 6ᵉ caractéristique, tirée au dé comme les autres (+1 virevolteur, +2 rôdeur). En combat : dé + Initiative (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
   ordre ; les créatures agissent ensemble à leur place dans la file. La frise des tours reste affichée.
 - **Dégâts** en PV : un coup normal = 2 PV, chaque hache du virevolteur = 2 PV, un critique double tout.
-- **Cinq actions par classe** (les passifs en plus) : que chaque joueur ait autant de choses à faire.
-- **Aveuglée** : la créature rate un coup sur deux.
+- **Cinq actions par classe** (les passifs en plus ; le guerrier : quatre, plus l’Intervention en réaction) : que chaque joueur ait autant de choses à faire.
+- **Aveuglée** : la créature rate un coup sur deux (ses sorts partent quand même). **Bâillonnée** : pas de sort.
 - **Délais** : les coups puissants se relancent « 1 tour sur 3 » (ou 4) ; les autres sont à volonté.
 - Durée visée (simulation, héros moyens) : 2 à 4 tours de table pour un petit combat, 5 à 7 pour le Loup ; jamais de mort.
 - Le code : `engine/board.ts` (plateau), `engine/rules.ts` (`CLASSES`, `ABILITIES`), `engine/engine.ts` (combat).

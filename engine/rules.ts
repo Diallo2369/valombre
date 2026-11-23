@@ -40,9 +40,10 @@ export type AbilityId =
 	| 'frapper'
 	| 'coup-assommant'
 	| 'taillade'
+	| 'onde-de-choc'
 	| 'intervention'
-	| 'oeil-pour-oeil'
 	| 'aura'
+	| 'oeil-pour-oeil'
 	// Virevolteur
 	| 'double-attaque'
 	| 'moquerie'
@@ -53,10 +54,11 @@ export type AbilityId =
 	| 'folie'
 	// Rôdeur
 	| 'tir'
+	| 'fleche-visee'
 	| 'salve'
 	| 'filet'
 	| 'fleche-empoisonnee'
-	| 'fleche-aveuglante'
+	| 'pointes-trempees'
 	// Mage : la magie des runes
 	| 'projectiles-runes'
 	| 'rune-eclat'
@@ -80,6 +82,8 @@ export interface Ability {
 	text: string;
 	/** Capacité passive : toujours active, pas un bouton. */
 	passive?: boolean;
+	/** Réaction : elle se joue pendant le tour des monstres (Intervention), pas à son tour. */
+	reaction?: boolean;
 	target: AbilityTarget;
 	/** Portée en cases (1 = au contact). Sans portée : le groupe entier, peu importe la distance. */
 	range?: number;
@@ -105,11 +109,16 @@ export interface Ability {
 	leap?: boolean;
 	/** Repousse d'une case les créatures touchées, loin du héros (Déflagration runique). */
 	push?: boolean;
-	/**
-	 * Œil pour œil : jusqu'au prochain tour du héros, chaque créature qui le frappe reçoit `damage` PV en retour,
-	 * avec `stunChance` d'être assommée ; les créatures à `provoke` cases ou moins sont provoquées.
-	 */
-	riposte?: { damage: number; stunChance: number; provoke: number };
+	/** Œil pour œil (passif) : chaque créature qui le frappe au contact reçoit `damage` PV, avec `stunChance` d'être assommée. */
+	riposte?: { damage: number; stunChance: number };
+	/** Cône : la créature visée (collée au héros) et celles juste derrière elle (Onde de choc). */
+	cone?: boolean;
+	/** Bâillonne la créature touchée (pas de sort) pendant ce nombre de tours. */
+	silence?: number;
+	/** Une flèche (Pointes trempées s'applique). */
+	arrow?: boolean;
+	/** Moquerie : la créature, enragée, frappe le moqueur de +25 % à +100 %. */
+	rage?: boolean;
 	/** Coup critique : dégâts doublés. */
 	crit?: boolean;
 	/** Dégâts doublés contre une créature de brume. */
@@ -162,22 +171,27 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: 'Un grand revers d’épée : jusqu’à 3 créatures collées à toi perdent 2 PV.',
 	}),
+	'onde-de-choc': A({
+		id: 'onde-de-choc', range: 1,
+		name: 'Onde de choc',
+		icon: '💢',
+		target: 'foe',
+		cone: true,
+		push: true,
+		stat: 'force',
+		damage: 3,
+		every: 3,
+		text: 'Un grand coup de bouclier : une onde de force part devant toi. La créature collée à toi et celles juste derrière elle perdent 3 PV et reculent d’une case.',
+	}),
 	intervention: A({
-		id: 'intervention', range: 1,
+		id: 'intervention',
 		name: 'Intervention',
 		icon: '🛡️',
-		target: 'ally',
-		protect: true,
-		text: 'Défendre un compagnon collé à toi : jusqu’à ton prochain tour, les coups qui le visent sont pour toi, avec 1 dégât de moins.',
-	}),
-	'oeil-pour-oeil': A({
-		id: 'oeil-pour-oeil',
-		name: 'Œil pour œil',
-		icon: '👁️',
+		passive: true,
+		reaction: true,
 		target: 'none',
-		riposte: { damage: 2, stunChance: 0.25, provoke: 2 },
-		every: 3,
-		text: 'Tu lèves ton bouclier et tu défies tout le monde : les créatures à 2 cases ou moins ne pensent plus qu’à toi. Jusqu’à ton prochain tour, chaque créature qui te frappe reçoit 2 PV en retour, et 1 fois sur 4 elle est assommée.',
+		protect: true,
+		text: 'Pendant le tour des monstres, quand une flèche montre qu’un compagnon proche (2 cases) va être attaqué : tu te jettes devant lui et tu prends ses coups jusqu’à ton prochain tour, avec 1 dégât de moins. Une fois par tour.',
 	}),
 	aura: A({
 		id: 'aura',
@@ -185,7 +199,16 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🔱',
 		passive: true,
 		target: 'none',
-		text: 'Les monstres ont bien du mal à résister à l’envie de t’attaquer, toi plutôt que tes amis (sauf ceux qu’on a provoqués).',
+		text: 'Tout ce que tu fais énerve davantage les monstres (une fois et demie plus) : ils ont bien du mal à résister à l’envie de t’attaquer, toi plutôt que tes amis.',
+	}),
+	'oeil-pour-oeil': A({
+		id: 'oeil-pour-oeil',
+		name: 'Œil pour œil',
+		icon: '👁️',
+		passive: true,
+		target: 'none',
+		riposte: { damage: 1, stunChance: 0.25 },
+		text: 'Chaque créature qui te frappe au contact reçoit le coup en retour : 1 PV, et 1 fois sur 4 elle est assommée.',
 	}),
 
 	/* ---- Virevolteur : deux haches, pas d'armure ---- */
@@ -205,8 +228,9 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '😜',
 		target: 'foe',
 		taunt: true,
-		every: 3,
-		text: 'Tu nargues une créature : elle ne pense plus qu’à toi et t’attaquera à son prochain tour (même l’aura du guerrier n’y peut rien). Attention : sans armure, ça peut faire très mal.',
+		rage: true,
+		every: 2,
+		text: 'Tu nargues une créature : elle ne pense plus qu’à toi et t’attaquera à son prochain tour. Mais elle est folle de rage : son coup fera de 25 % à 100 % de dégâts en plus !',
 	}),
 	'fureur-ours': A({
 		id: 'fureur-ours', range: 1,
@@ -261,7 +285,20 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 	}),
 
 	/* ---- Rôdeur : à distance ---- */
-	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 2, text: 'Une flèche bien ajustée, de loin : 2 PV.' }),
+	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 3, arrow: true, text: 'Une flèche bien ajustée, de loin : 3 PV.' }),
+	'fleche-visee': A({
+		id: 'fleche-visee', range: 5,
+		name: 'Flèche visée',
+		icon: '🎯',
+		target: 'foe',
+		stat: 'agilite',
+		harder: 2,
+		damage: 3,
+		crit: true,
+		silence: 2,
+		arrow: true,
+		text: 'Prendre le temps de viser la gorge : plus dur à réussir (+2), mais coup critique (6 PV), et la créature, bâillonnée, ne peut plus lancer de sort pendant 2 tours.',
+	}),
 	salve: A({
 		id: 'salve', range: 5,
 		name: 'Salve',
@@ -270,6 +307,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		maxTargets: 3,
 		stat: 'agilite',
 		damage: 2,
+		arrow: true,
 		every: 3,
 		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 2 PV.',
 	}),
@@ -291,20 +329,17 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		poison: 3,
+		arrow: true,
 		every: 3,
 		text: '2 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
 	}),
-	'fleche-aveuglante': A({
-		id: 'fleche-aveuglante', range: 5,
-		name: 'Flèche aveuglante',
-		icon: '🌫️',
-		target: 'foe',
-		stat: 'agilite',
-		damage: 1,
-		blind: 2,
-		poison: 2,
-		every: 3,
-		text: 'Une flèche trempée dans le suc piquant de l’herbe-aux-larmes : 1 PV, la créature pleure et n’y voit plus rien (elle rate un coup sur deux pendant 2 tours), et le poison la ronge (1 PV à ses 2 prochains tours).',
+	'pointes-trempees': A({
+		id: 'pointes-trempees',
+		name: 'Pointes trempées',
+		icon: '🌿',
+		passive: true,
+		target: 'none',
+		text: 'Tes pointes de flèche sont trempées dans des sucs de la forêt : chaque flèche qui touche a 1 chance sur 4 d’aveugler la créature (elle rate un coup sur deux pendant 2 tours) et 1 chance sur 4 de la bâillonner (pas de sort pendant 2 tours).',
 	}),
 
 	/* ---- Mage : la magie des runes ---- */
@@ -439,8 +474,6 @@ export interface ClassDef {
 	armor: number;
 	/** Points de mouvement : cases parcourues par tour. */
 	move: number;
-	/** Capacité d'aggro : peut tenter de détourner un monstre vers lui (avec cette caractéristique). */
-	aggro?: StatKey;
 	/** Actions en combat. */
 	abilities: AbilityId[];
 	/** Pouvoir hors combat, rechargé au repos. */
@@ -456,12 +489,11 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		tagline: 'Un bouclier cabossé, un cœur solide.',
 		stat: 'force',
 		bonus: { force: 1, endurance: 2 },
-		pvBonus: 2,
-		armor: 3,
+		pvBonus: 3,
+		armor: 4,
 		move: 2,
-		aggro: 'force',
-		abilities: ['frapper', 'coup-assommant', 'taillade', 'intervention', 'oeil-pour-oeil', 'aura'],
-		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +2 PV et 3 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et s’interpose pour protéger ses amis.' },
+		abilities: ['frapper', 'coup-assommant', 'taillade', 'onde-de-choc', 'intervention', 'aura', 'oeil-pour-oeil'],
+		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +3 PV et 4 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et se jette devant ses amis pour les protéger.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},
 	danseur: {
@@ -474,7 +506,6 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 1,
 		armor: 0,
 		move: 4,
-		aggro: 'charme',
 		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
@@ -489,7 +520,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 1,
 		armor: 1,
 		move: 3,
-		abilities: ['tir', 'salve', 'filet', 'fleche-empoisonnee', 'fleche-aveuglante'],
+		abilities: ['tir', 'fleche-visee', 'salve', 'filet', 'fleche-empoisonnee', 'pointes-trempees'],
 		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
 		kit: ['Arc et flèches', 'Cape de laine', 'Silex'],
 	},

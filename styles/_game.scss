@@ -1452,6 +1452,14 @@
 		stroke-width: 4;
 	}
 
+	/* Une case où va tomber un sort de zone préparé par une créature : on a encore un tour pour s'en écarter. */
+	&.is-danger {
+		fill: rgb(255 90 50 / 28%);
+		stroke: rgb(255 120 70 / 85%);
+		stroke-width: 3;
+		animation: hex-danger 0.9s ease-in-out infinite alternate;
+	}
+
 	&.is-move {
 		fill: rgb(127 179 138 / 22%);
 		stroke: rgb(127 179 138 / 80%);
@@ -1477,6 +1485,18 @@
 
 	&--aggro {
 		stroke: var(--ember-300);
+	}
+
+	/* Un sort qui se prépare ou qui part. */
+	&--spell {
+		stroke: #c58cff;
+		stroke-dasharray: 4 9;
+	}
+}
+
+@keyframes hex-danger {
+	to {
+		fill: rgb(255 90 50 / 48%);
 	}
 }
 
@@ -2098,6 +2118,7 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.hex.is-move,
+	.hex.is-danger,
 	.intent,
 	.token.is-target .token__img,
 	.token.is-aggro .token__img,

@@ -2,12 +2,14 @@ import { BOARD, approach, distance, hexKey, neighbors, reachable, sameHex, start
 import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, initiativeOf, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
 import { voiceHash } from './voices';
 import type {
+	Affliction,
 	Campaign,
 	Character,
 	CheckDef,
 	Choice,
 	CombatDef,
 	CombatState,
+	FoeSpell,
 	FoeState,
 	Intent,
 	Cond,
@@ -508,6 +510,15 @@ export function foeScale(partySize: number) {
 /** Nombre de créatures d'une bande écrite pour 6 héros, pour un groupe de `partySize`. */
 const bandSize = (listed: number, partySize: number) => Math.min(listed, Math.max(2, Math.round((listed * partySize) / 6)));
 
+/** PV des créatures en plus des cœurs écrits (les héros frappent fort : deux haches, flèches à 3 PV…). */
+const SOLID = 1.4;
+
+/** Le sort d'une créature, ses dégâts ajustés comme ses coups. */
+function spellOf(sp: FoeSpell | undefined, mul: number): { spell?: FoeSpell } {
+	if (!sp) return {};
+	return { spell: sp.damage && sp.kind !== 'rally' ? { ...sp, damage: Math.max(1, Math.round(sp.damage * mul)) } : sp };
+}
+
 function foesOf(def: CombatDef, partySize: number): FoeState[] {
 	const { hp: scale, damage: hit } = foeScale(partySize);
 	const band = Boolean(def.foes && def.foes.length > 1);
@@ -519,7 +530,8 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 	const dmgMul = band ? 1 : hit;
 	return list.map((f, i) => {
 		const afflict = 'afflict' in f && f.afflict ? f.afflict : def.enemy.afflict;
-		const hp = Math.max(2, Math.round(f.hearts * 2 * hpMul));
+		// Des monstres solides : un gros coup ne les abat pas d'un seul coup.
+		const hp = Math.max(2, Math.round(f.hearts * 2 * hpMul * SOLID));
 		return {
 			id: `f${i + 1}`,
 			name: f.name,
@@ -532,6 +544,7 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 			...(('cleave' in f && f.cleave) || (!band && def.enemy.cleave) ? { cleave: true } : {}),
 			...(!band && def.enemy.attacks ? { attacks: def.enemy.attacks } : {}),
 			...((('stun' in f && f.stun) || (!band && def.enemy.stun)) ? { stun: ('stun' in f && f.stun) || def.enemy.stun } : {}),
+			...spellOf(('spell' in f && f.spell) || (!band ? def.enemy.spell : undefined), dmgMul),
 			...(afflict ? { afflict } : {}),
 		};
 	});
@@ -600,29 +613,67 @@ function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
 		intents: [],
 		reclaimed: [],
 	};
+	// Le guerrier attire les regards dès le début (l'Aura de bataille).
+	for (const c of game.party.filter((h) => hasAbility(h, 'aura'))) for (const f of foes) addThreat(f, c, 2);
 	events.push({ kind: 'initiative', order: rolls });
 	log(game.state, 'combat', `Initiative : ${rolls.map((r) => `${r.name} ${r.total}`).join(', ')}.`);
 }
 
-/** Héros qui peuvent tenter de détourner cette créature vers eux (guerrier, virevolteur). */
-export function reclaimers(combat: CombatState | null, party: Character[], intent: Intent): Character[] {
-	if (!combat || intent.tried) return [];
-	return activeHeroes(party).filter((c) => CLASSES[c.classId].aggro && c.id !== intent.heroId && !combat.reclaimed.includes(c.id));
+/** Menace : ce qu'un héros fait énerve les créatures ; l'Aura de bataille du guerrier la double. */
+function addThreat(foe: FoeState, hero: Character, amount: number) {
+	if (amount <= 0) return;
+	const k = hasAbility(hero, 'aura') ? 1.5 : 1;
+	foe.threat = { ...foe.threat, [hero.id]: (foe.threat?.[hero.id] ?? 0) + amount * k };
 }
 
-/** Chaque créature choisit sa cible : celui qui l'a provoquée, sinon le guerrier (aura, jet caché), sinon le plus proche. */
+/** Menace d'un héros sur une créature. */
+export const threatOf = (foe: FoeState, heroId: string) => foe.threat?.[heroId] ?? 0;
+
+/** Guerriers qui peuvent s'interposer devant le héros visé par cette créature (Intervention : à 2 cases au plus). */
+export function interveners(combat: CombatState | null, party: Character[], intent: Intent): Character[] {
+	if (!combat || intent.why === 'spell' || !intent.heroId) return [];
+	const target = combat.pos[intent.heroId];
+	if (!target || combat.heroes[intent.heroId]?.protectedBy) return [];
+	return activeHeroes(party).filter(
+		(c) =>
+			hasAbility(c, 'intervention') &&
+			c.id !== intent.heroId &&
+			!combat.heroes[c.id]?.stunned &&
+			!combat.reclaimed.includes(c.id) &&
+			distance(combat.pos[c.id], target) <= 2,
+	);
+}
+
+/** Le sort de la créature est-il prêt (et pas bâillonné) ? */
+const spellReady = (combat: CombatState, foe: FoeState) => Boolean(foe.spell) && !foe.silenced && (foe.spellReady ?? 0) <= combat.round;
+
+/**
+ * Chaque créature choisit ce qu'elle fait :
+ * - elle lance le sort qu'elle préparait (à la place de son attaque) ;
+ * - sinon elle attaque celui qui l'a provoquée (Moquerie), sinon celui qui l'énerve le plus (la menace) parmi ceux
+ *   qu'elle peut atteindre ce tour-ci, sinon le plus proche.
+ */
 function computeIntents(game: Game, combat: CombatState): Intent[] {
 	const active = activeHeroes(game.party);
-	const tank = active.find((c) => hasAbility(c, 'aura'));
 	const out: Intent[] = [];
 	for (const foe of livingFoes(combat)) {
 		if (foe.stunned) continue;
+		const at = combat.pos[foe.id];
+		if (foe.charging) {
+			out.push({ foeId: foe.id, heroId: foe.charging.heroId ?? '', why: 'spell' });
+			continue;
+		}
 		const taunter = foe.taunt ? active.find((c) => c.id === foe.taunt) : undefined;
-		if (taunter) out.push({ foeId: foe.id, heroId: taunter.id, why: 'taunt' });
-		// Aura de bataille : la créature lui résiste seulement sur 5 ou 6 (jet qu'on ne voit pas).
-		else if (tank && rollD6() <= 4) out.push({ foeId: foe.id, heroId: tank.id, why: 'aura' });
+		if (taunter) {
+			out.push({ foeId: foe.id, heroId: taunter.id, why: 'taunt' });
+			continue;
+		}
+		const reach = active.filter((c) => distance(at, combat.pos[c.id]) <= foe.move + foe.range);
+		const angry = (list: Character[]) => list.filter((c) => threatOf(foe, c.id) > 0).sort((a, b) => threatOf(foe, b.id) - threatOf(foe, a.id) || distance(at, combat.pos[a.id]) - distance(at, combat.pos[b.id]))[0];
+		const top = angry(reach) ?? angry(active);
+		if (top) out.push({ foeId: foe.id, heroId: top.id, why: 'threat' });
 		else {
-			const near = nearestHero(active, combat, combat.pos[foe.id]);
+			const near = nearestHero(active, combat, at);
 			if (near) out.push({ foeId: foe.id, heroId: near.id, why: 'near' });
 		}
 	}
@@ -646,7 +697,7 @@ function beginEnemyTurn(game: Game, def: CombatDef, events: GameEvent[]): 'inten
 	combat.intents = computeIntents(game, combat);
 	combat.reclaimed = [];
 	if (combat.intents.length) events.push({ kind: 'intent', intents: clone(combat.intents) });
-	if (combat.intents.some((i) => reclaimers(combat, game.party, i).length)) {
+	if (combat.intents.some((i) => interveners(combat, game.party, i).length)) {
 		combat.phase = 'intent';
 		return 'intent';
 	}
@@ -655,7 +706,75 @@ function beginEnemyTurn(game: Game, def: CombatDef, events: GameEvent[]): 'inten
 	return livingFoes(combat).length ? 'done' : 'victory';
 }
 
-/** Les créatures agissent : chacune avance vers sa cible et frappe si elle l'atteint. */
+/** Les effets qui s'usent à chaque tour de la créature (aveuglement, bâillon). */
+function wearOff(foe: FoeState) {
+	if (foe.blind) {
+		foe.blind -= 1;
+		if (!foe.blind) delete foe.blind;
+	}
+	if (foe.silenced) {
+		foe.silenced -= 1;
+		if (!foe.silenced) delete foe.silenced;
+	}
+}
+
+/** Après son attaque : si son sort est prêt et qu'elle a quelqu'un à portée, elle le prépare (il partira au tour suivant). */
+function maybePrepare(game: Game, foe: FoeState, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	if (!spellReady(combat, foe) || foe.stunned) return;
+	const sp = foe.spell!;
+	const at = combat.pos[foe.id];
+	const aim = activeHeroes(game.party)
+		.filter((c) => distance(at, combat.pos[c.id]) <= sp.range)
+		.sort((a, b) => threatOf(foe, b.id) - threatOf(foe, a.id))[0];
+	if (sp.kind === 'rally' ? livingFoes(combat).length > 1 : aim) prepareSpell(game, foe, sp.kind === 'rally' ? '' : aim!.id, events);
+}
+
+/** La créature prépare son sort : on le voit venir, il partira à son prochain tour. */
+function prepareSpell(game: Game, foe: FoeState, heroId: string, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	const sp = foe.spell!;
+	const at = heroId ? combat.pos[heroId] : undefined;
+	const zone = sp.kind === 'blast' && at ? [at, ...neighbors(at)] : undefined;
+	foe.charging = { ...(heroId ? { heroId } : {}), ...(zone ? { zone } : {}) };
+	foe.spellReady = combat.round + sp.every;
+	events.push({ kind: 'foe-charge', foeId: foe.id, name: foe.name, spell: sp.name, icon: sp.icon, text: sp.prepare, ...(zone ? { zone } : {}) });
+	log(game.state, 'combat', `${capitalize(foe.name)} ${sp.prepare}`);
+}
+
+/** Le sort part (ou s'éteint si elle a été bâillonnée entre-temps). */
+function castSpell(game: Game, foe: FoeState, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	const sp = foe.spell!;
+	const ch = foe.charging!;
+	delete foe.charging;
+	if (foe.silenced) {
+		events.push({ kind: 'foe-fizzle', foeId: foe.id, name: foe.name, spell: sp.name, why: 'muet' });
+		log(game.state, 'combat', `${capitalize(foe.name)}, bâillonnée, ne peut pas lancer ${sp.name} !`);
+		return;
+	}
+	events.push({ kind: 'foe-cast', foeId: foe.id, name: foe.name, spell: sp.name, icon: sp.icon, spellKind: sp.kind });
+	const active = activeHeroes(game.party);
+	const target = active.find((c) => c.id === ch.heroId);
+	const inReach = (c: Character) => distance(combat.pos[foe.id], combat.pos[c.id]) <= sp.range + 1;
+	if (sp.kind === 'rally') {
+		for (const f of livingFoes(combat)) if (f.id !== foe.id) f.rallied = (f.rallied ?? 0) + (sp.damage ?? 1);
+		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name} : les autres frapperont plus fort !`);
+	} else if (sp.kind === 'blast') {
+		const zone = new Set((ch.zone ?? []).map(hexKey));
+		const hit = active.filter((c) => zone.has(hexKey(combat.pos[c.id])));
+		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name}${hit.length ? '' : ' : tout le monde s’est écarté à temps !'}`);
+		for (const c of hit) foeAttack(game, foe, c, events, { damage: sp.damage, spell: sp.name, afflict: sp.afflict, guardable: false });
+	} else if (!target || !inReach(target)) {
+		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name}… mais sa cible est hors de portée !`);
+	} else if (sp.kind === 'sleep') {
+		heroState(combat, target.id).stunned = true;
+		events.push({ kind: 'foe-attack', foeId: foe.id, name: foe.name, heroId: target.id, amount: 0, absorbed: 0, shielded: 0, stunned: true, spell: sp.name });
+		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name} : ${target.name} s’endort et passera son tour.`);
+	} else foeAttack(game, foe, target, events, { damage: sp.damage, spell: sp.name, afflict: sp.afflict });
+}
+
+/** Les créatures agissent : sort, ou elle avance vers sa cible et frappe si elle l'atteint. */
 function resolveEnemies(game: Game, events: GameEvent[]) {
 	const combat = game.state.combat!;
 	for (const foe of livingFoes(combat)) {
@@ -669,11 +788,21 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 			events.push({ kind: 'foe-skip', foeId: foe.id, name: foe.name, reason });
 			const what = reason === 'filet' ? 'se débat dans le filet' : reason === 'sommeil' ? 'dort à poings fermés' : 'est encore sonnée';
 			log(game.state, 'combat', `${capitalize(foe.name)} ${what} et passe son tour.`);
+			// Sonnée, prise au filet, endormie : le sort qu'elle préparait s'éteint.
+			if (foe.charging && foe.spell) {
+				delete foe.charging;
+				events.push({ kind: 'foe-fizzle', foeId: foe.id, name: foe.name, spell: foe.spell.name, why: 'assomme' });
+			}
 			continue;
 		}
 		const active = activeHeroes(game.party);
 		if (!active.length) break;
 		const intent = combat.intents.find((i) => i.foeId === foe.id);
+		if (foe.charging && foe.spell) {
+			castSpell(game, foe, events);
+			wearOff(foe);
+			continue;
+		}
 		const target = active.find((c) => c.id === intent?.heroId) ?? nearestHero(active, combat, combat.pos[foe.id]);
 		if (!target) break;
 		const from = combat.pos[foe.id];
@@ -686,6 +815,8 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 		delete foe.taunt;
 		if (distance(to, combat.pos[target.id]) > foe.range) {
 			log(game.state, 'combat', `${capitalize(foe.name)} s’approche de ${target.name}.`);
+			maybePrepare(game, foe, events);
+			wearOff(foe);
 			continue;
 		}
 		const near = (h: Character) => h.pv > 0 && distance(combat.pos[foe.id], combat.pos[h.id]) <= 1;
@@ -694,38 +825,61 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 		for (let n = 0; n < (foe.attacks ?? 1) && aim && foe.hp > 0; n += 1) {
 			// Coup balayé (la première attaque) : ceux qui sont collés à elle, à côté de sa cible (regardés avant le coup).
 			const swept = foe.cleave && n === 0 ? activeHeroes(game.party).filter((h) => h.id !== aim!.id && near(h)) : [];
-			const struck = foeAttack(game, foe, aim, n === 0 && intent?.why === 'aura', n === 0 && (taunted || intent?.why === 'taunt'), events);
-			for (const h of swept) if (foe.hp > 0 && h.pv > 0 && h.id !== struck) foeAttack(game, foe, h, false, false, events, true);
+			const first = n === 0;
+			const rage = first && taunted && Boolean(foe.enraged);
+			const struck = foeAttack(game, foe, aim, events, { taunted: first && taunted, rage });
+			for (const h of swept) if (foe.hp > 0 && h.pv > 0 && h.id !== struck) foeAttack(game, foe, h, events, { cleave: true });
 			if (aim.pv <= 0) aim = activeHeroes(game.party).filter((h) => distance(combat.pos[foe.id], combat.pos[h.id]) <= foe.range).sort((a, b) => distance(combat.pos[foe.id], combat.pos[a.id]) - distance(combat.pos[foe.id], combat.pos[b.id]))[0];
 		}
-		if (foe.blind) {
-			foe.blind -= 1;
-			if (!foe.blind) delete foe.blind;
-		}
+		if (taunted) delete foe.enraged;
+		delete foe.rallied;
+		if (foe.hp > 0) maybePrepare(game, foe, events);
+		wearOff(foe);
 	}
 	combat.phase = 'hero';
 	combat.intents = [];
 	combat.reclaimed = [];
 }
 
-/** Une créature frappe ; renvoie le héros réellement touché (le guerrier qui s'interpose, sinon la cible). */
-function foeAttack(game: Game, foe: FoeState, target: Character, aura: boolean, taunted: boolean, events: GameEvent[], cleave = false): string {
+/** Les dés de la rage (Moquerie) : +25 %, +50 %, +75 % ou +100 %. */
+const RAGE = [1.25, 1.5, 1.75, 2];
+
+interface Blow {
+	taunted?: boolean;
+	cleave?: boolean;
+	/** Enragée par la Moquerie. */
+	rage?: boolean;
+	/** Un sort : ses dégâts, son nom, son mal. */
+	damage?: number;
+	spell?: string;
+	afflict?: Affliction;
+	/** Le guerrier peut-il s'interposer (pas devant un souffle qui couvre une zone) ? */
+	guardable?: boolean;
+}
+
+/** Une créature frappe (ou son sort touche) ; renvoie le héros réellement touché (le guerrier qui s'interpose, sinon la cible). */
+function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEvent[], o: Blow = {}): string {
 	const combat = game.state.combat!;
+	const taunted = Boolean(o.taunted);
+	const cleave = Boolean(o.cleave);
 	let victim = target;
 	let guarded = false;
-	const protector = combat.heroes[target.id]?.protectedBy;
+	const protector = o.guardable === false ? undefined : combat.heroes[target.id]?.protectedBy;
 	const guard = protector ? activeHeroes(game.party).find((c) => c.id === protector && c.id !== target.id) : undefined;
 	if (guard) {
 		victim = guard;
 		guarded = true;
 	}
-	// Aveuglée : elle frappe à côté une fois sur deux.
-	if (foe.blind && Math.random() < 0.5) {
-		events.push({ kind: 'foe-attack', foeId: foe.id, name: foe.name, heroId: victim.id, amount: 0, absorbed: 0, shielded: 0, guarded, aura, taunted, cleave, missed: true });
+	// Aveuglée : elle frappe à côté une fois sur deux (ses sorts, eux, partent quand même).
+	if (!o.spell && foe.blind && Math.random() < 0.5) {
+		events.push({ kind: 'foe-attack', foeId: foe.id, name: foe.name, heroId: victim.id, amount: 0, absorbed: 0, shielded: 0, guarded, taunted, cleave, missed: true });
 		log(game.state, 'combat', `${capitalize(foe.name)}, aveuglée, frappe à côté de ${victim.name} !`);
 		return victim.id;
 	}
-	let blow = Math.max(0, foe.damage - (guarded ? 1 : 0));
+	let base = (o.damage ?? foe.damage) + (o.spell ? 0 : (foe.rallied ?? 0));
+	const rage = o.rage && victim.id === target.id ? RAGE[Math.floor(Math.random() * RAGE.length)] : undefined;
+	if (rage) base = Math.round(base * rage);
+	let blow = Math.max(0, base - (guarded ? 1 : 0));
 	const hs = heroState(combat, victim.id);
 	const shielded = Math.min(hs.shield ?? 0, blow);
 	blow -= shielded;
@@ -741,35 +895,54 @@ function foeAttack(game: Game, foe: FoeState, target: Character, aura: boolean, 
 	// Folie vengeresse : le moindre coup reçu réveille la fureur.
 	if (amount + absorbed + shielded > 0 && victim.pv > 0 && hasAbility(victim, 'folie')) hs.fury = true;
 	// Gros coup : s'il porte (même sur l'armure), le héros peut être assommé.
-	const stunned = amount + absorbed > 0 && victim.pv > 0 && Boolean(foe.stun) && Math.random() < foe.stun!;
+	const stunned = !o.spell && amount + absorbed > 0 && victim.pv > 0 && Boolean(foe.stun) && Math.random() < foe.stun!;
 	if (stunned) hs.stunned = true;
-	if (amount > 0 && victim.pv > 0 && foe.afflict && Math.random() < (foe.afflict.chance ?? 1)) {
-		hs.afflict = { ...foe.afflict };
-		afflict = foe.afflict.name;
+	const mal = o.afflict ?? (o.spell ? undefined : foe.afflict);
+	if (amount > 0 && victim.pv > 0 && mal && Math.random() < (mal.chance ?? 1)) {
+		hs.afflict = { ...mal };
+		afflict = mal.name;
 	}
-	events.push({ kind: 'foe-attack', foeId: foe.id, name: foe.name, heroId: victim.id, amount, absorbed, shielded, guarded, aura, taunted, afflict, cleave, stunned });
+	events.push({
+		kind: 'foe-attack',
+		foeId: foe.id,
+		name: foe.name,
+		heroId: victim.id,
+		amount,
+		absorbed,
+		shielded,
+		guarded,
+		taunted,
+		afflict,
+		cleave,
+		stunned,
+		...(o.spell ? { spell: o.spell } : {}),
+		...(rage ? { rage } : {}),
+	});
 	const parts = [
 		guarded ? `${victim.name} s’interpose devant ${target.name}.` : '',
+		rage ? `Folle de rage, elle frappe ${Math.round((rage - 1) * 100)} % plus fort !` : '',
 		shielded ? `Le bouclier de lune encaisse ${shielded}.` : '',
 		absorbed ? `L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '',
 		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed ? `${victim.name} ne perd rien.` : '',
 		afflict ? `${victim.name} souffre de ${afflict}.` : '',
 		stunned ? `${victim.name} est assommé·e et passera son tour.` : '',
 	].filter(Boolean);
-	log(game.state, 'combat', `${capitalize(foe.name)} ${cleave ? 'balaie aussi' : 'frappe'} ${guarded ? target.name : victim.name}. ${parts.join(' ')}`);
+	const verb = o.spell ? `touche avec ${o.spell}` : cleave ? 'balaie aussi' : 'frappe';
+	log(game.state, 'combat', `${capitalize(foe.name)} ${verb} ${guarded ? target.name : victim.name}. ${parts.join(' ')}`);
 	if (victim.pv === 0) log(game.state, 'combat', `${victim.name} tombe, ${epuise(victim)} !`);
-	// Œil pour œil : le coup revient à l'envoyeur (même si l'armure l'a encaissé).
-	const back = hs.riposte;
-	if (back && foe.hp > 0) {
+	// Œil pour œil (passif) : un coup au contact revient à l'envoyeur (même si l'armure l'a encaissé).
+	const back = victim.pv > 0 && !o.spell && distance(combat.pos[foe.id], combat.pos[victim.id]) <= 1 ? ABILITIES['oeil-pour-oeil'].riposte : undefined;
+	if (back && hasAbility(victim, 'oeil-pour-oeil') && foe.hp > 0) {
 		const hurt = Math.min(back.damage, foe.hp);
 		foe.hp -= hurt;
-		const stunned = foe.hp > 0 && Math.random() < back.stunChance;
-		if (stunned) {
+		addThreat(foe, victim, hurt);
+		const stunnedFoe = foe.hp > 0 && Math.random() < back.stunChance;
+		if (stunnedFoe) {
 			foe.stunned = Math.max(foe.stunned ?? 0, 1);
 			foe.stunKind = 'assomme';
 		}
-		events.push({ kind: 'riposte', heroId: victim.id, foeId: foe.id, name: foe.name, amount: hurt, stunned, dead: foe.hp <= 0 });
-		log(game.state, 'combat', `Œil pour œil : ${victim.name} renvoie le coup, ${foe.name} −${hurt} PV${foe.hp <= 0 ? ' (vaincue !)' : stunned ? ', assommée !' : '.'}`);
+		events.push({ kind: 'riposte', heroId: victim.id, foeId: foe.id, name: foe.name, amount: hurt, stunned: stunnedFoe, dead: foe.hp <= 0 });
+		log(game.state, 'combat', `Œil pour œil : ${victim.name} renvoie le coup, ${foe.name} −${hurt} PV${foe.hp <= 0 ? ' (vaincue !)' : stunnedFoe ? ', assommée !' : '.'}`);
 	}
 	return victim.id;
 }
@@ -780,7 +953,11 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 	const order = combat.order;
 	for (let step = 0; step < order.length * 3; step += 1) {
 		const turn = (combat.turn + 1) % order.length;
-		if (turn === 0 && combat.turn >= 0) combat.round += 1;
+		if (turn === 0 && combat.turn >= 0) {
+			combat.round += 1;
+			// La colère retombe un peu à chaque tour : l'aggro bouge.
+			for (const f of combat.foes) if (f.threat) for (const k of Object.keys(f.threat)) f.threat[k] *= 0.75;
+		}
 		combat.turn = turn;
 		const id = order[turn];
 		if (id === 'enemy') {
@@ -796,7 +973,6 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 		// Début de son tour : la protection qu'il donnait s'arrête, son mal le ronge.
 		for (const h of Object.values(combat.heroes)) if (h.protectedBy === id) delete h.protectedBy;
 		const hs = combat.heroes[id];
-		if (hs?.riposte) delete hs.riposte;
 		if (hs?.stunned) {
 			delete hs.stunned;
 			events.push({ kind: 'hero-skip', heroId: id });
@@ -828,7 +1004,7 @@ export type CombatAction =
 	| { kind: 'move'; to: Hex }
 	| { kind: 'ability'; ability: AbilityId; targets?: string[]; roll: RollResult | null; rerollBy?: string }
 	| { kind: 'wait' }
-	| { kind: 'reclaim'; foeId: string; heroId: string; roll: RollResult; rerollBy?: string }
+	| { kind: 'intervene'; heroId: string; allyId: string }
 	| { kind: 'resolve' }
 	| { kind: 'talk'; roll: RollResult; rerollBy?: string }
 	| { kind: 'flee'; roll: RollResult; rerollBy?: string };
@@ -917,6 +1093,8 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		if (!f) throw new Error('Cible hors de portée');
 		foes = [f];
 		if (ab.area) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1));
+		// Cône : celles juste derrière la première (collées à elle, à 2 cases du héros).
+		if (ab.cone) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1 && distance(combat.pos[o.id], combat.pos[hero.id]) === 2));
 		const chain = ab.chain;
 		if (chain) {
 			// L'éclair rebondit chaque fois sur la créature la plus proche de la précédente (dans l'ordre : c'est celui de l'effet).
@@ -933,7 +1111,6 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const chosen = inRange.foes.filter((f) => action.targets?.includes(f.id));
 		foes = (chosen.length ? chosen : inRange.foes).slice(0, ab.maxTargets ?? 3);
 	} else if (ab.target === 'all') foes = inRange.foes;
-	else if (ab.riposte) foes = livingFoes(combat).filter((f) => distance(combat.pos[hero.id], combat.pos[f.id]) <= ab.riposte!.provoke);
 	if (['foe', 'foes', 'all'].includes(ab.target) && !foes.length) throw new Error('Personne à portée');
 	const ally = ab.target === 'ally' ? inRange.allies.find((c) => c.id === action.targets?.[0]) : undefined;
 	if (ab.target === 'ally' && !ally) throw new Error('Compagnon hors de portée');
@@ -977,6 +1154,8 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 			// Critique : les deux haches font double dégâts.
 			const amount = Math.min((main + (ab.offhand ?? 0)) * (crit ? 2 : 1), foe.hp);
 			foe.hp -= amount;
+			// Menace : les dégâts énervent, un critique deux fois plus.
+			addThreat(foe, hero, amount * (crit ? 2 : 1));
 			events.push({ kind: 'hit', heroId: hero.id, foeId: foe.id, amount, spell: ab.spell, crit, offhand: Boolean(ab.offhand) });
 			hits.push(`${foe.name} −${amount} PV${foe.hp <= 0 ? ' (vaincue !)' : ''}`);
 		}
@@ -990,7 +1169,9 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 		if (ab.push) {
 			const here = combat.pos[hero.id];
-			for (const foe of foes.filter((f) => f.hp > 0)) {
+			// Les plus loin d'abord : elles libèrent la place pour celles de devant.
+			const order = foes.filter((f) => f.hp > 0).sort((a, b) => distance(here, combat.pos[b.id]) - distance(here, combat.pos[a.id]));
+			for (const foe of order) {
 				const to = pushAway(combat, here, foe);
 				if (!to) continue;
 				events.push({ kind: 'foe-move', foeId: foe.id, from: combat.pos[foe.id], to, pushed: true });
@@ -1000,6 +1181,23 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	}
 
 	for (const foe of foes.filter((f) => f.hp > 0)) {
+		// Contrôler une créature l'énerve aussi.
+		if (ab.stun || ab.blind || ab.poison || ab.silence) addThreat(foe, hero, 2);
+		if (ab.silence) {
+			foe.silenced = Math.max(foe.silenced ?? 0, ab.silence);
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'muet' });
+		}
+		// Pointes trempées : chaque flèche qui touche peut aveugler, ou bâillonner.
+		if (ab.arrow && hasAbility(hero, 'pointes-trempees')) {
+			if (Math.random() < 0.25) {
+				foe.blind = Math.max(foe.blind ?? 0, 2);
+				events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'aveugle' });
+			}
+			if (!ab.silence && Math.random() < 0.25) {
+				foe.silenced = Math.max(foe.silenced ?? 0, 2);
+				events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'muet' });
+			}
+		}
 		if (ab.stun) {
 			foe.stunned = Math.max(foe.stunned ?? 0, ab.stun.turns);
 			foe.stunKind = ab.stun.kind;
@@ -1015,23 +1213,18 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 		if (ab.taunt) {
 			foe.taunt = hero.id;
+			// Moquerie : il passe en tête de sa menace, et elle est folle de rage.
+			const top = Math.max(0, ...Object.values(foe.threat ?? {}));
+			foe.threat = { ...foe.threat, [hero.id]: top + 5 };
+			if (ab.rage) foe.enraged = true;
 			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'provoque' });
 		}
 	}
-	if (!ab.damage && !ab.riposte && foes.length) {
+	if (!ab.damage && foes.length) {
 		const what = ab.stun?.kind === 'filet' ? 'prend au filet' : ab.stun?.kind === 'sommeil' ? 'endort' : ab.blind ? 'aveugle' : ab.taunt ? 'nargue' : 'vise';
 		log(work.state, 'combat', `${hero.name} (${how}) ${what} ${names(foes)} !`);
 	}
 
-	if (ab.riposte) {
-		heroState(combat, hero.id).riposte = { damage: ab.riposte.damage, stunChance: ab.riposte.stunChance };
-		for (const foe of foes) {
-			foe.taunt = hero.id;
-			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'provoque' });
-		}
-		events.push({ kind: 'support', heroId: hero.id, what: 'riposte', targetId: hero.id });
-		log(work.state, 'combat', `${hero.name} lève son bouclier : œil pour œil !${foes.length ? ` ${names(foes)} ne pensent plus qu’à ${hero.name}.` : ''}`);
-	}
 	if (ab.protect && ally) {
 		heroState(combat, ally.id).protectedBy = hero.id;
 		events.push({ kind: 'support', heroId: hero.id, what: 'protect', targetId: ally.id });
@@ -1040,17 +1233,26 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	if (ab.shield && ally) {
 		const hs = heroState(combat, ally.id);
 		hs.shield = (hs.shield ?? 0) + ab.shield;
+		for (const f of livingFoes(combat)) addThreat(f, hero, ab.shield / 2);
 		events.push({ kind: 'support', heroId: hero.id, what: 'shield', targetId: ally.id, amount: ab.shield });
 		log(work.state, 'combat', `${hero.name} entoure ${ally.id === hero.id ? 'son propre corps' : ally.name} d’un bouclier de lune.`);
 	}
 	if (ab.heal && ally) {
 		const amount = Math.min(ab.heal, ally.pvMax - ally.pv);
 		ally.pv += amount;
+		// Soigner attire un peu l'attention de toutes les créatures.
+		for (const f of livingFoes(combat)) addThreat(f, hero, amount / 2);
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
 		events.push({ kind: 'support', heroId: hero.id, what: 'heal', targetId: ally.id, amount });
 		log(work.state, 'combat', `${hero.name} joue l’${ab.name} : ${ally.id === hero.id ? 'soi-même' : ally.name} +${amount} PV.`);
 	} else if (ab.heal) {
-		for (const c of work.party) c.pv = Math.min(c.pvMax, c.pv + ab.heal);
+		let healed = 0;
+		for (const c of work.party) {
+			const gain = c.pv > 0 ? Math.min(ab.heal, c.pvMax - c.pv) : 0;
+			c.pv += gain;
+			healed += gain;
+		}
+		for (const f of livingFoes(combat)) addThreat(f, hero, healed / 2);
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
 		events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: ab.heal });
 		log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +${ab.heal} PV pour tout le groupe.`);
@@ -1064,7 +1266,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	}
 }
 
-/** Une étape de combat : déplacement, action, reprise d'aggro… puis la suite de la file. */
+/** Une étape de combat : déplacement, action, Intervention… puis la suite de la file. */
 export function combatTurn(campaign: Campaign, game: Game, action: CombatAction): StepResult {
 	const scene = getScene(campaign, game.state.sceneId);
 	const def = scene.combat;
@@ -1105,25 +1307,19 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		return finish(advanceCombat(work, def, events));
 	};
 
-	/* ---- Tour des monstres : reprendre l'aggro, ou les laisser faire ---- */
+	/* ---- Tour des monstres : le guerrier s'interpose (Intervention), ou on les laisse faire ---- */
 	if (combat.phase === 'intent') {
-		if (action.kind === 'reclaim') {
-			const intent = combat.intents.find((i) => i.foeId === action.foeId);
+		if (action.kind === 'intervene') {
 			const who = work.party.find((c) => c.id === action.heroId);
-			if (!intent || !who || !reclaimers(combat, work.party, intent).some((c) => c.id === who.id)) throw new Error('Impossible de reprendre l’aggro');
-			intent.tried = true;
+			const intent = combat.intents.find((i) => i.heroId === action.allyId && interveners(combat, work.party, i).some((c) => c.id === action.heroId));
+			const ally = work.party.find((c) => c.id === action.allyId);
+			if (!who || !ally || !intent) throw new Error('Impossible de s’interposer');
 			combat.reclaimed.push(who.id);
-			const foe = combat.foes.find((f) => f.id === intent.foeId)!;
-			const ok = action.roll.success;
-			if (ok) {
-				intent.heroId = who.id;
-				intent.why = 'reclaim';
-			}
-			events.push({ kind: 'sfx', id: ok ? 'sfx-succes' : 'sfx-echec' });
-			events.push({ kind: 'reclaim', heroId: who.id, foeId: foe.id, success: ok });
-			const cry = who.classId === 'danseur' ? 'nargue' : 'rugit vers';
-			log(work.state, 'combat', `${who.name} ${cry} ${foe.name} (${rollText(action.roll)}) : ${ok ? 'elle change de cible !' : 'elle ne se laisse pas distraire.'}`);
-			if (combat.intents.some((i) => reclaimers(combat, work.party, i).length)) return finish('intent');
+			heroState(combat, ally.id).protectedBy = who.id;
+			events.push({ kind: 'sfx', id: 'sfx-succes' });
+			events.push({ kind: 'intervene', heroId: who.id, allyId: ally.id });
+			log(work.state, 'combat', `${who.name} se jette devant ${ally.name} : les coups seront pour ${who.name} !`);
+			if (combat.intents.some((i) => interveners(combat, work.party, i).length)) return finish('intent');
 			return afterEnemies();
 		}
 		if (action.kind === 'resolve') return afterEnemies();

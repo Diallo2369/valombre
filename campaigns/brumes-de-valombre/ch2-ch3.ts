@@ -371,10 +371,10 @@ export const CH2_CH3: Scene[] = [
 		combat: {
 			enemy: { name: 'la bande de brumelins', hearts: 13, difficulty: 'moyen', damage: 2, move: 3, brume: true, image: 'img-brumelins', attack: 'La ronde des brumelins se resserre : ça pince, ça chatouille, ça mordille de partout !', afflict: { name: 'le froid de brume', damage: 1, turns: 2, chance: 0.3 } },
 			foes: [
-				{ name: 'le grand brumelin', hearts: 4, damage: 3, cleave: true, stun: 0.2 },
+				{ name: 'le grand brumelin', hearts: 4, damage: 3, cleave: true, stun: 0.2, spell: { id: 'ralliement', name: 'Cri de ralliement', icon: '📣', kind: 'rally', damage: 1, range: 6, every: 3, prepare: 'bombe le torse et prend son souffle pour appeler les autres…' } },
 				{ name: 'le brumelin siffleur', hearts: 3 },
 				{ name: 'le petit brumelin', hearts: 3 },
-				{ name: 'le brumelin cracheur', hearts: 3 },
+				{ name: 'le brumelin cracheur', hearts: 3, spell: { id: 'crachat', name: 'Crachat de brume', icon: '💦', kind: 'bolt', damage: 2, range: 3, every: 3, afflict: { name: 'le froid de brume', damage: 1, turns: 2 }, prepare: 'se racle la gorge en faisant des bulles grises…' } },
 				{ name: 'le brumelin hargneux', hearts: 3 },
 				{ name: 'le brumelin rieur', hearts: 3 },
 				{ name: 'le brumelin pinceur', hearts: 3 },
@@ -526,7 +526,7 @@ export const CH2_CH3: Scene[] = [
 		media: { image: 'img-loup', music: 'mus-boss', ambience: 'amb-sanctuaire', sfx: ['sfx-grondement'] },
 		lines: [{ who: 'narrateur', text: 'Le Loup de Cendre est puissant ! Chaque coup de patte soulève des étincelles. Il faudra rester unis.' }],
 		combat: {
-			enemy: { name: 'le Loup de Cendre', hearts: 18, difficulty: 'moyen', damage: 4, move: 3, cleave: true, attacks: 2, stun: 0.2, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !', afflict: { name: 'la brûlure', damage: 1, turns: 2, chance: 0.5 } },
+			enemy: { name: 'le Loup de Cendre', hearts: 16, difficulty: 'moyen', damage: 4, move: 3, cleave: true, attacks: 2, stun: 0.2, spell: { id: 'souffle-braise', name: 'Souffle de braise', icon: '🔥', kind: 'blast', damage: 4, range: 3, every: 3, afflict: { name: 'la brûlure', damage: 1, turns: 2 }, prepare: 'prend une grande inspiration… les braises rougeoient au fond de sa gorge. Écartez-vous de la zone rouge !' }, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !', afflict: { name: 'la brûlure', damage: 1, turns: 2, chance: 0.5 } },
 			victory: { to: 'loup-vaincu', effects: [{ xp: 3 }] },
 			defeat: { to: 'defaite-foret' },
 			talk: {

@@ -700,7 +700,7 @@ export const CH1_AUBERGE: Scene[] = [
 		media: { image: 'img-pff', music: 'mus-combat', ambience: 'amb-cave', sfx: ['sfx-ricanement'] },
 		lines: [{ who: 'narrateur', text: 'Une petite boule de brume rebondit de tonneau en tonneau en sifflant comme une bouilloire ! Elle est rapide !' }],
 		combat: {
-			enemy: { name: 'la boule de brume', hearts: 16, difficulty: 'facile', damage: 6, stun: 0.2, move: 3, brume: true, image: 'img-pff', attack: 'La boule de brume rebondit de tonneau en tonneau et vous fonce dessus en sifflant !' },
+			enemy: { name: 'la boule de brume', hearts: 16, difficulty: 'facile', damage: 6, stun: 0.2, spell: { id: 'nuage-endormant', name: 'Nuage endormant', icon: '💤', kind: 'sleep', range: 3, every: 3, prepare: 'gonfle ses joues, toute ronde : un Nuage endormant se prépare !' }, move: 3, brume: true, image: 'img-pff', attack: 'La boule de brume rebondit de tonneau en tonneau et vous fonce dessus en sifflant !' },
 			victory: {
 				to: 'pff-chasse',
 				effects: [{ quest: 'q-cave', status: 'done' }],

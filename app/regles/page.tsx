@@ -61,8 +61,11 @@ export default function RulesPage() {
 						contact, une flèche, un sort… Si c’est réussi, la créature perd des points de vie (sa barre de vie se vide).
 					</p>
 					<p>
-						Au tour des monstres, chacun montre d’une flèche <strong>qui il va attaquer</strong>. Le guerrier et le virevolteur
-						peuvent alors tenter de l’attirer vers eux, avec un jet de dé. L’<strong>armure</strong> prend les coups avant les points de
+						Les monstres attaquent <strong>celui qui les énerve le plus</strong> : celui qui leur fait mal, surtout avec un coup
+						critique, mais aussi celui qui soigne ou qui les entrave. Le guerrier, lui, les attire naturellement. Au tour des monstres,
+						chacun montre d’une flèche qui il va attaquer : le guerrier peut alors <strong>se jeter devant un compagnon</strong> visé.
+						Certains monstres préparent un <strong>sort</strong> : on le voit venir un tour à l’avance, et on peut le couper (en les
+						bâillonnant, en les assommant, en les endormant) ou s’écarter de la zone rouge. L’<strong>armure</strong> prend les coups avant les points de
 						vie, et elle est réparée à chaque nouveau combat. Méfiez-vous des gros monstres : certains frappent deux fois, balaient
 						tous ceux qui sont collés à eux, ou donnent de gros coups qui <strong>assomment</strong> (on passe son prochain tour).
 						Mieux vaut ne pas rester tous serrés autour d’eux ! On peut parfois parler ou s’enfuir au lieu de se battre.
