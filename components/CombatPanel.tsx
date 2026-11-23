@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
 import { availableAbilities, canUse, cooldownLeft, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
 import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, type Ability, type AbilityId } from '@/engine/rules';
-import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } from '@/engine/types';
+import type { Character, CombatDef, CombatState, FoeState, GameEvent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
@@ -491,15 +491,6 @@ export function CombatPanel(props: Props) {
 	const hs = combat.heroes[shown.id];
 	const cls = CLASSES[shown.classId];
 
-	const intentLine = (i: Intent) => {
-		const foe = foeById(i.foeId);
-		const hero = heroById(i.heroId);
-		if (!foe || !hero) return '';
-		const why =
-			i.why === 'aura' ? ` (attirée par l’aura de ${hero.name})` : i.why === 'taunt' ? ` (folle de rage : ${hero.name} l’a provoquée)` : i.why === 'reclaim' ? ` (détournée par ${hero.name})` : '';
-		return `${cap(foe.name)} semble se diriger vers ${hero.name}${why}.`;
-	};
-
 	// La fenêtre des monstres prend le focus à l'ouverture, et le garde tant qu'elle est ouverte.
 	const intentOpen = phase === 'intent' && !busy;
 	useEffect(() => {
@@ -520,34 +511,35 @@ export function CombatPanel(props: Props) {
 	};
 
 	/* ---------- Tour des monstres : une fenêtre par-dessus le plateau, on peut tenter de reprendre l'aggro ---------- */
+	// Toutes les provocations possibles : tel héros tente d'attirer tel monstre.
+	const provokes = phase === 'intent' ? combat.intents.flatMap((i) => reclaimers(combat, party, i).map((c) => ({ intent: i, hero: c }))) : [];
 	const intentPopin =
 		phase === 'intent' && !busy ? (
-			<div className="overlay overlay--light" role="presentation">
+			<div className="overlay overlay--bottom" role="presentation">
 				<section className="intent-panel card" role="dialog" aria-modal="true" aria-labelledby="intent-title" ref={intentRef} onKeyDown={trapFocus}>
-					<h3 id="intent-title">Les monstres préparent leur coup…</h3>
-					<ul className="intent-panel__list">
-						{combat.intents.map((i) => {
-							const who = reclaimers(combat, party, i);
-							return (
-								<li key={i.foeId}>
-									<p>{intentLine(i)}</p>
-									{who.length ? (
-										<div className="intent-panel__actions">
-											{who.map((c) => {
-												const stat = CLASSES[c.classId].aggro!;
-												return (
-													<button key={c.id} type="button" className="btn btn--small" onClick={() => props.onReclaim(i.foeId, c.id)}>
-														{c.classId === 'danseur' ? '😜' : '🔱'} {c.name} tente de l’attirer · {STAT_LABEL[stat]} {c.stats[stat]} : {need(c.stats[stat], difficulty)}
-													</button>
-												);
-											})}
-										</div>
-									) : null}
-								</li>
-							);
-						})}
-					</ul>
-					<button type="button" className="btn btn--ghost" onClick={props.onResolve}>
+					<h3 id="intent-title">{provokes.length ? 'Provoquer un monstre ?' : 'Les monstres attaquent !'}</h3>
+					<p className="intent-panel__note">Les flèches rouges montrent qui ils visent.</p>
+					{provokes.length ? (
+						<div className="intent-panel__picks">
+							{provokes.map(({ intent, hero }) => {
+								const stat = CLASSES[hero.classId].aggro!;
+								const foe = foeById(intent.foeId);
+								return (
+									<button key={`${hero.id}-${intent.foeId}`} type="button" className="intent-panel__pick" onClick={() => props.onReclaim(intent.foeId, hero.id)}>
+										<span className="intent-panel__who">
+											{hero.classId === 'danseur' ? '😜' : '🔱'} {hero.name}
+										</span>
+										<span className="intent-panel__verb">attire</span>
+										<span className="intent-panel__foe">{foe ? cap(foe.name) : ''}</span>
+										<span className="intent-panel__chance">
+											{STAT_LABEL[stat]} {hero.stats[stat]} : {need(hero.stats[stat], difficulty)}
+										</span>
+									</button>
+								);
+							})}
+						</div>
+					) : null}
+					<button type="button" className="btn intent-panel__go" onClick={props.onResolve}>
 						⚔️ Laisser les monstres attaquer
 					</button>
 				</section>

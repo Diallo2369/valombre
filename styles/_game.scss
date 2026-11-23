@@ -708,9 +708,10 @@
 		padding: 0;
 	}
 
-	/* Fenêtre posée sur le plateau : on voit encore les flèches des monstres derrière. */
-	&--light {
-		background: rgb(5 8 14 / 40%);
+	/* Panneau en bas de l'écran, sans voile : le plateau et les flèches des monstres restent bien visibles. */
+	&--bottom {
+		place-items: end center;
+		background: none;
 		backdrop-filter: none;
 	}
 }
@@ -1833,35 +1834,80 @@
 .intent-panel {
 	display: grid;
 	gap: 12px;
-	width: min(520px, 100%);
-	max-height: calc(100vh - 32px);
+	width: min(620px, 100%);
+	max-height: calc(60vh - 32px);
 	overflow: auto;
-	padding: 20px;
+	padding: 18px 20px;
 	border-color: rgb(232 87 74 / 55%);
 	box-shadow: 0 0 0 1px rgb(232 87 74 / 35%), 0 20px 60px rgb(0 0 0 / 65%);
 	animation: popin 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 
 	h3 {
 		margin: 0;
+		font-size: clamp(1.3rem, 3.5vw, 1.7rem);
 		color: #ffb3a6;
+		text-align: center;
 	}
 
-	&__list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		gap: 10px;
+	&__note {
+		margin: -6px 0 0;
+		text-align: center;
+		font-size: 0.9rem;
+		color: var(--parchment-300);
+	}
 
-		p {
-			margin: 0 0 6px;
+	&__picks {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 10px;
+	}
+
+	/* Un gros bouton par provocation possible : qui attire quel monstre, et ses chances. */
+	&__pick {
+		display: grid;
+		justify-items: center;
+		gap: 2px;
+		padding: 14px 12px;
+		border-radius: var(--radius-m);
+		border: 2px solid var(--ember-400);
+		background: linear-gradient(180deg, rgb(240 164 87 / 22%), rgb(240 164 87 / 6%));
+		color: var(--parchment-100);
+		font: inherit;
+		cursor: pointer;
+		transition: transform 0.15s ease, background 0.15s ease;
+
+		&:hover,
+		&:focus-visible {
+			transform: translateY(-2px);
+			background: linear-gradient(180deg, rgb(240 164 87 / 36%), rgb(240 164 87 / 12%));
 		}
 	}
 
-	&__actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+	&__who,
+	&__foe {
+		font-family: var(--font-title);
+		font-size: 1.2rem;
+	}
+
+	&__verb {
+		font-size: 0.85rem;
+		color: var(--parchment-300);
+	}
+
+	&__foe {
+		color: #ffb3a6;
+	}
+
+	&__chance {
+		margin-top: 4px;
+		font-size: 0.8rem;
+		color: #bcdaf3;
+	}
+
+	&__go {
+		justify-self: center;
+		font-size: 1.1rem;
+		padding: 12px 26px;
 	}
 }
 
