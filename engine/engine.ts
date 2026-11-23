@@ -639,7 +639,7 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 				combat.hearts -= dmg;
 				events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 				events.push({ kind: 'hit', target: 'enemy', heroId: hero.id, amount: dmg, spell: ab.spell });
-				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} !${ab.effect === 'double' && base === 2 ? ' Les deux lames font mouche !' : ''} −${dmg} ♥`);
+				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} !${ab.effect === 'double' && base === 2 ? ' Les deux haches font mouche !' : ''} −${dmg} ♥`);
 			} else {
 				events.push({ kind: 'sfx', id: 'sfx-rate' });
 				events.push({ kind: 'miss', heroId: hero.id });

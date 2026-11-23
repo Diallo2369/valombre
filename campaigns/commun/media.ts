@@ -63,7 +63,7 @@ export const COMMON_MEDIA: MediaAsset[] = [
 		type: 'image',
 		title: 'Portrait — Danseuse de guerre',
 		prompt:
-			'Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Danseuse de guerre » : deux sabres courbes croisés devant elle, un dans chaque main, longs rubans rouge sombre noués aux poignets qui flottent comme en plein mouvement, tunique légère sans armure, grelots de cuivre, cheveux tressés, regard vif et concentré. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
+			'Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Danseuse de guerre » : deux haches de guerre, une dans chaque main, croisées devant elle, manteau de fourrure épaisse sur les épaules nues, aucune armure, peintures de guerre bleu sombre et ocre sur le visage, cheveux en bataille ornés de petites tresses et de perles d’os ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais elle sourit, confiante et chaleureuse, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
 		notes: 'Même tenue et mêmes attributs que la version garçon, pour qu’on reconnaisse la classe au premier coup d’œil. Aucune armure : c’est sa faiblesse.',
 	},
 	{
@@ -71,7 +71,7 @@ export const COMMON_MEDIA: MediaAsset[] = [
 		type: 'image',
 		title: 'Portrait — Danseur de guerre',
 		prompt:
-			'Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Danseur de guerre » : deux sabres courbes croisés devant lui, un dans chaque main, longs rubans rouge sombre noués aux poignets qui flottent comme en plein mouvement, tunique légère sans armure, grelots de cuivre, cheveux attachés, regard vif et concentré. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
+			'Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Danseur de guerre » : deux haches de guerre, une dans chaque main, croisées devant lui, manteau de fourrure épaisse sur les épaules nues, aucune armure, peintures de guerre bleu sombre et ocre sur le visage, cheveux en bataille ornés de petites tresses et de perles d’os ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais il sourit, confiant et chaleureux, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
 		notes: 'Même tenue et mêmes attributs que la version fille, pour qu’on reconnaisse la classe au premier coup d’œil. Aucune armure : c’est sa faiblesse.',
 	},
 	{

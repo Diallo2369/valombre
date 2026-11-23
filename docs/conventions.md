@@ -114,7 +114,7 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 | Classe | Profil | En combat |
 |---|---|---|
 | Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3 d’armure | Frapper · Coup puissant (2 ♥, 1×/combat) · Intervention (se rue devant le groupe : la prochaine attaque est pour lui, −1 dégât) |
-| Danseur·se de guerre (corps à corps, gros dégâts) | +2 Agilité, +1 PV, aucune armure | Ambidextre : Deux lames (Agilité ; 1 ♥, 2 ♥ si le dé fait 4 ou plus) · Tourbillon d’acier (3 ♥, 1×/combat) |
+| Danseur·se de guerre (corps à corps, gros dégâts) | +2 Agilité, +1 PV, aucune armure | Ambidextre, allure barbare : Deux haches (Agilité ; 1 ♥, 2 ♥ si le dé fait 4 ou plus) · Tourbillon d’acier (3 ♥, 1×/combat) |
 | Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1 d’armure | Tir à l’arc (Agilité) · Corps à corps (Force) · Seconde chance (relancer un dé, rechargée au repos) |
 | Mage | +2 Esprit | Deux sorts : Trait de lumière (Esprit) · Étincelle d’aube (touche à coup sûr, 2 ♥ contre la brume, 1×/combat) |
 | Barde | +1 Charme, +1 Esprit | Magie et contrôle : Note perçante (Charme) · Berceuse (le monstre passe son tour, 1×/combat) · Chant de courage (+2 PV au groupe, 1×/combat) |
