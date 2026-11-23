@@ -608,8 +608,8 @@ export function CombatPanel(props: Props) {
 									: `Les monstres jouent.`
 								: ability
 								? ability.target === 'ally'
-									? `Touche le compagnon à aider (il brille).`
-									: `Touche la créature à viser (elle brille).`
+									? `Touche le compagnon à aider (il brille), ou choisis-le ci-dessous.`
+									: `Touche la créature à viser (elle brille), ou choisis-la ci-dessous.`
 								: !combat.moved
 									? `Tu peux d’abord te déplacer : touche une case lumineuse. Puis choisis ton action.`
 									: `Choisis ton action.`}
@@ -618,6 +618,20 @@ export function CombatPanel(props: Props) {
 
 					{ability && mine ? (
 						<div className="hero-card__actions">
+							{/* Les cibles possibles, aussi en boutons : on peut viser sans passer par le plateau. */}
+							<div className="hero-card__targets" role="group" aria-label={ability.target === 'ally' ? 'Compagnon à aider' : 'Créature à viser'}>
+								{ability.target === 'ally'
+									? targets.allies.map((c) => (
+											<button key={c.id} type="button" className="btn btn--small" onClick={() => fire(ability, [c.id])}>
+												{c.id === actor.id ? `${c.name} (toi)` : c.name} · {c.pv}/{c.pvMax} PV
+											</button>
+										))
+									: targets.foes.map((f) => (
+											<button key={f.id} type="button" className="btn btn--small" onClick={() => fire(ability, [f.id])}>
+												{cap(f.name)} · {Math.max(0, f.hp)} PV
+											</button>
+										))}
+							</div>
 							<button type="button" className="btn btn--ghost" onClick={() => setSelected(null)}>
 								← Choisir une autre action
 							</button>
