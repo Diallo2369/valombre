@@ -272,6 +272,42 @@
 	}
 }
 
+/* On franchit l'écran d'entrée : le bouton grossit comme si on fonçait dedans, le noir s'ouvre sur la page. */
+.intro-gate.is-leaving {
+	pointer-events: none;
+	animation: gate-open 1s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+
+	.intro-gate__card {
+		animation: gate-dive 1s cubic-bezier(0.6, 0, 0.8, 0.3) forwards;
+	}
+}
+
+@keyframes gate-dive {
+	0% {
+		scale: 1;
+		opacity: 1;
+		filter: blur(0);
+	}
+	70% {
+		opacity: 1;
+	}
+	100% {
+		scale: 14;
+		opacity: 0;
+		filter: blur(6px);
+	}
+}
+
+@keyframes gate-open {
+	0%,
+	35% {
+		background: rgb(0 0 0 / 100%);
+	}
+	100% {
+		background: rgb(0 0 0 / 0%);
+	}
+}
+
 @keyframes gate-glow {
 	50% {
 		box-shadow: 0 0 22px rgb(246 194 127 / 22%);

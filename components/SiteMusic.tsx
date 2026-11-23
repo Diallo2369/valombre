@@ -30,6 +30,9 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	const [off, setOff] = useState(false);
 	/** Le navigateur a bloqué le son : on affiche l'écran d'entrée. */
 	const [blocked, setBlocked] = useState(false);
+	/** On franchit l'écran d'entrée : il s'agrandit comme si on avançait dedans, puis disparaît. */
+	const [leaving, setLeaving] = useState(false);
+	const leavingRef = useRef(false);
 	const gate = useRef<HTMLDivElement>(null);
 	// Écran de partie (vraie ou de test) : la partie a son propre réglage du son.
 	const inGame = /^\/aventure\/(?!nouvelle)[^/]+$/.test(pathname) || /^\/atelier\/test\/[^/]+$/.test(pathname);
@@ -81,7 +84,8 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 			.play()
 			// Le clic sur « Commencer l'aventure » peut arriver pendant le démarrage : on ne remonte pas le son.
 			.then(() => {
-				setBlocked(false);
+				// Pendant qu'on franchit l'écran d'entrée, c'est son animation qui le fera disparaître.
+				if (!leavingRef.current) setBlocked(false);
 				if (!silenced.current && !paused.current) fadeTo(volume(), FADE_IN_MS);
 			})
 			.catch(() => {
@@ -149,14 +153,22 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	};
 
 	useEffect(() => {
-		const gated = blocked && !inGame;
+		const gated = blocked && !inGame && !leaving;
 		if (gated) gate.current?.querySelector<HTMLElement>('button')?.focus();
-		// Tant que l'écran d'entrée est là, les animations de la page attendent (le titre s'écrira une fois entré).
+		// Tant que l'écran d'entrée est là, les animations de la page attendent : elles démarrent quand on le franchit.
 		document.documentElement.classList.toggle('is-gated', gated);
-	}, [blocked, inGame]);
+	}, [blocked, inGame, leaving]);
 
 	const enter = (withSound: boolean) => {
-		setBlocked(false);
+		if (leavingRef.current) return;
+		// On avance dans l'écran d'entrée (il grossit et s'ouvre sur la page), puis il disparaît.
+		leavingRef.current = true;
+		setLeaving(true);
+		window.setTimeout(() => {
+			leavingRef.current = false;
+			setLeaving(false);
+			setBlocked(false);
+		}, 1000);
 		if (withSound) start();
 		else {
 			// Sans le son pour cette visite seulement : le bouton « Remettre la musique » reste là.
@@ -181,7 +193,7 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	return (
 		<>
 			{blocked ? (
-				<div className="intro-gate" role="dialog" aria-modal="true" aria-labelledby="intro-gate-title" ref={gate} onKeyDown={trapFocus}>
+				<div className={`intro-gate${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-labelledby="intro-gate-title" ref={gate} onKeyDown={trapFocus}>
 					<div className="intro-gate__card">
 						<h2 id="intro-gate-title" className="visually-hidden">
 							Valombre
