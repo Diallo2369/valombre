@@ -9,7 +9,7 @@ import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } f
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
-import { celebrate, playAbility, playFoeAttack, playPoison } from './fx/fx-library';
+import { BIG_FX, celebrate, playAbility, playFoeAttack, playPoison } from './fx/fx-library';
 import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
 
@@ -300,7 +300,7 @@ export function CombatPanel(props: Props) {
 						if (ev.roll) setDice({ heroId: ev.heroId, roll: ev.roll });
 						const land = () => {
 							setLanded(true);
-							if (ev.crit) setShake(true);
+							if (ev.crit || (ev.success && BIG_FX.has(ev.ability))) setShake(true);
 							setDmgLeft((d) => {
 								const next = { ...d };
 								for (const id of ev.foeIds) delete next[id];

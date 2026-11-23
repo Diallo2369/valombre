@@ -30,9 +30,16 @@ const beside = (from: P, to: P): P => {
 
 /** L'impact : un éclair, une onde, une gerbe d'étincelles. */
 export function impact(eng: FxEngine, at: P, colors: string[], power = 1, delay = 0) {
-	eng.add({ x: at.x, y: at.y, life: 260, delay, size: 34 * power, sizeEnd: 52 * power, color: colors[0] });
-	eng.add({ x: at.x, y: at.y, life: 420, delay, size: 12, sizeEnd: 62 * power, color: colors[1] ?? colors[0], shape: 'ring' });
-	eng.burst(at, Math.round(14 * power), { speed: 320 * power, life: 420, delay, size: 3.5, color: colors, shape: 'spark', drag: 2.5 });
+	const main = colors[1] ?? colors[0];
+	// Un éclair blanc bref, puis un halo coloré qui gonfle.
+	eng.add({ x: at.x, y: at.y, life: 200, delay, size: 46 * power, sizeEnd: 80 * power, color: '#ffffff' });
+	eng.add({ x: at.x, y: at.y, life: 420, delay, size: 60 * power, sizeEnd: 115 * power, color: main, alpha: 0.85 });
+	// Deux ondes : une rapide et fine, une lente et épaisse.
+	eng.add({ x: at.x, y: at.y, life: 320, delay, size: 10, sizeEnd: 95 * power, color: '#ffffff', shape: 'ring' });
+	eng.add({ x: at.x, y: at.y, life: 560, delay: delay + 40, size: 20, sizeEnd: 125 * power, color: main, shape: 'ring' });
+	// Étincelles qui fusent, et éclats qui retombent.
+	eng.burst(at, Math.round(28 * power), { speed: 560 * power, life: 480, delay, size: 4.5, color: colors, shape: 'spark', drag: 2.2 });
+	eng.burst(at, Math.round(12 * power), { speed: 260 * power, life: 750, delay, size: 5, sizeEnd: 1, color: colors, ay: 700, drag: 0.8 });
 }
 
 /** Le coup tombe à côté : un petit nuage gris. */
@@ -42,7 +49,7 @@ function puff(eng: FxEngine, at: P, delay = 0) {
 
 /** Une entaille en arc de cercle, qui balaie la cible. */
 export function slash(eng: FxEngine, at: P, color: string, angle: number, delay = 0, k = 1, life = 320) {
-	const R = 52 * k;
+	const R = 66 * k;
 	const c = { x: at.x - Math.cos(angle) * R * 0.45, y: at.y - Math.sin(angle) * R * 0.45 };
 	const a0 = angle - 1.25;
 	const a1 = angle + 1.25;
@@ -55,10 +62,11 @@ export function slash(eng: FxEngine, at: P, color: string, angle: number, delay 
 			const N = 20;
 			ctx.lineCap = 'round';
 			ctx.shadowColor = color;
-			ctx.shadowBlur = 14;
+			ctx.shadowBlur = 22;
 			for (const [w, col] of [
-				[8 * k, color],
-				[3 * k, '#ffffff'],
+				[22 * k, color],
+				[13 * k, color],
+				[4.5 * k, '#ffffff'],
 			] as const) {
 				ctx.strokeStyle = col;
 				for (let i = 0; i < N; i += 1) {
@@ -66,7 +74,7 @@ export function slash(eng: FxEngine, at: P, color: string, angle: number, delay 
 					const u2 = tail + ((head - tail) * (i + 1)) / N;
 					const b1 = a0 + (a1 - a0) * u1;
 					const b2 = a0 + (a1 - a0) * u2;
-					ctx.globalAlpha = 1 - t * 0.6;
+					ctx.globalAlpha = (w > 15 * k ? 0.35 : 1) * (1 - t * 0.6);
 					ctx.lineWidth = w * Math.sin((Math.PI * (i + 0.5)) / N);
 					ctx.beginPath();
 					ctx.moveTo(c.x + Math.cos(b1) * R, c.y + Math.sin(b1) * R);
@@ -132,7 +140,8 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 			const p = { x: base.x - Math.sin(a) * side, y: base.y - lift + Math.cos(a) * side };
 			const dir = Math.atan2(p.y - last.y, p.x - last.x) || a;
 			last = p;
-			e.add({ x: p.x, y: p.y, life: 280, size: size * 0.8, sizeEnd: 1, color: trail, alpha: 0.7 });
+			e.add({ x: p.x, y: p.y, life: 420, size: size * 1.4, sizeEnd: 1, color: trail, alpha: 0.75 });
+			if (Math.random() < 0.5) e.add({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, life: 380, size: 2.5, color: '#ffffff', shape: 'spark' });
 			ctx.shadowColor = color;
 			ctx.shadowBlur = 16;
 			ctx.fillStyle = color;
@@ -348,27 +357,70 @@ const ABILITY_FX: Record<string, Fx> = {
 		return t;
 	},
 	tourbillon: (e, c) => {
+		// Un vortex bleuté : des bras de vent en spirale qui tournent autour du danseur et s'élargissent.
+		const at = c.from;
+		const BLUES = ['#ffffff', '#bfefff', '#7fe3ff', '#4a8dff'];
 		e.draw({
-			life: 700,
+			life: 1000,
 			draw(ctx, t) {
-				const r = 70 + 50 * ease.out(t);
+				const r = 40 + 105 * ease.out(Math.min(1, t * 1.4));
+				const fade = t < 0.75 ? 1 : (1 - t) / 0.25;
+				// Le cœur du vortex : un disque bleu qui tourne.
+				const g = ctx.createRadialGradient(at.x, at.y, 0, at.x, at.y, r);
+				g.addColorStop(0, 'rgba(160,230,255,0.55)');
+				g.addColorStop(0.6, 'rgba(70,140,255,0.25)');
+				g.addColorStop(1, 'rgba(0,0,0,0)');
+				ctx.globalAlpha = fade;
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
+				ctx.fill();
+				// Les bras en spirale.
 				ctx.lineCap = 'round';
-				ctx.shadowColor = '#ff6a3c';
-				ctx.shadowBlur = 16;
-				ctx.globalAlpha = 1 - t * 0.8;
-				for (let k = 0; k < 3; k += 1) {
-					const a = t * Math.PI * 5 + (k * Math.PI * 2) / 3;
-					ctx.strokeStyle = k % 2 ? '#ffd2a8' : '#ff6a3c';
-					ctx.lineWidth = 7 * (1 - t * 0.5);
-					ctx.beginPath();
-					ctx.arc(c.from.x, c.from.y, r, a, a + 1.3);
-					ctx.stroke();
+				ctx.shadowColor = '#7fe3ff';
+				ctx.shadowBlur = 20;
+				const base = t * Math.PI * 9;
+				for (let k = 0; k < 5; k += 1) {
+					ctx.strokeStyle = BLUES[k % 4];
+					const N = 22;
+					for (let j = 0; j < N; j += 1) {
+						const u1 = j / N;
+						const u2 = (j + 1) / N;
+						const p1 = base + (k * Math.PI * 2) / 5 + u1 * 2.4;
+						const p2 = base + (k * Math.PI * 2) / 5 + u2 * 2.4;
+						const r1 = r * (0.25 + 0.75 * u1);
+						const r2 = r * (0.25 + 0.75 * u2);
+						ctx.globalAlpha = fade * (0.35 + 0.65 * u1);
+						ctx.lineWidth = 2 + 7 * u1 * (1 - t * 0.4);
+						ctx.beginPath();
+						ctx.moveTo(at.x + Math.cos(p1) * r1, at.y + Math.sin(p1) * r1);
+						ctx.lineTo(at.x + Math.cos(p2) * r2, at.y + Math.sin(p2) * r2);
+						ctx.stroke();
+					}
 				}
 			},
 		});
-		e.burst(c.from, 18, { speed: 260, life: 600, size: 3, color: FURY, shape: 'spark', drag: 1.5 });
-		c.foes.forEach((f, i) => (c.success ? impact(e, f, FURY, 1, 260 + i * 60) : puff(e, f, 260)));
-		return 260;
+		// Des éclats de vent arrachés au tourbillon, qui partent en tournoyant.
+		for (let i = 0; i < 46; i += 1) {
+			const a = Math.random() * Math.PI * 2;
+			const d = 30 + Math.random() * 70;
+			const v = 260 + Math.random() * 260;
+			e.add({
+				x: at.x + Math.cos(a) * d,
+				y: at.y + Math.sin(a) * d,
+				vx: -Math.sin(a) * v + Math.cos(a) * 120,
+				vy: Math.cos(a) * v + Math.sin(a) * 120,
+				life: 650 + Math.random() * 300,
+				delay: Math.random() * 300,
+				size: 3.5,
+				color: BLUES[i % 4],
+				shape: 'spark',
+				drag: 1.4,
+			});
+		}
+		e.add({ x: at.x, y: at.y, life: 700, delay: 250, size: 30, sizeEnd: 170, color: '#7fe3ff', shape: 'ring' });
+		c.foes.forEach((f, i) => (c.success ? impact(e, f, BLUES, 1.25, 320 + i * 70) : puff(e, f, 320)));
+		return 320;
 	},
 
 	/* Rôdeur */
@@ -565,21 +617,135 @@ const ABILITY_FX: Record<string, Fx> = {
 };
 
 /** Joue l'effet d'une compétence ; renvoie le moment de l'impact (ms). */
+/* ---------------- Le côté bande dessinée ---------------- */
+
+/** Onomatopée et couleur de bulle de chaque compétence. */
+const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
+	frapper: { word: 'POW !', fill: '#ffd23f', melee: true },
+	'coup-assommant': { word: 'BONK !', fill: '#ffd23f', melee: true },
+	taillade: { word: 'SHLAK !', fill: '#ffb03f', melee: true },
+	intervention: { word: 'HOP !', fill: '#ffe28a' },
+	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
+	moquerie: { word: 'NANANÈRE !', fill: '#ff9a4a' },
+	tourbillon: { word: 'WHOOSH !', fill: '#7fe3ff', melee: true },
+	tir: { word: 'TCHAC !', fill: '#ffe28a' },
+	'fleche-visee': { word: 'PAF !!', fill: '#ffd23f' },
+	salve: { word: 'TAC TAC TAC !', fill: '#ffe28a' },
+	filet: { word: 'FLOP !', fill: '#e8dcb5' },
+	'fleche-empoisonnee': { word: 'BLURP !', fill: '#8cff7a' },
+	'trait-lumiere': { word: 'ZIIING !', fill: '#bcd6ff' },
+	etincelle: { word: 'BOUM !', fill: '#ffb347' },
+	'pluie-etoiles': { word: 'BLING !', fill: '#fff1a8' },
+	'bouclier-lune': { word: 'BLOING !', fill: '#bcd6ff' },
+	lueur: { word: 'FLASH !', fill: '#ffffff' },
+	'note-percante': { word: 'DIIING !', fill: '#e2b8ff' },
+	berceuse: { word: 'ZZZ…', fill: '#cfe0ff' },
+	chant: { word: 'LA LA LAAA !', fill: '#b8f0c4' },
+	delivrance: { word: 'POUF !', fill: '#ffe28a' },
+};
+
+/**
+ * La bulle de BD : une explosion en étoile, bord noir épais, avec l'onomatopée qui surgit en rebondissant.
+ * Dessinée en « source-over » (pas en lumière additive) pour garder les contours noirs.
+ */
+export function kapow(eng: FxEngine, at: P, word: string, fill: string, delay = 0, k = 1) {
+	const rot = (Math.random() - 0.5) * 0.5;
+	// Un peu sur le côté et au-dessus, sauf tout en haut du plateau (on passe dessous).
+	const side = Math.random() < 0.5 ? -1 : 1;
+	const pos = { x: at.x + side * 34 * k, y: at.y + (at.y < 130 ? 34 : -44) * k };
+	const spikes = Array.from({ length: 14 }, (_, i) => (i % 2 ? 0.58 : 1) * (0.88 + Math.random() * 0.24));
+	eng.draw({
+		life: 900,
+		delay,
+		draw(ctx, t) {
+			// Surgit trop grand, rebondit, tient, puis s'éteint.
+			const pop = t < 0.14 ? ease.out(t / 0.14) * 1.3 : t < 0.26 ? 1.3 - 0.3 * ease.inOut((t - 0.14) / 0.12) : 1;
+			const alpha = t < 0.78 ? 1 : 1 - (t - 0.78) / 0.22;
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.globalAlpha = Math.max(0, alpha);
+			ctx.translate(pos.x, pos.y);
+			ctx.rotate(rot);
+			ctx.scale(pop * k, pop * k);
+			const w = Math.max(70, word.length * 13);
+			ctx.beginPath();
+			spikes.forEach((m, i) => {
+				const a = (i / spikes.length) * Math.PI * 2;
+				ctx.lineTo(Math.cos(a) * (w / 2 + 10) * m, Math.sin(a) * 34 * m);
+			});
+			ctx.closePath();
+			ctx.fillStyle = fill;
+			ctx.fill();
+			ctx.lineJoin = 'round';
+			ctx.lineWidth = 4;
+			ctx.strokeStyle = '#111';
+			ctx.stroke();
+			ctx.font = `900 ${Math.min(26, 300 / Math.max(6, word.length))}px "Arial Black", Impact, "Helvetica Neue", sans-serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.lineWidth = 6;
+			ctx.strokeStyle = '#111';
+			ctx.strokeText(word, 0, 1);
+			ctx.fillStyle = '#fff';
+			ctx.fillText(word, 0, 1);
+		},
+	});
+}
+
+/** Des traits de vitesse qui jaillissent autour de l'impact, comme dans une case de BD. */
+export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
+	const lines = Array.from({ length: 12 }, () => ({ a: Math.random() * Math.PI * 2, r: 0.8 + Math.random() * 0.5 }));
+	eng.draw({
+		life: 320,
+		delay,
+		draw(ctx, t) {
+			ctx.strokeStyle = color;
+			ctx.lineCap = 'round';
+			ctx.lineWidth = 3;
+			ctx.globalAlpha = 1 - t;
+			for (const l of lines) {
+				const r0 = (40 + 50 * ease.out(t)) * l.r;
+				const r1 = r0 + 26 * (1 - t);
+				ctx.beginPath();
+				ctx.moveTo(at.x + Math.cos(l.a) * r0, at.y + Math.sin(l.a) * r0);
+				ctx.lineTo(at.x + Math.cos(l.a) * r1, at.y + Math.sin(l.a) * r1);
+				ctx.stroke();
+			}
+		},
+	});
+}
+
+/** Joue l'effet d'une compétence (et sa bulle de BD) ; renvoie le moment de l'impact (ms). */
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
+	let t: number;
 	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'delivrance', 'tourbillon'].includes(ability))) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
-		return 120;
-	}
-	return fx(eng, c);
+		t = 120;
+	} else t = fx(eng, c);
+	const w = WORDS[ability];
+	if (!c.success || !w) return t;
+	// La bulle sur la cible principale (le danseur pour le tourbillon, le barde pour un chant),
+	// et de plus petites sur les autres cibles.
+	const main = ability === 'tourbillon' || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
+	const word = c.crit ? w.word.replace(/ ?!*$/, ' !!!') : w.word;
+	kapow(eng, main, word, c.crit ? '#ff5a3c' : w.fill, t, c.crit ? 1.25 : 1);
+	if (w.melee) for (const f of c.foes.slice(0, 3)) speedLines(eng, f, t);
+	for (const f of c.foes.slice(ability === 'tourbillon' ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
+	return t;
 }
 
 /** L'attaque d'une créature sur un héros : morsure pour les bêtes, griffes pour le reste. */
 export function playFoeAttack(eng: FxEngine, foeName: string, from: P, to: P, hurt: boolean) {
 	const beast = /loup|chien|ours|sanglier|bête/i.test(foeName);
 	const t = beast ? bite(eng, to, '#ff5a3c') : claws(eng, from, to, '#c98bff');
-	if (hurt) impact(eng, to, ['#ffd2c8', '#ff5a3c', '#ff2d4a'], 1, t);
-	else clang(eng, to, t);
+	if (hurt) {
+		impact(eng, to, ['#ffd2c8', '#ff5a3c', '#ff2d4a'], 1, t);
+		speedLines(eng, to, t);
+		kapow(eng, to, beast ? 'CROC !' : 'SCRATCH !', beast ? '#ff8a6a' : '#d9b0ff', t);
+	} else {
+		clang(eng, to, t);
+		kapow(eng, to, 'CLANG !', '#d5dbe6', t, 0.85);
+	}
 	return t;
 }
 
@@ -601,3 +767,6 @@ export function celebrate(eng: FxEngine, at: P) {
 	for (let i = 0; i < 4; i += 1)
 		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 9, color: '#ffe28a', shape: 'star', vr: 4 });
 }
+
+/** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
+export const BIG_FX = new Set(['tourbillon', 'coup-assommant', 'etincelle', 'pluie-etoiles', 'fleche-visee', 'taillade']);
