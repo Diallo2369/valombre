@@ -20,6 +20,8 @@
 
 	--font-title: var(--font-cinzel), 'Cinzel', serif;
 	--font-body: var(--font-alegreya), 'Alegreya', Georgia, serif;
+	/* Petits textes : plus épais et lisibles que la police du récit. */
+	--font-ui: var(--font-alegreya-sans), 'Alegreya Sans', system-ui, sans-serif;
 
 	--radius-s: 8px;
 	--radius-m: 14px;

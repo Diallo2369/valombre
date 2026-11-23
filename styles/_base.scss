@@ -57,6 +57,12 @@ textarea {
 	border-radius: var(--radius-s);
 }
 
+/* Les petites mentions : la police des petits textes, plus épaisse. */
+small {
+	font-family: var(--font-ui);
+	font-weight: 600;
+}
+
 .visually-hidden {
 	position: absolute !important;
 	width: 1px;

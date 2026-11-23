@@ -345,6 +345,8 @@ body:has(.home) .site-header {
 	&__switch {
 		text-align: center;
 		font-size: 0.95rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 	}
 }
 
@@ -388,6 +390,8 @@ body:has(.home) .site-header {
 		margin: 4px 0 0;
 		color: var(--mist-400);
 		font-size: 0.95rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 	}
 
 	&__actions {
@@ -426,8 +430,9 @@ body:has(.home) .site-header {
 	}
 
 	&__sub {
-		font-family: var(--font-title);
+		font-family: var(--font-ui);
 		font-size: 0.8rem;
+		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--ember-300);
@@ -522,6 +527,8 @@ body:has(.home) .site-header {
 		padding: 0;
 		margin: 0 0 20px;
 		font-size: 0.9rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-400);
 
 		.is-current {
@@ -662,6 +669,8 @@ body:has(.home) .site-header {
 
 	&__power {
 		font-size: 0.92rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-300);
 	}
 }
@@ -807,6 +816,8 @@ body:has(.home) .site-header {
 	h4 {
 		margin: 0 0 4px;
 		font-size: 0.95rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -838,6 +849,8 @@ body:has(.home) .site-header {
 
 	&__meta {
 		font-size: 0.95rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 	}
 
 	&__tagline {
@@ -862,6 +875,8 @@ body:has(.home) .site-header {
 
 		dt {
 			font-size: 0.8rem;
+			font-family: var(--font-ui);
+			font-weight: 600;
 		}
 
 		dd {
@@ -895,12 +910,15 @@ body:has(.home) .site-header {
 
 		span {
 			font-size: 0.85rem;
-			font-family: var(--font-body);
+			font-weight: 600;
+			font-family: var(--font-ui);
 		}
 	}
 
 	&__small {
 		font-size: 0.85rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: #5c5144;
 	}
 
@@ -1167,6 +1185,8 @@ body:has(.home) .site-header {
 	&__used,
 	&__notes {
 		font-size: 0.9rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-400);
 		margin: 0;
 	}
@@ -1222,6 +1242,8 @@ body:has(.home) .site-header {
 
 	&__hint {
 		font-size: 0.85rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-400);
 	}
 
@@ -1229,6 +1251,8 @@ body:has(.home) .site-header {
 		flex-basis: 100%;
 		margin: 0;
 		font-size: 0.9rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 
 		&:empty {
 			display: none;
@@ -1264,6 +1288,8 @@ body:has(.home) .site-header {
 
 		span {
 			font-size: 0.85rem;
+			font-family: var(--font-ui);
+			font-weight: 600;
 			color: var(--mist-400);
 		}
 
@@ -1296,6 +1322,8 @@ body:has(.home) .site-header {
 
 	&__head {
 		font-size: 0.9rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-400);
 	}
 
@@ -1339,6 +1367,8 @@ body:has(.home) .site-header {
 	&__role {
 		color: var(--mist-400);
 		font-size: 0.95rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 	}
 
 	&__casting {
@@ -1389,6 +1419,8 @@ body:has(.home) .site-header {
 
 	&__context {
 		font-size: 0.85rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--mist-400);
 	}
 
@@ -1446,6 +1478,8 @@ body:has(.home) .site-header {
 
 	span {
 		font-size: 0.85rem;
+		font-family: var(--font-ui);
+		font-weight: 600;
 		color: var(--parchment-300);
 	}
 }
