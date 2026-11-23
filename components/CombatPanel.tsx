@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
 import { availableAbilities, canUse, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
-import { CLASSES, DIFFICULTY, STAT_LABEL, className, classWithArticle, heartsText, type Ability, type AbilityId } from '@/engine/rules';
+import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, heartsText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { HeroPortrait } from './HeroPortrait';
@@ -115,6 +115,8 @@ export function CombatPanel(props: Props) {
 	const difficulty = DIFFICULTY[def.enemy.difficulty].target;
 	const [beat, setBeat] = useState<Beat | null>(null);
 	const [selected, setSelected] = useState<AbilityId | null>(null);
+	/** Compétence passive dont on lit l'explication (clic sur son badge). */
+	const [passiveId, setPassiveId] = useState<AbilityId | null>(null);
 	/** Pendant la mise en scène : PV pas encore perdus, et cases d'où partent les créatures. */
 	const [dmgLeft, setDmgLeft] = useState<Record<string, number>>({});
 	const [posFrom, setPosFrom] = useState<Record<string, Hex>>({});
@@ -293,6 +295,7 @@ export function CombatPanel(props: Props) {
 	const mine = shown.id === actor.id && phase === 'hero';
 	const abilities = availableAbilities(combat, shown);
 	const passives = passiveAbilities(shown);
+	const passive = passives.find((a) => a.id === passiveId);
 	const hs = combat.heroes[shown.id];
 	const cls = CLASSES[shown.classId];
 
@@ -373,13 +376,36 @@ export function CombatPanel(props: Props) {
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
 						</p>
+						<dl className="hero-card__attrs" aria-label={`Caractéristiques de ${shown.name}`}>
+							{STATS.map((st) => (
+								<div key={st.key} className="hero-card__attr" title={st.hint}>
+									<dt>{st.label}</dt>
+									<dd>{shown.stats[st.key] ?? '–'}</dd>
+								</div>
+							))}
+						</dl>
 						{passives.length ? (
-							<p className="hero-card__passives">
+							<div className="hero-card__passives">
 								{passives.map((a) => (
-									<span key={a.id} className="badge" title={a.text}>
-										{a.icon} {a.name}
-									</span>
+									<button
+										key={a.id}
+										type="button"
+										className={`badge hero-card__passive${passive?.id === a.id ? ' is-open' : ''}`}
+										aria-expanded={passive?.id === a.id}
+										aria-controls="hero-card-passive"
+										onClick={() => setPassiveId(passive?.id === a.id ? null : a.id)}
+									>
+										{a.icon} {a.name} <span aria-hidden="true">{passive?.id === a.id ? '▴' : 'ⓘ'}</span>
+									</button>
 								))}
+							</div>
+						) : null}
+						{passive ? (
+							<p id="hero-card-passive" className="hero-card__passive-text">
+								<strong>
+									{passive.icon} {passive.name}
+								</strong>{' '}
+								(passif, toujours actif) : {passive.text}
 							</p>
 						) : null}
 						<div className="hero-card__tools">
