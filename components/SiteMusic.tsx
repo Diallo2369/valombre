@@ -14,9 +14,10 @@ const PAUSE_KEY = 'valombre:musique-coupee';
 const FADE_OUT_MS = 3500;
 
 /**
- * Thème musical du site : il démarre dès l'arrivée (au premier clic ou à la première touche,
- * les navigateurs interdisant le son avant un geste), continue d'une page à l'autre,
+ * Thème musical du site : il démarre dès l'arrivée, continue d'une page à l'autre,
  * et s'efface en fondu quand on clique sur « Commencer l'aventure ».
+ * Les navigateurs interdisent le son avant un geste : si la musique est bloquée, un écran d'entrée
+ * (« Entrer dans Valombre ») propose ce premier clic, qui la lance.
  */
 export function SiteMusic({ urls }: { urls: string[] }) {
 	const pathname = usePathname();
@@ -27,6 +28,9 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	/** Coupé à la main (bouton « Musique ») : on ne relance pas, même en changeant de page. */
 	const paused = useRef(false);
 	const [off, setOff] = useState(false);
+	/** Le navigateur a bloqué le son : on affiche l'écran d'entrée. */
+	const [blocked, setBlocked] = useState(false);
+	const gate = useRef<HTMLDivElement>(null);
 	// Écran de partie (vraie ou de test) : la partie a son propre réglage du son.
 	const inGame = /^\/aventure\/(?!nouvelle)[^/]+$/.test(pathname) || /^\/atelier\/test\/[^/]+$/.test(pathname);
 
@@ -69,10 +73,12 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 			.play()
 			// Le clic sur « Commencer l'aventure » peut arriver pendant le démarrage : on ne remonte pas le son.
 			.then(() => {
+				setBlocked(false);
 				if (!silenced.current && !paused.current) fadeTo(volume(), FADE_IN_MS);
 			})
 			.catch(() => {
-				/* pas encore de geste de l'utilisateur : on réessaiera au premier clic */
+				// Pas encore de geste de l'utilisateur : l'écran d'entrée le propose (on réessaiera aussi au premier clic).
+				setBlocked(true);
 			});
 	};
 
@@ -90,7 +96,11 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 		}
 		setOff(paused.current);
 		start();
-		const onGesture = () => start();
+		// Un clic dans l'écran d'entrée est traité par ses boutons (« sans le son » ne doit rien lancer).
+		const onGesture = (e: Event) => {
+			if (e.target instanceof Element && e.target.closest('.intro-gate')) return;
+			start();
+		};
 		window.addEventListener('pointerdown', onGesture);
 		window.addEventListener('keydown', onGesture);
 		const onStory = () => silence();
@@ -130,11 +140,55 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 		else start();
 	};
 
+	useEffect(() => {
+		if (blocked && !inGame) gate.current?.querySelector<HTMLElement>('button')?.focus();
+	}, [blocked, inGame]);
+
+	const enter = (withSound: boolean) => {
+		setBlocked(false);
+		if (withSound) start();
+		else {
+			// Sans le son pour cette visite seulement : le bouton « Remettre la musique » reste là.
+			paused.current = true;
+			setOff(true);
+		}
+	};
+
+	const trapFocus = (e: React.KeyboardEvent) => {
+		if (e.key === 'Escape') return enter(false);
+		if (e.key !== 'Tab' || !gate.current) return;
+		const items = [...gate.current.querySelectorAll<HTMLElement>('button')];
+		const edge = e.shiftKey ? items[0] : items[items.length - 1];
+		if (document.activeElement === edge) {
+			e.preventDefault();
+			(e.shiftKey ? items[items.length - 1] : items[0]).focus();
+		}
+	};
+
 	// Sur l'écran de jeu, c'est le bouton « Son » de la partie qui règle tout.
 	if (!urls.length || inGame) return null;
 	return (
-		<button type="button" className="site-music" onClick={toggle} aria-pressed={!off} title={off ? 'Remettre la musique' : 'Couper la musique'}>
-			<span aria-hidden="true">{off ? '▶' : '⏸'}</span> {off ? 'Remettre la musique' : 'Musique'}
-		</button>
+		<>
+			{blocked ? (
+				<div className="intro-gate" role="dialog" aria-modal="true" aria-labelledby="intro-gate-title" ref={gate} onKeyDown={trapFocus}>
+					<div className="intro-gate__card">
+						<p className="intro-gate__eyebrow">Jeu de rôle familial</p>
+						<h2 id="intro-gate-title" className="intro-gate__title">
+							Valombre
+						</h2>
+						<p>Une vallée noyée de brume vous attend. Montez le son !</p>
+						<button type="button" className="btn" onClick={() => enter(true)}>
+							🔊 Entrer dans Valombre
+						</button>
+						<button type="button" className="intro-gate__quiet" onClick={() => enter(false)}>
+							Entrer sans le son
+						</button>
+					</div>
+				</div>
+			) : null}
+			<button type="button" className="site-music" onClick={toggle} aria-pressed={!off} title={off ? 'Remettre la musique' : 'Couper la musique'}>
+				<span aria-hidden="true">{off ? '▶' : '⏸'}</span> {off ? 'Remettre la musique' : 'Musique'}
+			</button>
+		</>
 	);
 }
