@@ -44,7 +44,7 @@ export type AbilityId =
 	| 'intervention'
 	| 'aura'
 	| 'oeil-pour-oeil'
-	// Virevolteur
+	// Cœur-sauvage
 	| 'double-attaque'
 	| 'moquerie'
 	| 'tourbillon'
@@ -211,7 +211,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		text: 'Quand une créature te frappe au contact, 2 fois sur 3 tu lui renvoies le coup : 2 PV, et 1 fois sur 4 elle est assommée. Plus on te frappe, plus ça leur coûte !',
 	}),
 
-	/* ---- Virevolteur : deux haches, pas d'armure ---- */
+	/* ---- Cœur-sauvage : deux haches, pas d'armure ---- */
 	'double-attaque': A({
 		id: 'double-attaque', range: 1,
 		name: 'Double attaque',
@@ -472,7 +472,7 @@ export interface ClassDef {
 	pvBonus: number;
 	/** Armure : elle prend les coups avant les PV, et se répare à chaque combat. */
 	armor: number;
-	/** Menace : ce qu'il fait énerve les monstres davantage (guerrier : son aura ; virevolteur : sa fureur se voit de loin). */
+	/** Menace : ce qu'il fait énerve les monstres davantage (guerrier : son aura ; cœur-sauvage : sa fureur se voit de loin). */
 	threat?: number;
 	/** Points de mouvement : cases parcourues par tour. */
 	move: number;
@@ -501,8 +501,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 	},
 	danseur: {
 		id: 'danseur',
-		name: 'Virevolteur·se',
-		names: { f: 'Virevolteuse', m: 'Virevolteur' },
+		name: 'Cœur-sauvage',
+		names: { f: 'Cœur-sauvage', m: 'Cœur-sauvage' },
 		tagline: 'Deux haches, un grand sourire, et la fureur au fond des yeux.',
 		stat: 'agilite',
 		bonus: { agilite: 2, initiative: 1 },

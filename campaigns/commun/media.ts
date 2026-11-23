@@ -71,17 +71,17 @@ export const COMMON_MEDIA: MediaAsset[] = [
 	{
 		id: 'classe-danseur-f',
 		type: 'image',
-		title: 'Portrait — Virevolteuse',
+		title: 'Portrait — Cœur-sauvage',
 		prompt:
-			'Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Virevolteuse » : deux haches de guerre, une dans chaque main, croisées devant elle, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais elle sourit, confiante et chaleureuse, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
+			'Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Cœur-sauvage » : deux haches de guerre, une dans chaque main, croisées devant elle, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais elle sourit, confiante et chaleureuse, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
 		notes: 'Même tenue et mêmes attributs que la version garçon, pour qu’on reconnaisse la classe au premier coup d’œil. Juste des épaulières, pas de vraie armure : c’est sa faiblesse.',
 	},
 	{
 		id: 'classe-danseur-m',
 		type: 'image',
-		title: 'Portrait — Virevolteur',
+		title: 'Portrait — Cœur-sauvage',
 		prompt:
-			'Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Virevolteur » : deux haches de guerre, une dans chaque main, croisées devant lui, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais il sourit, confiant et chaleureux, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
+			'Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Cœur-sauvage » : deux haches de guerre, une dans chaque main, croisées devant lui, épaulières en plaques d’acier cabossées, uniquement sur les épaules (bras et torse sans armure), manteau de fourrure épaisse dont la tête d’ours, gueule ouverte, lui coiffe le crâne comme un capuchon, peintures de guerre bleu sombre et ocre sur le visage, quelques mèches en bataille ornées de petites tresses et de perles d’os qui dépassent de la fourrure ; une lueur de fureur magique, comme des braises dorées, s’échappe de ses yeux, mais il sourit, confiant et chaleureux, l’air de ne rien craindre. Allure un peu barbare. Fond uni brume bleutée. Format carré 1:1, cadrage centré.',
 		notes: 'Même tenue et mêmes attributs que la version fille, pour qu’on reconnaisse la classe au premier coup d’œil. Juste des épaulières, pas de vraie armure : c’est sa faiblesse.',
 	},
 	{
