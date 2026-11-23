@@ -244,3 +244,16 @@
 		outline-offset: 2px;
 	}
 }
+
+/* Choix d'une image personnalisée pour un héros. */
+.portrait-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+
+	.form-error {
+		flex-basis: 100%;
+		margin: 0;
+	}
+}

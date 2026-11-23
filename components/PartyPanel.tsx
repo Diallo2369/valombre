@@ -3,7 +3,7 @@
 import { CLASSES, levelFromXp } from '@/engine/rules';
 import type { Character } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
-import { MediaView } from './MediaView';
+import { HeroPortrait } from './HeroPortrait';
 
 interface Props {
 	party: Character[];
@@ -34,7 +34,7 @@ export function PartyPanel({ party, media, activeId, spokesId, onOpenSheet, onBa
 							.join(' ')}
 					>
 						<button type="button" className="party__main" onClick={() => onOpenSheet(c.id)} aria-label={`Fiche de ${c.name}`}>
-							<MediaView className="party__portrait" media={media} image={`classe-${c.classId}`} alt="" />
+							<HeroPortrait className="party__portrait" character={c} media={media} />
 							<span className="party__text">
 								<span className="party__name">{c.name}</span>
 								<span className="party__sub">

@@ -1,7 +1,7 @@
-import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, classPortrait, levelFromXp } from '@/engine/rules';
+import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, levelFromXp } from '@/engine/rules';
 import type { Character } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
-import { MediaView } from './MediaView';
+import { HeroPortrait } from './HeroPortrait';
 
 interface Props {
 	character: Character;
@@ -19,7 +19,7 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 	return (
 		<article className={`sheet${print ? ' sheet--print' : ''}`}>
 			<header className="sheet__head">
-				<MediaView className="sheet__portrait" media={media} image={classPortrait(c)} alt={`Portrait : ${className(c)}`} />
+				<HeroPortrait className="sheet__portrait" character={c} media={media} alt={`Portrait de ${c.name}`} />
 				<div>
 					<h3 className="sheet__name">{c.name}</h3>
 					<p className="sheet__meta">

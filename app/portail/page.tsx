@@ -5,7 +5,9 @@ import { ConfirmSubmit } from '@/components/ConfirmSubmit';
 import { MediaView } from '@/components/MediaView';
 import { SiteHeader } from '@/components/SiteHeader';
 import { UnlockForm } from '@/components/UnlockForm';
-import { className, classPortrait, levelFromXp } from '@/engine/rules';
+import { className, levelFromXp } from '@/engine/rules';
+import { HeroPortrait } from '@/components/HeroPortrait';
+import { HeroPortraitEdit } from '@/components/HeroPortraitEdit';
 import { requireUser } from '@/lib/auth';
 import { scanMedia } from '@/lib/media';
 import { listAdventures, listCharacters, unlockedIds } from '@/lib/repo';
@@ -120,8 +122,8 @@ export default function PortalPage() {
 						<ul className="heroes">
 							{heroes.map((h) => (
 								<li key={h.id} className="hero-chip card">
-									<MediaView className="hero-chip__img" media={common} image={classPortrait(h)} alt="" />
-									<div>
+									<HeroPortrait className="hero-chip__img" character={h} media={common} />
+									<div className="hero-chip__info">
 										<strong>{h.name}</strong>
 										<small>
 											{className(h)} niv. {levelFromXp(h.xp)} · {h.player || '—'}
@@ -138,6 +140,7 @@ export default function PortalPage() {
 												</button>
 											</form>
 										) : null}
+										<HeroPortraitEdit hero={h} />
 									</div>
 									<form action={deleteCharacterAction}>
 										<input type="hidden" name="id" value={h.id} />

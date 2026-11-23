@@ -8,7 +8,9 @@ import { newId } from '@/lib/ids';
 import type { MediaMap } from '@/lib/media-types';
 import { CharacterSheet } from './CharacterSheet';
 import { Die, rollWithSuspense } from './Die';
+import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
+import { PortraitPicker } from './PortraitPicker';
 
 interface Props {
 	campaignId: string;
@@ -26,6 +28,8 @@ interface Draft {
 	classId: ClassId | null;
 	rolls: (number | null)[];
 	swap: [StatKey, StatKey] | null;
+	/** Image choisie à la place du portrait de classe (data URL, enregistrée au départ de l'aventure). */
+	portrait?: string;
 }
 
 const EMPTY: Draft = { player: '', gender: null, name: '', classId: null, rolls: STATS.map(() => null), swap: null };
@@ -46,7 +50,8 @@ function baseFromDraft(d: Draft): Stats | null {
 function draftToCharacter(d: Draft): Character | null {
 	const base = baseFromDraft(d);
 	if (!base || !d.classId) return null;
-	return makeCharacter({ id: newId('tmp'), name: d.name, player: d.player, gender: d.gender ?? undefined, classId: d.classId, base, rolls: d.rolls as number[] });
+	const c = makeCharacter({ id: newId('tmp'), name: d.name, player: d.player, gender: d.gender ?? undefined, classId: d.classId, base, rolls: d.rolls as number[] });
+	return d.portrait ? { ...c, portrait: d.portrait } : c;
 }
 
 /** Création du groupe : héros existants à reprendre + nouveaux héros tirés aux dés. */
@@ -125,7 +130,7 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 											disabled={!on && total >= MAX}
 											onChange={() => setReuse((r) => (on ? r.filter((x) => x !== c.id) : [...r, c.id]))}
 										/>
-										<MediaView className="creator__mini" media={media} image={classPortrait(c)} alt="" />
+										<HeroPortrait className="creator__mini" character={c} media={media} />
 										<span>
 											<strong>{c.name}</strong>
 											<small>
@@ -333,6 +338,16 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 									</button>
 								</p>
 							)}
+							<div className="creator__portrait">
+								<p>
+									Le portrait de classe ne te plaît pas ? Tu peux mettre <strong>ton propre dessin ou une photo</strong> : l’image sera recadrée en carré.
+								</p>
+								<PortraitPicker
+									hasCustom={Boolean(draft.portrait)}
+									onPick={(portrait) => setDraft((d) => (d ? { ...d, portrait } : d))}
+									onReset={() => setDraft((d) => (d ? { ...d, portrait: undefined } : d))}
+								/>
+							</div>
 							<CharacterSheet character={preview} media={media} />
 							<div className="creator__nav">
 								<button type="button" className="btn btn--ghost" onClick={() => setStep('des')}>

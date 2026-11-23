@@ -22,6 +22,11 @@ export interface Character {
 	player: string;
 	/** Une héroïne (f) ou un héros (m) : accorde le nom de classe et choisit le portrait. */
 	gender?: Gender;
+	/**
+	 * Image choisie par le joueur à la place du portrait de classe : adresse /heros/portrait/<id>?v=…
+	 * (pendant la création seulement, une data URL pas encore enregistrée).
+	 */
+	portrait?: string;
 	classId: ClassId;
 	stats: Stats;
 	pvMax: number;

@@ -8,6 +8,7 @@ import { computePvMax } from '@/engine/rules';
 import type { Character, GameState } from '@/engine/types';
 import { requireUser } from '@/lib/auth';
 import { newId } from '@/lib/ids';
+import { removePortrait, savePortrait } from '@/lib/portraits';
 import {
 	createAdventure,
 	deleteAdventure,
@@ -51,6 +52,12 @@ function sanitizeCharacter(c: Character): Character {
 	};
 }
 
+/** Le portrait personnalisé ne vient jamais du navigateur : on reprend celui qui est enregistré. */
+function keepPortrait(c: Character, stored?: Character): Character {
+	const { portrait: _ignored, ...rest } = c;
+	return stored?.portrait ? { ...rest, portrait: stored.portrait } : rest;
+}
+
 /** Crée une aventure à partir de nouveaux héros et/ou de héros existants. */
 export async function createAdventureAction(input: {
 	campaignId: string;
@@ -64,7 +71,11 @@ export async function createAdventureAction(input: {
 	if (!isUnlocked(user.id, campaign)) return { error: 'Cette campagne est encore verrouillée.' };
 
 	const reused = getCharacters(user.id, input.reuseIds).map((c) => ({ ...c, pv: c.pvMax, powerReady: true }));
-	const created = input.newHeroes.map((h) => sanitizeCharacter({ ...h, id: newId('h') }));
+	const created = input.newHeroes.map((h) => {
+		const c = sanitizeCharacter({ ...h, id: newId('h') });
+		const portrait = h.portrait?.startsWith('data:') ? savePortrait(c.id, h.portrait) : null;
+		return portrait ? { ...c, portrait } : c;
+	});
 	const party = [...reused, ...created].slice(0, MAX_HEROES);
 	if (!party.length) return { error: 'Il faut au moins un héros pour partir à l’aventure.' };
 
@@ -93,7 +104,7 @@ export async function saveGameAction(adventureId: string, state: GameState, part
 	// Un écran ouvert avant un réglage fait ailleurs (le genre, au portail) ne doit pas l'effacer.
 	const stored = new Map(getCharacters(user.id, adventure.partyIds).map((c) => [c.id, c]));
 	for (const c of party)
-		if (allowed.has(c.id)) saveCharacter(user.id, sanitizeCharacter({ ...c, gender: c.gender ?? stored.get(c.id)?.gender }));
+		if (allowed.has(c.id)) saveCharacter(user.id, keepPortrait(sanitizeCharacter({ ...c, gender: c.gender ?? stored.get(c.id)?.gender }), stored.get(c.id)));
 	updateAdventureState(user.id, adventureId, { ...state, campaignId: adventure.campaignId });
 
 	// Fin de campagne : déblocage de la suivante.
@@ -143,8 +154,29 @@ export async function setGenderAction(form: FormData) {
 
 export async function deleteCharacterAction(form: FormData) {
 	const user = requireUser();
-	deleteCharacter(user.id, String(form.get('id')));
+	const id = String(form.get('id'));
+	if (getCharacters(user.id, [id]).length) removePortrait(id);
+	deleteCharacter(user.id, id);
 	revalidatePath('/portail');
+}
+
+/** Change l'image d'un héros (data URL recadrée par le navigateur), ou remet le portrait de classe (null). */
+export async function setPortraitAction(id: string, dataUrl: string | null): Promise<{ error?: string }> {
+	const user = requireUser();
+	const [c] = getCharacters(user.id, [id]);
+	if (!c) return { error: 'Héros introuvable.' };
+	if (dataUrl === null) {
+		removePortrait(id);
+		const { portrait: _old, ...rest } = c;
+		saveCharacter(user.id, rest);
+	} else {
+		const portrait = savePortrait(id, dataUrl);
+		if (!portrait) return { error: 'Image refusée : il faut une image (JPEG, PNG ou WebP) de moins de 2 Mo.' };
+		saveCharacter(user.id, { ...c, portrait });
+	}
+	revalidatePath('/portail');
+	revalidatePath('/aventure', 'layout');
+	return {};
 }
 
 export async function unlockCodeAction(_prev: { message?: string; ok?: boolean }, form: FormData) {
