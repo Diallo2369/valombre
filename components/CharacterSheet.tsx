@@ -1,4 +1,4 @@
-import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, levelFromXp } from '@/engine/rules';
+import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, initiativeOf, levelFromXp } from '@/engine/rules';
 import type { Character } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { HeroPortrait } from './HeroPortrait';
@@ -53,6 +53,12 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 					</p>
 				</div>
 				<div className="sheet__box">
+					<h4>Initiative</h4>
+					<p className="sheet__big">
+						⚡ {initiativeOf(c)} <span>+ un dé · 👣 {cls.move} cases par tour</span>
+					</p>
+				</div>
+				<div className="sheet__box">
 					<h4>Expérience</h4>
 					<p className="sheet__big">
 						{c.xp} <span>/ {nextLevelXp} pour le niveau {level + 1}</span>
@@ -71,7 +77,7 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 									{a.icon} {a.name}
 								</strong>{' '}
 								<span className="sheet__small">
-									{a.stat ? `(${STAT_LABEL[a.stat]})` : '(sans dé)'} {a.perCombat ? '· une fois par combat' : ''}
+									{a.passive ? '(passif, toujours actif)' : a.stat ? `(${STAT_LABEL[a.stat]})` : '(sans dé)'} {a.perCombat ? '· une fois par combat' : ''}
 								</span>
 								<br />
 								{a.text}

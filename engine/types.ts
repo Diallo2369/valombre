@@ -3,6 +3,8 @@
  * Une campagne est un graphe de scènes écrit à l'avance : le moteur ne fait que le dérouler.
  */
 
+import type { Hex } from './board';
+
 export type StatKey = 'force' | 'agilite' | 'endurance' | 'esprit' | 'charme';
 export type Stats = Record<StatKey, number>;
 export type ClassId = 'guerrier' | 'danseur' | 'rodeur' | 'mage' | 'barde';
@@ -116,6 +118,28 @@ export interface Choice {
 	who?: string;
 }
 
+/** Un mal qui ronge un héros : il perd des PV au début de ses tours. */
+export interface Affliction {
+	/** « brûlure », « poison », « froid de brume »… */
+	name: string;
+	/** PV perdus au début de chacun de ses tours. */
+	damage: number;
+	turns: number;
+	/** Probabilité que le coup le transmette (1 par défaut). */
+	chance?: number;
+}
+
+/** Une créature d'un groupe. Ce qui n'est pas précisé vient de `CombatDef.enemy`. */
+export interface FoeDef {
+	name: string;
+	hearts: number;
+	image?: string;
+	damage?: number;
+	afflict?: Affliction;
+	move?: number;
+	range?: number;
+}
+
 export interface CombatDef {
 	enemy: {
 		name: string;
@@ -129,7 +153,17 @@ export interface CombatDef {
 		/** Créature de brume : le pouvoir du mage fait double effet. */
 		brume?: boolean;
 		image?: string;
+		/** Mal laissé par ses coups (brûlure, poison…) : le barde peut l'enlever. */
+		afflict?: Affliction;
+		/** Cases parcourues par tour (2 par défaut) et portée de ses coups (1 = au contact). */
+		move?: number;
+		range?: number;
 	};
+	/**
+	 * Plusieurs créatures, chacune avec ses cœurs (sinon une seule : `enemy`).
+	 * `enemy` garde alors le nom du groupe, la difficulté, l'attaque racontée et les valeurs par défaut.
+	 */
+	foes?: FoeDef[];
 	victory: Outcome;
 	defeat: Outcome;
 	talk?: { label: string; stat: StatKey; difficulty: Difficulty; outcome: Outcome };
@@ -310,26 +344,79 @@ export interface Campaign {
 /* État de partie                                                      */
 /* ------------------------------------------------------------------ */
 
+/** Une créature pendant le combat. Ses points de vie sont comptés en demi-cœurs. */
+export interface FoeState {
+	id: string;
+	name: string;
+	hp: number;
+	maxHp: number;
+	image?: string;
+	damage: number;
+	afflict?: Affliction;
+	move: number;
+	range: number;
+	/** Tours qu'elle doit encore passer : sonnée (Coup assommant), prise au filet, endormie. */
+	stunned?: number;
+	stunKind?: StunKind;
+	/** Tours de poison restants (½ ♥ perdu à chacun de ses tours). */
+	poison?: number;
+	/** Tours d'aveuglement restants (ses coups font 1 dégât de moins). */
+	blind?: number;
+	/** Héros qui l'a provoquée (Moquerie) : sa prochaine attaque est pour lui. */
+	taunt?: string;
+}
+
+export type StunKind = 'assomme' | 'filet' | 'sommeil';
+
+/** Ce qui arrive à un héros pendant le combat. */
+export interface HeroCombatState {
+	/** Armure restante : elle prend les coups avant les PV, réparée à chaque combat. */
+	armor: number;
+	/** Bouclier de lune posé par le mage : absorbe les prochains dégâts. */
+	shield?: number;
+	/** Folie vengeresse : il a reçu un coup, sa prochaine attaque est un coup critique. */
+	fury?: boolean;
+	/** Le guerrier qui le protège (Intervention) jusqu'à son prochain tour. */
+	protectedBy?: string;
+	afflict?: Affliction;
+}
+
 export interface CombatState {
-	hearts: number;
-	maxHearts: number;
+	foes: FoeState[];
 	/** Index du héros dont c'est le tour dans le groupe. */
 	actor: number;
 	round: number;
-	/** Ordre de jeu tiré à l'initiative : identifiants des héros, et 'enemy' pour le monstre. */
-	order?: string[];
+	/** Ordre de jeu tiré à l'initiative : identifiants des héros, et 'enemy' pour les monstres. */
+	order: string[];
 	/** Position actuelle dans l'ordre de jeu. */
-	turn?: number;
+	turn: number;
 	/** Jets d'initiative (dé + bonus), pour les afficher. */
-	initiative?: Record<string, { die: number; bonus: number; total: number }>;
+	initiative: Record<string, { die: number; bonus: number; total: number }>;
 	/** Actions « une fois par combat » déjà utilisées, par héros. */
-	used?: Record<string, string[]>;
-	/** Héros qui s'est interposé (Intervention) : la prochaine attaque est pour lui. */
-	guard?: string | null;
-	/** Le monstre dort (Berceuse) : il passe son prochain tour. */
-	asleep?: boolean;
-	/** Armure restante de chaque héros (elle prend les coups avant les PV, réparée à chaque combat). */
-	armor?: Record<string, number>;
+	used: Record<string, string[]>;
+	heroes: Record<string, HeroCombatState>;
+	/** Position de chacun sur le plateau (héros et créatures). */
+	pos: Record<string, Hex>;
+	/** Le héros dont c'est le tour s'est déjà déplacé. */
+	moved: boolean;
+	/**
+	 * 'hero' : un héros joue. 'intent' : les créatures ont annoncé leur cible,
+	 * le groupe peut tenter de reprendre l'aggro avant qu'elles n'agissent.
+	 */
+	phase: 'hero' | 'intent';
+	intents: Intent[];
+	/** Héros qui ont déjà tenté de reprendre l'aggro pendant ce tour des monstres. */
+	reclaimed: string[];
+}
+
+/** Ce qu'une créature s'apprête à faire : aller frapper tel héros. */
+export interface Intent {
+	foeId: string;
+	heroId: string;
+	/** Attirée par l'aura du guerrier, provoquée par la moquerie, ou reprise par un jet. */
+	why: 'aura' | 'taunt' | 'reclaim' | 'near';
+	/** On a déjà tenté de la détourner. */
+	tried?: boolean;
 }
 
 export interface LogEntry {
@@ -374,15 +461,49 @@ export type GameEvent =
 	/** Phrase de résultat (après un dé) lue en tête de la scène suivante. */
 	| { kind: 'narration'; text: string; who?: string }
 	/** Un coup en combat, pour l'animer : l'ennemi touché (carte qui tremble, cœur barré) ou un héros blessé. */
-	| { kind: 'hit'; target: 'enemy' | 'hero'; heroId: string; amount: number; spell?: boolean }
+	/** Un héros touche une créature (amount en demi-cœurs). */
+	| { kind: 'hit'; heroId: string; foeId: string; amount: number; spell?: boolean; crit?: boolean; offhand?: boolean }
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
-	/** Tour du monstre : il attaque un héros (ou il dort, ou un héros s'interpose). */
-	| { kind: 'enemy-turn'; name: string; attack: string; heroId: string; amount: number; asleep?: boolean; guarded?: boolean; absorbed?: number }
+	/** Début du tour des monstres (l'attaque du groupe, racontée par le conteur). */
+	| { kind: 'enemy-turn'; name: string; attack: string }
+	/** Une créature attaque un héros. */
+	| {
+			kind: 'foe-attack';
+			foeId: string;
+			name: string;
+			heroId: string;
+			/** PV perdus. */
+			amount: number;
+			/** Encaissé par l'armure, par le bouclier de lune. */
+			absorbed: number;
+			shielded: number;
+			/** Le guerrier s'est interposé ; l'aura l'a attirée ; elle a été provoquée. */
+			guarded?: boolean;
+			aura?: boolean;
+			taunted?: boolean;
+			/** Mal transmis (brûlure…). */
+			afflict?: string;
+	  }
+	/** Une créature passe son tour (sonnée, au filet, endormie). */
+	| { kind: 'foe-skip'; foeId: string; name: string; reason: StunKind }
+	/** Le poison ronge une créature. */
+	| { kind: 'foe-poison'; foeId: string; name: string; amount: number; dead: boolean }
+	/** Un état posé sur une créature par un héros (ou raté). */
+	| { kind: 'foe-status'; foeId: string; heroId: string; what: StunKind | 'poison' | 'aveugle' | 'provoque'; failed?: boolean }
+	/** Un mal ronge un héros au début de son tour. */
+	| { kind: 'affliction'; heroId: string; name: string; amount: number }
+	/** Déplacements sur le plateau. */
+	| { kind: 'hero-move'; heroId: string; from: Hex; to: Hex }
+	| { kind: 'foe-move'; foeId: string; from: Hex; to: Hex }
+	/** Les créatures annoncent leur cible. */
+	| { kind: 'intent'; intents: Intent[] }
+	/** Un héros tente de reprendre l'aggro. */
+	| { kind: 'reclaim'; heroId: string; foeId: string; success: boolean }
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
-	/** Actions de soutien : s'interposer, endormir le monstre, soigner le groupe. */
-	| { kind: 'support'; heroId: string; what: 'guard' | 'sleep' | 'sleep-fail' | 'heal'; amount?: number }
+	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse'; targetId?: string; amount?: number }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

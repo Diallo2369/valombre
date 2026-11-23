@@ -55,10 +55,15 @@ export default function RulesPage() {
 				<section className="card rules__block">
 					<h2>3. Les combats</h2>
 					<p>
-						Au début, chacun lance l’<strong>initiative</strong> (un dé + l’Agilité) : on joue dans cet ordre, le monstre à sa place.
-						À son tour, chaque héros choisit une action de sa classe : un coup, un tir, un sort… Si c’est réussi, le monstre perd un ou
-						plusieurs cœurs ♥. Quand vient son tour, le monstre attaque un héros. L’<strong>armure</strong> prend les coups avant les points
-						de vie, et elle est réparée à chaque nouveau combat. On peut parfois parler ou s’enfuir au lieu de se battre.
+						Le combat se joue sur un <strong>plateau d’hexagones</strong> : les monstres en haut, les aventuriers en bas. Au début,
+						chacun lance l’<strong>initiative</strong> (un dé + l’Agilité + le bonus de sa classe) : on joue dans cet ordre. À son tour,
+						un héros peut <strong>se déplacer</strong> (les cases qui s’allument), puis il choisit une action de sa classe : un coup au
+						contact, une flèche, un sort… Si c’est réussi, la créature perd des cœurs ♥ (parfois un demi-cœur).
+					</p>
+					<p>
+						Au tour des monstres, chacun montre d’une flèche <strong>qui il va attaquer</strong>. Le guerrier et le danseur de guerre
+						peuvent alors tenter de l’attirer vers eux, avec un jet de dé. L’<strong>armure</strong> prend les coups avant les points de
+						vie, et elle est réparée à chaque nouveau combat. On peut parfois parler ou s’enfuir au lieu de se battre.
 					</p>
 					<p>
 						<strong>Personne ne meurt à Valombre.</strong> À 0 PV, un héros est épuisé : il ne peut plus agir jusqu’à ce qu’on le soigne

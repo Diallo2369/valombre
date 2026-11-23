@@ -9,6 +9,8 @@ export interface RollRequest {
 	title: string;
 	stat: StatKey;
 	difficulty: Difficulty;
+	/** Plus dur que la difficulté de base (Flèche visée : +2). */
+	harder?: number;
 	/** Héros imposé (combat) ; sinon on demande « Qui tente ? ». */
 	heroId?: string;
 	/** Le mage peut réussir sans lancer (Étincelle d'aube) : géré par l'appelant. */
@@ -44,7 +46,8 @@ export function RollDialog({ request, party, realDice, onSfx, onResolve, onCance
 	const dialogRef = useRef<HTMLDivElement>(null);
 
 	const hero = party.find((c) => c.id === heroId) ?? null;
-	const target = DIFFICULTY[request.difficulty];
+	const base = DIFFICULTY[request.difficulty];
+	const target = { label: request.harder ? `${base.label}, +${request.harder}` : base.label, target: base.target + (request.harder ?? 0) };
 	const candidates = party.filter((c) => c.pv > 0);
 	const rangers = party.filter((c) => c.classId === 'rodeur' && c.powerReady && c.id !== rerollBy);
 
@@ -62,7 +65,7 @@ export function RollDialog({ request, party, realDice, onSfx, onResolve, onCance
 
 	const apply = (die: number) => {
 		if (!hero) return;
-		setRoll(evaluateRoll(die, hero.stats[request.stat], request.difficulty));
+		setRoll(evaluateRoll(die, hero.stats[request.stat], request.difficulty, request.harder ?? 0));
 		setPhase('result');
 	};
 

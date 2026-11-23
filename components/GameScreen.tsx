@@ -15,7 +15,7 @@ import {
 	visibleChoices,
 	visibleLines,
 } from '@/engine/engine';
-import { ABILITIES, DIFFICULTY, STAT_LABEL, type AbilityId, type RollResult } from '@/engine/rules';
+import { ABILITIES, CLASSES, DIFFICULTY, STAT_LABEL, type AbilityId, type RollResult } from '@/engine/rules';
 import type { Campaign, Game, GameEvent, StatKey, StepResult } from '@/engine/types';
 import { AudioDirector } from '@/lib/audio';
 import { mediaVariants, type MediaMap } from '@/lib/media-types';
@@ -52,7 +52,8 @@ interface Toast {
 
 type PendingRoll =
 	| { kind: 'check'; choiceIndex: number; request: RollRequest }
-	| { kind: 'ability'; ability: AbilityId; request: RollRequest }
+	| { kind: 'ability'; ability: AbilityId; targets?: string[]; request: RollRequest }
+	| { kind: 'reclaim'; foeId: string; heroId: string; request: RollRequest }
 	| { kind: 'talk'; request: RollRequest }
 	| { kind: 'flee'; request: RollRequest };
 
@@ -267,24 +268,46 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		setPending(null);
 		if (!p) return;
 		if (p.kind === 'check') apply(resolveCheck(campaign, game, p.choiceIndex, heroId, roll, rerollBy));
-		else if (p.kind === 'ability') apply(combatTurn(campaign, game, { kind: 'ability', ability: p.ability, roll, rerollBy }));
+		else if (p.kind === 'ability') apply(combatTurn(campaign, game, { kind: 'ability', ability: p.ability, targets: p.targets, roll, rerollBy }));
+		else if (p.kind === 'reclaim') apply(combatTurn(campaign, game, { kind: 'reclaim', foeId: p.foeId, heroId: p.heroId, roll, rerollBy }));
 		else if (p.kind === 'talk') apply(combatTurn(campaign, game, { kind: 'talk', roll, rerollBy }));
 		else if (p.kind === 'flee') apply(combatTurn(campaign, game, { kind: 'flee', roll, rerollBy }));
 	};
 
 	/* ---------------- Combat ---------------- */
-	/** Une action de combat : avec dé (fenêtre de lancer) ou sans (Intervention, Étincelle, Chant). */
-	const useAbility = (id: AbilityId) => {
+	/** Une action de combat, sa cible déjà choisie sur le plateau : avec dé (fenêtre de lancer) ou sans. */
+	const useAbility = (id: AbilityId, targets?: string[]) => {
 		if (!actor || !combatDef) return;
 		const ab = ABILITIES[id];
 		if (!ab.stat) {
-			apply(combatTurn(campaign, game, { kind: 'ability', ability: id, roll: null }));
+			apply(combatTurn(campaign, game, { kind: 'ability', ability: id, targets, roll: null }));
 			return;
 		}
 		setPending({
 			kind: 'ability',
 			ability: id,
-			request: { title: `${actor.name} : ${ab.name}`, stat: ab.stat, difficulty: combatDef.enemy.difficulty, heroId: actor.id, cancellable: true },
+			targets,
+			request: { title: `${actor.name} : ${ab.name}`, stat: ab.stat, difficulty: combatDef.enemy.difficulty, harder: ab.harder, heroId: actor.id, cancellable: true },
+		});
+	};
+
+	/** Pendant le tour des monstres : un héros tente de détourner une créature vers lui. */
+	const reclaim = (foeId: string, heroId: string) => {
+		const hero = party.find((c) => c.id === heroId);
+		const stat = hero && CLASSES[hero.classId].aggro;
+		if (!hero || !stat || !combatDef || !combat) return;
+		const foe = combat.foes.find((f) => f.id === foeId);
+		setPending({
+			kind: 'reclaim',
+			foeId,
+			heroId,
+			request: {
+				title: `${hero.name} tente d’attirer ${foe?.name ?? 'la créature'}`,
+				stat,
+				difficulty: combatDef.enemy.difficulty,
+				heroId,
+				cancellable: true,
+			},
 		});
 	};
 
@@ -443,6 +466,10 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							voiceVolume={prefs.voice.npc || prefs.voice.narrator ? prefs.voice.volume : 0}
 							log={state.log.filter((l) => l.kind === 'combat' && l.turn === state.turn).slice(-3).map((l) => l.text)}
 							onAbility={useAbility}
+							onMove={(to) => apply(combatTurn(campaign, game, { kind: 'move', to }))}
+							onWait={() => apply(combatTurn(campaign, game, { kind: 'wait' }))}
+							onReclaim={reclaim}
+							onResolve={() => apply(combatTurn(campaign, game, { kind: 'resolve' }))}
 							onTalk={() =>
 								setPending({
 									kind: 'talk',

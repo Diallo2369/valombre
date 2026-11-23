@@ -53,7 +53,7 @@ export function atelierCollections(): AtelierCollection[] {
 		use(c.cover, `${c.title} (couverture)`);
 		for (const s of Object.values(c.scenes)) {
 			const m = s.media ?? {};
-			[m.image, m.video, m.music, m.ambience, ...(m.sfx ?? []), s.combat?.enemy.image].forEach((id) => use(id, s.title));
+			[m.image, m.video, m.music, m.ambience, ...(m.sfx ?? []), s.combat?.enemy.image, ...(s.combat?.foes ?? []).map((f) => f.image)].forEach((id) => use(id, s.title));
 		}
 		for (const n of Object.values(c.npcs)) use(n.portrait, `PNJ : ${n.name}`);
 	}

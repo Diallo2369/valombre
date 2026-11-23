@@ -1,4 +1,5 @@
-import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
+import { BOARD, approach, distance, hexKey, reachable, sameHex, startPositions, type Hex } from './board';
+import { ABILITIES, CLASSES, ENEMY_INITIATIVE, STAT_LABEL, computePvMax, evaluateRoll, heartsText, initiativeOf, levelFromXp, rollD6, type Ability, type AbilityId, type RollResult } from './rules';
 import { voiceHash } from './voices';
 import type {
 	Campaign,
@@ -7,6 +8,8 @@ import type {
 	Choice,
 	CombatDef,
 	CombatState,
+	FoeState,
+	Intent,
 	Cond,
 	Effect,
 	Game,
@@ -486,103 +489,439 @@ function firstActor(party: Character[], from: number): number {
 	return 0;
 }
 
+const livingFoes = (combat: CombatState) => combat.foes.filter((f) => f.hp > 0);
+const hasAbility = (c: Character, id: AbilityId) => CLASSES[c.classId].abilities.includes(id);
+const heroState = (combat: CombatState, id: string) => (combat.heroes[id] ??= { armor: 0 });
+const epuise = (c: Character) => (c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e');
+
 /**
- * Début du combat : chacun lance l'initiative (dé + Agilité ; le monstre : dé + bonus de difficulté).
- * On joue ensuite dans cet ordre, le monstre à sa place dans la file.
+ * Les créatures du combat : un groupe (`foes`) ou une seule (`enemy`).
+ * Les cœurs sont écrits pour 4 héros : à 2 héros, ¾ des cœurs ; à 6, un quart de plus.
+ */
+function foesOf(def: CombatDef, partySize: number): FoeState[] {
+	const scale = 0.5 + partySize / 8;
+	const list = def.foes?.length ? def.foes : [{ name: def.enemy.name, hearts: def.enemy.hearts }];
+	return list.map((f, i) => {
+		const afflict = 'afflict' in f && f.afflict ? f.afflict : def.enemy.afflict;
+		return {
+			id: `f${i + 1}`,
+			name: f.name,
+			hp: Math.max(2, Math.round(f.hearts * 2 * scale)),
+			maxHp: Math.max(2, Math.round(f.hearts * 2 * scale)),
+			image: ('image' in f && f.image) || def.enemy.image,
+			damage: ('damage' in f && f.damage) || def.enemy.damage,
+			move: ('move' in f && f.move) || def.enemy.move || 2,
+			range: ('range' in f && f.range) || def.enemy.range || 1,
+			...(afflict ? { afflict } : {}),
+		};
+	});
+}
+
+/** Cases occupées (les créatures vaincues libèrent la leur ; les héros épuisés restent couchés là). */
+function occupied(combat: CombatState, except?: string): Set<string> {
+	const set = new Set<string>();
+	for (const [id, h] of Object.entries(combat.pos)) {
+		if (id === except) continue;
+		const foe = combat.foes.find((f) => f.id === id);
+		if (foe && foe.hp <= 0) continue;
+		set.add(hexKey(h));
+	}
+	return set;
+}
+
+function nearestHero(heroes: Character[], combat: CombatState, from: Hex): Character | undefined {
+	let best: Character | undefined;
+	let bestD = Infinity;
+	for (const c of heroes) {
+		const d = distance(from, combat.pos[c.id]) + Math.random() * 0.5;
+		if (d < bestD) {
+			bestD = d;
+			best = c;
+		}
+	}
+	return best;
+}
+
+/**
+ * Début du combat : placement sur le plateau (créatures en haut, aventuriers en bas, ceux du contact devant),
+ * puis initiative : dé + Agilité + bonus de classe ; les créatures : dé + bonus de difficulté.
  */
 function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
+	const foes = foesOf(def, game.party.length);
 	const rolls = [
-		...game.party.map((c) => ({ id: c.id, name: c.name, bonus: c.stats.agilite })),
+		...game.party.map((c) => ({ id: c.id, name: c.name, bonus: initiativeOf(c) })),
 		{ id: 'enemy', name: def.enemy.name, bonus: ENEMY_INITIATIVE[def.enemy.difficulty] },
 	].map((r) => {
 		const die = rollD6();
 		return { ...r, die, total: die + r.bonus };
 	});
-	// À égalité, les héros passent avant le monstre.
+	// À égalité, les héros passent avant les monstres.
 	rolls.sort((a, b) => b.total - a.total || (a.id === 'enemy' ? 1 : b.id === 'enemy' ? -1 : 0));
+
+	const pos: Record<string, Hex> = {};
+	const front = game.party.filter((c) => c.classId === 'guerrier' || c.classId === 'danseur');
+	const back = game.party.filter((c) => !front.includes(c));
+	startPositions(front.length, [BOARD.rows - 2]).forEach((h, i) => (pos[front[i].id] = h));
+	startPositions(back.length, [BOARD.rows - 1]).forEach((h, i) => (pos[back[i].id] = h));
+	startPositions(foes.length, [1, 0]).forEach((h, i) => (pos[foes[i].id] = h));
+
 	game.state.combat = {
-		hearts: def.enemy.hearts,
-		maxHearts: def.enemy.hearts,
+		foes,
 		actor: firstActor(game.party, 0),
 		round: 1,
 		order: rolls.map((r) => r.id),
 		turn: -1,
 		initiative: Object.fromEntries(rolls.map((r) => [r.id, { die: r.die, bonus: r.bonus, total: r.total }])),
 		used: {},
-		guard: null,
-		asleep: false,
-		armor: Object.fromEntries(game.party.map((c) => [c.id, CLASSES[c.classId].armor])),
+		heroes: Object.fromEntries(game.party.map((c) => [c.id, { armor: CLASSES[c.classId].armor }])),
+		pos,
+		moved: false,
+		phase: 'hero',
+		intents: [],
+		reclaimed: [],
 	};
 	events.push({ kind: 'initiative', order: rolls });
 	log(game.state, 'combat', `Initiative : ${rolls.map((r) => `${r.name} ${r.total}`).join(', ')}.`);
 }
 
-/** Le monstre agit : il attaque un héros (celui qui s'est interposé s'il y en a un), sauf s'il dort. */
-function enemyAct(game: Game, def: CombatDef, events: GameEvent[]) {
-	const combat = game.state.combat!;
-	const name = def.enemy.name;
-	if (combat.asleep) {
-		combat.asleep = false;
-		events.push({ kind: 'enemy-turn', name, attack: `${capitalize(name)} dort à poings fermés et passe son tour !`, heroId: '', amount: 0, asleep: true });
-		log(game.state, 'combat', `${capitalize(name)} dort et passe son tour.`);
-		return;
-	}
-	const active = activeHeroes(game.party);
-	const guard = combat.guard ? active.find((c) => c.id === combat.guard) : undefined;
-	const victim = guard ?? active[Math.floor(Math.random() * active.length)];
-	combat.guard = null;
-	if (!victim) return;
-	const blow = Math.max(0, def.enemy.damage - (guard ? 1 : 0));
-	// L'armure prend les coups avant les PV.
-	const armor = combat.armor?.[victim.id] ?? 0;
-	const absorbed = Math.min(armor, blow);
-	if (absorbed) combat.armor = { ...combat.armor, [victim.id]: armor - absorbed };
-	const amount = blow - absorbed;
-	const attack = def.enemy.attack ?? `${capitalize(name)} attaque !`;
-	events.push({ kind: 'enemy-turn', name, attack, heroId: victim.id, amount, guarded: Boolean(guard), absorbed });
-	const armorText = absorbed ? ` L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '';
-	const lost = amount ? ` ${victim.name} perd ${amount} PV.` : '';
-	log(game.state, 'combat', guard ? `${attack} ${victim.name} s’est interposé·e.${armorText}${lost}` : `${attack}${armorText}${lost}`);
-	if (amount > 0) hurt(game, victim, amount, events, false);
+/** Héros qui peuvent tenter de détourner cette créature vers eux (guerrier, danseur de guerre). */
+export function reclaimers(combat: CombatState | null, party: Character[], intent: Intent): Character[] {
+	if (!combat || intent.tried) return [];
+	return activeHeroes(party).filter((c) => CLASSES[c.classId].aggro && c.id !== intent.heroId && !combat.reclaimed.includes(c.id));
 }
 
-/** Passe au suivant dans l'ordre de jeu ; le monstre agit quand vient sa place. Renvoie 'defeat' si le groupe tombe. */
-function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' | 'defeat' {
+/** Chaque créature choisit sa cible : celui qui l'a provoquée, sinon le guerrier (aura, jet caché), sinon le plus proche. */
+function computeIntents(game: Game, combat: CombatState): Intent[] {
+	const active = activeHeroes(game.party);
+	const tank = active.find((c) => hasAbility(c, 'aura'));
+	const out: Intent[] = [];
+	for (const foe of livingFoes(combat)) {
+		if (foe.stunned) continue;
+		const taunter = foe.taunt ? active.find((c) => c.id === foe.taunt) : undefined;
+		if (taunter) out.push({ foeId: foe.id, heroId: taunter.id, why: 'taunt' });
+		// Aura de bataille : la créature lui résiste seulement sur 5 ou 6 (jet qu'on ne voit pas).
+		else if (tank && rollD6() <= 4) out.push({ foeId: foe.id, heroId: tank.id, why: 'aura' });
+		else {
+			const near = nearestHero(active, combat, combat.pos[foe.id]);
+			if (near) out.push({ foeId: foe.id, heroId: near.id, why: 'near' });
+		}
+	}
+	return out;
+}
+
+/** Arrivée au tour des monstres : le poison les ronge, puis elles annoncent leur cible. */
+function beginEnemyTurn(game: Game, def: CombatDef, events: GameEvent[]): 'intent' | 'done' | 'victory' {
 	const combat = game.state.combat!;
-	const order = combat.order ?? [...game.party.map((c) => c.id), 'enemy'];
-	combat.order = order;
-	for (let step = 0; step < order.length * 2; step += 1) {
-		const turn = ((combat.turn ?? -1) + 1) % order.length;
-		if (turn === 0 && (combat.turn ?? -1) >= 0) combat.round += 1;
+	events.push({ kind: 'enemy-turn', name: def.enemy.name, attack: def.enemy.attack ?? `${capitalize(def.enemy.name)} attaque !` });
+	for (const foe of livingFoes(combat)) {
+		if (!foe.poison) continue;
+		const amount = Math.min(1, foe.hp);
+		foe.hp -= amount;
+		foe.poison -= 1;
+		if (!foe.poison) delete foe.poison;
+		events.push({ kind: 'foe-poison', foeId: foe.id, name: foe.name, amount, dead: foe.hp <= 0 });
+		log(game.state, 'combat', `Le poison ronge ${foe.name} : −½ ♥${foe.hp <= 0 ? ', elle s’effondre !' : '.'}`);
+	}
+	if (!livingFoes(combat).length) return 'victory';
+	combat.intents = computeIntents(game, combat);
+	combat.reclaimed = [];
+	if (combat.intents.length) events.push({ kind: 'intent', intents: clone(combat.intents) });
+	if (combat.intents.some((i) => reclaimers(combat, game.party, i).length)) {
+		combat.phase = 'intent';
+		return 'intent';
+	}
+	resolveEnemies(game, events);
+	return 'done';
+}
+
+/** Les créatures agissent : chacune avance vers sa cible et frappe si elle l'atteint. */
+function resolveEnemies(game: Game, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	for (const foe of livingFoes(combat)) {
+		if (foe.stunned) {
+			const reason = foe.stunKind ?? 'assomme';
+			foe.stunned -= 1;
+			if (!foe.stunned) {
+				delete foe.stunned;
+				delete foe.stunKind;
+			}
+			events.push({ kind: 'foe-skip', foeId: foe.id, name: foe.name, reason });
+			const what = reason === 'filet' ? 'se débat dans le filet' : reason === 'sommeil' ? 'dort à poings fermés' : 'est encore sonnée';
+			log(game.state, 'combat', `${capitalize(foe.name)} ${what} et passe son tour.`);
+			continue;
+		}
+		const active = activeHeroes(game.party);
+		if (!active.length) break;
+		const intent = combat.intents.find((i) => i.foeId === foe.id);
+		const target = active.find((c) => c.id === intent?.heroId) ?? nearestHero(active, combat, combat.pos[foe.id]);
+		if (!target) break;
+		const from = combat.pos[foe.id];
+		const to = approach(from, combat.pos[target.id], foe.range, foe.move, occupied(combat, foe.id));
+		if (!sameHex(from, to)) {
+			combat.pos[foe.id] = to;
+			events.push({ kind: 'foe-move', foeId: foe.id, from, to });
+		}
+		const taunted = foe.taunt === target.id;
+		delete foe.taunt;
+		if (distance(to, combat.pos[target.id]) > foe.range) {
+			log(game.state, 'combat', `${capitalize(foe.name)} s’approche de ${target.name}.`);
+			continue;
+		}
+		foeAttack(game, foe, target, intent?.why === 'aura', taunted || intent?.why === 'taunt', events);
+	}
+	combat.phase = 'hero';
+	combat.intents = [];
+	combat.reclaimed = [];
+}
+
+function foeAttack(game: Game, foe: FoeState, target: Character, aura: boolean, taunted: boolean, events: GameEvent[]) {
+	const combat = game.state.combat!;
+	let victim = target;
+	let guarded = false;
+	const protector = combat.heroes[target.id]?.protectedBy;
+	const guard = protector ? activeHeroes(game.party).find((c) => c.id === protector && c.id !== target.id) : undefined;
+	if (guard) {
+		victim = guard;
+		guarded = true;
+	}
+	let blow = Math.max(0, foe.damage - (guarded ? 1 : 0) - (foe.blind ? 1 : 0));
+	if (foe.blind) {
+		foe.blind -= 1;
+		if (!foe.blind) delete foe.blind;
+	}
+	const hs = heroState(combat, victim.id);
+	const shielded = Math.min(hs.shield ?? 0, blow);
+	blow -= shielded;
+	if (hs.shield) {
+		hs.shield -= shielded;
+		if (!hs.shield) delete hs.shield;
+	}
+	const absorbed = Math.min(hs.armor, blow);
+	hs.armor -= absorbed;
+	const amount = blow - absorbed;
+	let afflict: string | undefined;
+	if (amount > 0) victim.pv = Math.max(0, victim.pv - amount);
+	// Folie vengeresse : le moindre coup reçu réveille la fureur.
+	if (amount + absorbed + shielded > 0 && victim.pv > 0 && hasAbility(victim, 'folie')) hs.fury = true;
+	if (amount > 0 && victim.pv > 0 && foe.afflict && Math.random() < (foe.afflict.chance ?? 1)) {
+		hs.afflict = { ...foe.afflict };
+		afflict = foe.afflict.name;
+	}
+	events.push({ kind: 'foe-attack', foeId: foe.id, name: foe.name, heroId: victim.id, amount, absorbed, shielded, guarded, aura, taunted, afflict });
+	const parts = [
+		guarded ? `${victim.name} s’interpose devant ${target.name}.` : '',
+		shielded ? `Le bouclier de lune encaisse ${shielded}.` : '',
+		absorbed ? `L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '',
+		amount ? `${victim.name} perd ${amount} PV.` : !shielded && !absorbed ? `${victim.name} ne perd rien.` : '',
+		afflict ? `${victim.name} souffre de ${afflict}.` : '',
+	].filter(Boolean);
+	log(game.state, 'combat', `${capitalize(foe.name)} frappe ${guarded ? target.name : victim.name}. ${parts.join(' ')}`);
+	if (victim.pv === 0) log(game.state, 'combat', `${victim.name} tombe, ${epuise(victim)} !`);
+}
+
+/** Passe au suivant dans l'ordre de jeu ; les monstres agissent à leur place dans la file. */
+function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' | 'intent' | 'defeat' | 'victory' {
+	const combat = game.state.combat!;
+	const order = combat.order;
+	for (let step = 0; step < order.length * 3; step += 1) {
+		const turn = (combat.turn + 1) % order.length;
+		if (turn === 0 && combat.turn >= 0) combat.round += 1;
 		combat.turn = turn;
 		const id = order[turn];
 		if (id === 'enemy') {
-			enemyAct(game, def, events);
-			if (activeHeroes(game.party).length === 0) return 'defeat';
+			const r = beginEnemyTurn(game, def, events);
+			if (r === 'victory') return 'victory';
+			if (!activeHeroes(game.party).length) return 'defeat';
+			if (r === 'intent') return 'intent';
 			continue;
 		}
 		const idx = game.party.findIndex((c) => c.id === id);
-		if (idx >= 0 && game.party[idx].pv > 0) {
-			combat.actor = idx;
-			events.push({ kind: 'turn', heroId: id });
-			return 'hero';
+		const hero = game.party[idx];
+		if (!hero || hero.pv <= 0) continue;
+		// Début de son tour : la protection qu'il donnait s'arrête, son mal le ronge.
+		for (const h of Object.values(combat.heroes)) if (h.protectedBy === id) delete h.protectedBy;
+		const hs = combat.heroes[id];
+		if (hs?.afflict) {
+			const amount = Math.min(hs.afflict.damage, hero.pv);
+			hero.pv -= amount;
+			events.push({ kind: 'affliction', heroId: id, name: hs.afflict.name, amount });
+			log(game.state, 'combat', `${capitalize(hs.afflict.name)} : ${hero.name} perd ${amount} PV.`);
+			hs.afflict.turns -= 1;
+			if (hs.afflict.turns <= 0) delete hs.afflict;
+			if (hero.pv === 0) {
+				log(game.state, 'combat', `${hero.name} tombe, ${epuise(hero)} !`);
+				if (!activeHeroes(game.party).length) return 'defeat';
+				continue;
+			}
 		}
+		combat.actor = idx;
+		combat.moved = false;
+		events.push({ kind: 'turn', heroId: id });
+		return 'hero';
 	}
 	return activeHeroes(game.party).length ? 'hero' : 'defeat';
 }
 
 export type CombatAction =
-	| { kind: 'ability'; ability: AbilityId; roll: RollResult | null; rerollBy?: string }
+	| { kind: 'move'; to: Hex }
+	| { kind: 'ability'; ability: AbilityId; targets?: string[]; roll: RollResult | null; rerollBy?: string }
+	| { kind: 'wait' }
+	| { kind: 'reclaim'; foeId: string; heroId: string; roll: RollResult; rerollBy?: string }
+	| { kind: 'resolve' }
 	| { kind: 'talk'; roll: RollResult; rerollBy?: string }
 	| { kind: 'flee'; roll: RollResult; rerollBy?: string };
 
-/** Actions possibles pour un héros en combat (celles « une fois par combat » disparaissent une fois utilisées). */
+/** Actions possibles pour un héros (les « une fois par combat » disparaissent une fois utilisées ; les passives ne sont pas des boutons). */
 export function availableAbilities(state: CombatState, hero: Character): Ability[] {
 	const used = state.used?.[hero.id] ?? [];
-	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => !(a.perCombat && used.includes(a.id)));
+	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => !a.passive && !(a.perCombat && used.includes(a.id)));
 }
 
-/** Le tour d'un héros, puis la suite de la file (le monstre peut agir avant le héros suivant). */
+export function passiveAbilities(hero: Character): Ability[] {
+	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => a.passive);
+}
+
+/** Ce qu'une action peut viser depuis la case du héros (créatures et compagnons à portée). */
+export function targetsFor(combat: CombatState, party: Character[], hero: Character, ab: Ability): { foes: FoeState[]; allies: Character[] } {
+	const here = combat.pos[hero.id];
+	const range = ab.range ?? Infinity;
+	const foes = ['foe', 'foes', 'all'].includes(ab.target) ? livingFoes(combat).filter((f) => distance(here, combat.pos[f.id]) <= range) : [];
+	const allies =
+		ab.target === 'ally'
+			? activeHeroes(party).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range))
+			: [];
+	return { foes: foes.sort((a, b) => distance(here, combat.pos[a.id]) - distance(here, combat.pos[b.id])), allies };
+}
+
+/** Une action peut-elle être lancée maintenant (quelqu'un à portée) ? */
+export function canUse(combat: CombatState, party: Character[], hero: Character, ab: Ability): boolean {
+	if (ab.target === 'party' || ab.target === 'none') return true;
+	const t = targetsFor(combat, party, hero, ab);
+	return ab.target === 'ally' ? t.allies.length > 0 : t.foes.length > 0;
+}
+
+/** Cases où le héros peut aller ce tour-ci. */
+export function moveOptions(combat: CombatState, hero: Character): Hex[] {
+	if (combat.phase !== 'hero' || combat.moved) return [];
+	return reachable(combat.pos[hero.id], CLASSES[hero.classId].move, occupied(combat, hero.id));
+}
+
+/** Les anciennes parties (combat d'avant le plateau) : on relance proprement le combat en cours. */
+export function repairGame(campaign: Campaign, game: Game): Game {
+	const combat = game.state.combat as CombatState | null;
+	if (!combat || (Array.isArray(combat.foes) && combat.pos)) return game;
+	const scene = getScene(campaign, game.state.sceneId);
+	if (!scene.combat) return { ...game, state: { ...game.state, combat: null } };
+	const work: Game = { state: clone(game.state), party: clone(game.party) };
+	startCombat(work, scene.combat, []);
+	advanceCombat(work, scene.combat, []);
+	return work;
+}
+
+function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability, action: Extract<CombatAction, { kind: 'ability' }>, events: GameEvent[]) {
+	const combat = work.state.combat!;
+	const inRange = targetsFor(combat, work.party, hero, ab);
+	let foes: FoeState[] = [];
+	if (ab.target === 'foe') {
+		const f = inRange.foes.find((x) => x.id === action.targets?.[0]) ?? (inRange.foes.length === 1 ? inRange.foes[0] : undefined);
+		if (!f) throw new Error('Cible hors de portée');
+		foes = [f];
+		if (ab.area) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1));
+	} else if (ab.target === 'foes') {
+		const chosen = inRange.foes.filter((f) => action.targets?.includes(f.id));
+		foes = (chosen.length ? chosen : inRange.foes).slice(0, ab.maxTargets ?? 3);
+	} else if (ab.target === 'all') foes = inRange.foes;
+	if (['foe', 'foes', 'all'].includes(ab.target) && !foes.length) throw new Error('Personne à portée');
+	const ally = ab.target === 'ally' ? inRange.allies.find((c) => c.id === action.targets?.[0]) : undefined;
+	if (ab.target === 'ally' && !ally) throw new Error('Compagnon hors de portée');
+
+	if (ab.perCombat) {
+		combat.used = { ...combat.used, [hero.id]: [...(combat.used[hero.id] ?? []), ab.id] };
+		events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
+	}
+	if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
+	const success = !ab.stat || Boolean(action.roll?.success);
+	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
+	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
+
+	if (!success) {
+		events.push({ kind: 'sfx', id: 'sfx-rate' });
+		events.push({ kind: 'miss', heroId: hero.id });
+		for (const f of foes) if (!ab.damage) events.push({ kind: 'foe-status', foeId: f.id, heroId: hero.id, what: ab.stun?.kind ?? (ab.blind ? 'aveugle' : 'provoque'), failed: true });
+		log(work.state, 'combat', `${hero.name} (${how}) rate son coup.`);
+		return;
+	}
+
+	if (ab.damage) {
+		const hs = heroState(combat, hero.id);
+		const fury = Boolean(hs.fury);
+		if (fury) delete hs.fury;
+		const hits: string[] = [];
+		for (const foe of foes) {
+			let main = ab.damage;
+			if (ab.brumeBonus && def.enemy.brume) main *= 2;
+			const crit = Boolean(ab.crit) || fury;
+			if (crit) main *= 2;
+			const amount = Math.min(main + (ab.offhand ?? 0), foe.hp);
+			foe.hp -= amount;
+			events.push({ kind: 'hit', heroId: hero.id, foeId: foe.id, amount, spell: ab.spell, crit, offhand: Boolean(ab.offhand) });
+			hits.push(`${foe.name} −${heartsText(amount)}${foe.hp <= 0 ? ' (vaincue !)' : ''}`);
+		}
+		events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
+		log(work.state, 'combat', `${hero.name} (${how})${fury ? ', en pleine folie vengeresse,' : ''} touche : ${hits.join(' · ')}.`);
+	}
+
+	for (const foe of foes.filter((f) => f.hp > 0)) {
+		if (ab.stun) {
+			foe.stunned = Math.max(foe.stunned ?? 0, ab.stun.turns);
+			foe.stunKind = ab.stun.kind;
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: ab.stun.kind });
+		}
+		if (ab.poison) {
+			foe.poison = Math.max(foe.poison ?? 0, ab.poison);
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'poison' });
+		}
+		if (ab.blind) {
+			foe.blind = Math.max(foe.blind ?? 0, ab.blind);
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'aveugle' });
+		}
+		if (ab.taunt) {
+			foe.taunt = hero.id;
+			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'provoque' });
+		}
+	}
+	if (!ab.damage && foes.length) {
+		const what = ab.stun?.kind === 'filet' ? 'prend au filet' : ab.stun?.kind === 'sommeil' ? 'endort' : ab.blind ? 'aveugle' : ab.taunt ? 'nargue' : 'vise';
+		log(work.state, 'combat', `${hero.name} (${how}) ${what} ${names(foes)} !`);
+	}
+
+	if (ab.protect && ally) {
+		heroState(combat, ally.id).protectedBy = hero.id;
+		events.push({ kind: 'support', heroId: hero.id, what: 'protect', targetId: ally.id });
+		log(work.state, 'combat', `${hero.name} se poste devant ${ally.name} pour le défendre.`);
+	}
+	if (ab.shield && ally) {
+		const hs = heroState(combat, ally.id);
+		hs.shield = (hs.shield ?? 0) + ab.shield;
+		events.push({ kind: 'support', heroId: hero.id, what: 'shield', targetId: ally.id, amount: ab.shield });
+		log(work.state, 'combat', `${hero.name} entoure ${ally.id === hero.id ? 'son propre corps' : ally.name} d’un bouclier de lune.`);
+	}
+	if (ab.heal) {
+		for (const c of work.party) c.pv = Math.min(c.pvMax, c.pv + ab.heal);
+		events.push({ kind: 'sfx', id: 'sfx-soin' });
+		events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: ab.heal });
+		log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +${ab.heal} PV pour tout le groupe.`);
+	}
+	if (ab.cleanse) {
+		const healed = work.party.filter((c) => combat.heroes[c.id]?.afflict);
+		for (const c of healed) delete combat.heroes[c.id].afflict;
+		events.push({ kind: 'sfx', id: 'sfx-soin' });
+		events.push({ kind: 'support', heroId: hero.id, what: 'cleanse' });
+		log(work.state, 'combat', healed.length ? `${hero.name} chante : ${healed.map((c) => c.name).join(', ')} ${healed.length > 1 ? 'sont délivrés' : 'est délivré·e'} de leurs maux.` : `${hero.name} chante une mélodie claire : personne ne souffre de rien.`);
+	}
+}
+
+/** Une étape de combat : déplacement, action, reprise d'aggro… puis la suite de la file. */
 export function combatTurn(campaign: Campaign, game: Game, action: CombatAction): StepResult {
 	const scene = getScene(campaign, game.state.sceneId);
 	const def = scene.combat;
@@ -592,9 +931,70 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	const work: Game = { state: clone(game.state), party: clone(game.party) };
 	const combat = work.state.combat!;
 	const hero = work.party[combat.actor];
-	if (action.rerollBy) spendPower(work, action.rerollBy);
+	if ('rerollBy' in action && action.rerollBy) spendPower(work, action.rerollBy);
 	const rollText = (r: RollResult) => `${r.die} + ${r.stat} = ${r.total}`;
 
+	const finish = (result: 'hero' | 'intent' | 'defeat' | 'victory'): StepResult => {
+		if (result === 'victory') {
+			log(work.state, 'combat', `Victoire contre ${def.enemy.name}`);
+			if (def.victory.text) events.push({ kind: 'narration', text: def.victory.text });
+			applyEffects(campaign, work, def.victory.effects, events);
+			nextSpokes(work);
+			return enterScene(campaign, work, def.victory.to, events);
+		}
+		if (result === 'defeat') {
+			log(work.state, 'combat', `Le groupe est épuisé…`);
+			if (def.defeat.text) events.push({ kind: 'narration', text: def.defeat.text });
+			applyEffects(campaign, work, def.defeat.effects, events);
+			return enterScene(campaign, work, def.defeat.to, events);
+		}
+		return { ...work, events };
+	};
+	const afterHero = () => (livingFoes(combat).length ? finish(advanceCombat(work, def, events)) : finish('victory'));
+	const afterEnemies = () => {
+		resolveEnemies(work, events);
+		if (!activeHeroes(work.party).length) return finish('defeat');
+		return finish(advanceCombat(work, def, events));
+	};
+
+	/* ---- Tour des monstres : reprendre l'aggro, ou les laisser faire ---- */
+	if (combat.phase === 'intent') {
+		if (action.kind === 'reclaim') {
+			const intent = combat.intents.find((i) => i.foeId === action.foeId);
+			const who = work.party.find((c) => c.id === action.heroId);
+			if (!intent || !who || !reclaimers(combat, work.party, intent).some((c) => c.id === who.id)) throw new Error('Impossible de reprendre l’aggro');
+			intent.tried = true;
+			combat.reclaimed.push(who.id);
+			const foe = combat.foes.find((f) => f.id === intent.foeId)!;
+			const ok = action.roll.success;
+			if (ok) {
+				intent.heroId = who.id;
+				intent.why = 'reclaim';
+			}
+			events.push({ kind: 'sfx', id: ok ? 'sfx-succes' : 'sfx-echec' });
+			events.push({ kind: 'reclaim', heroId: who.id, foeId: foe.id, success: ok });
+			const cry = who.classId === 'danseur' ? 'nargue' : 'rugit vers';
+			log(work.state, 'combat', `${who.name} ${cry} ${foe.name} (${rollText(action.roll)}) : ${ok ? 'elle change de cible !' : 'elle ne se laisse pas distraire.'}`);
+			if (combat.intents.some((i) => reclaimers(combat, work.party, i).length)) return finish('intent');
+			return afterEnemies();
+		}
+		if (action.kind === 'resolve') return afterEnemies();
+		throw new Error('Les monstres vont agir');
+	}
+
+	/* ---- Tour d'un héros ---- */
+	if (action.kind === 'move') {
+		if (!moveOptions(combat, hero).some((h) => sameHex(h, action.to))) throw new Error('Case inaccessible');
+		const from = combat.pos[hero.id];
+		combat.pos[hero.id] = action.to;
+		combat.moved = true;
+		events.push({ kind: 'hero-move', heroId: hero.id, from, to: action.to });
+		return { ...work, events };
+	}
+	if (action.kind === 'wait') {
+		log(work.state, 'combat', `${hero.name} attend son heure.`);
+		return afterHero();
+	}
 	if (action.kind === 'talk' && def.talk) {
 		log(work.state, 'combat', `${hero.name} tente de parlementer (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
@@ -606,7 +1006,9 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		}
 		events.push({ kind: 'sfx', id: 'sfx-echec' });
 		events.push({ kind: 'miss', heroId: hero.id });
-	} else if (action.kind === 'flee' && def.flee) {
+		return afterHero();
+	}
+	if (action.kind === 'flee' && def.flee) {
 		log(work.state, 'combat', `${hero.name} tente de fuir (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
 			if (def.flee.outcome.text) events.push({ kind: 'narration', text: def.flee.outcome.text });
@@ -616,74 +1018,15 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		}
 		events.push({ kind: 'sfx', id: 'sfx-echec' });
 		events.push({ kind: 'miss', heroId: hero.id });
-	} else if (action.kind === 'ability') {
+		return afterHero();
+	}
+	if (action.kind === 'ability') {
 		const ab = ABILITIES[action.ability];
 		if (!ab || !availableAbilities(combat, hero).some((a) => a.id === ab.id)) throw new Error('Action impossible');
-		if (ab.perCombat) {
-			combat.used = { ...(combat.used ?? {}), [hero.id]: [...(combat.used?.[hero.id] ?? []), ab.id] };
-			events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
-		}
-		if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
-		const how = action.roll ? `${ab.name} : ${rollText(action.roll)}` : ab.name;
-
-		if (ab.effect === 'hit' || ab.effect === 'hit2' || ab.effect === 'hit3' || ab.effect === 'double' || ab.effect === 'sure') {
-			const success = ab.effect === 'sure' || Boolean(action.roll?.success);
-			if (success) {
-				const base =
-					ab.effect === 'hit3' ? 3
-					: ab.effect === 'hit2' ? 2
-					: ab.effect === 'double' ? ((action.roll?.die ?? 0) >= 4 ? 2 : 1)
-					: ab.effect === 'sure' && def.enemy.brume ? 2
-					: 1;
-				const dmg = Math.min(base, combat.hearts);
-				combat.hearts -= dmg;
-				events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
-				events.push({ kind: 'hit', target: 'enemy', heroId: hero.id, amount: dmg, spell: ab.spell });
-				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} !${ab.effect === 'double' && base === 2 ? ' Les deux haches font mouche !' : ''} −${dmg} ♥`);
-			} else {
-				events.push({ kind: 'sfx', id: 'sfx-rate' });
-				events.push({ kind: 'miss', heroId: hero.id });
-				log(work.state, 'combat', `${hero.name} (${how}) rate son coup.`);
-			}
-		} else if (ab.effect === 'guard') {
-			combat.guard = hero.id;
-			events.push({ kind: 'support', heroId: hero.id, what: 'guard' });
-			log(work.state, 'combat', `${hero.name} se rue devant ses amis et provoque ${def.enemy.name} !`);
-		} else if (ab.effect === 'sleep') {
-			const ok = Boolean(action.roll?.success);
-			if (ok) combat.asleep = true;
-			events.push({ kind: 'support', heroId: hero.id, what: ok ? 'sleep' : 'sleep-fail' });
-			log(work.state, 'combat', ok ? `${hero.name} (${how}) endort ${def.enemy.name} !` : `${hero.name} (${how}) chante, mais ${def.enemy.name} reste bien éveillé.`);
-		} else if (ab.effect === 'heal') {
-			for (const c of work.party) c.pv = Math.min(c.pvMax, c.pv + 2);
-			events.push({ kind: 'sfx', id: 'sfx-soin' });
-			events.push({ kind: 'support', heroId: hero.id, what: 'heal', amount: 2 });
-			log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +2 PV pour tout le groupe.`);
-		}
+		resolveAbility(work, def, hero, ab, action, events);
+		return afterHero();
 	}
-
-	if (combat.hearts <= 0) {
-		log(work.state, 'combat', `Victoire contre ${def.enemy.name}`);
-		if (def.victory.text) events.push({ kind: 'narration', text: def.victory.text });
-		applyEffects(campaign, work, def.victory.effects, events);
-		nextSpokes(work);
-		return enterScene(campaign, work, def.victory.to, events);
-	}
-
-	if (advanceCombat(work, def, events) === 'defeat') {
-		log(work.state, 'combat', `Le groupe est épuisé…`);
-		if (def.defeat.text) events.push({ kind: 'narration', text: def.defeat.text });
-		applyEffects(campaign, work, def.defeat.effects, events);
-		return enterScene(campaign, work, def.defeat.to, events);
-	}
-	return { ...work, events };
-}
-
-function hurt(game: Game, hero: Character, amount: number, events: GameEvent[], withLog = true) {
-	hero.pv = Math.max(0, hero.pv - amount);
-	events.push({ kind: 'hit', target: 'hero', heroId: hero.id, amount });
-	if (hero.pv === 0) log(game.state, 'combat', `${hero.name} tombe, ${hero.gender === 'm' ? 'épuisé' : hero.gender === 'f' ? 'épuisée' : 'épuisé·e'} !`);
-	else if (withLog) log(game.state, 'combat', `${hero.name} perd ${amount} PV.`);
+	throw new Error('Action inconnue');
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

@@ -98,36 +98,52 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 
 ---
 
-### Les combats
+### Les combats : le plateau
 
-- Le monstre est **matérialisé** : une carte avec son image, son nom, ses cœurs, et ce qu’il faut faire pour le toucher.
-- Chaque coup se **voit et s’entend** : la carte tremble et un cœur se barre (bruitage du cristal qui se fend),
-  un sort a son propre son, un coup raté fend l’air.
-- **Tour par tour** : chaque héros joue, puis le monstre attaque un héros (son attaque, lue par le Conteur, est
-  écrite dans `enemy.attack`) ; la carte du héros visé tremble et ses PV baissent à ce moment-là.
-- À chaque tour, l’écran dit **à qui c’est le tour**, et chaque action dit ce qu’il faut faire au dé pour ce héros-là.
-- Le récit des trois derniers coups reste affiché (dé + caractéristique = total, touché ou raté, riposte).
+- Un **plateau d’hexagones** (7 × 6) : les créatures en haut, les aventuriers en bas, chacun en jeton rond
+  (image du monstre, portrait du héros). Ceux qui combattent au contact (guerrier, danseur) commencent devant.
+- Le **tour d’un héros** : sa carte s’affiche en bas (portrait, PV, armure, mouvement, états, passifs, actions).
+  1. Il peut **se déplacer** : les cases atteignables s’allument (points de mouvement de sa classe).
+  2. Il **choisit une action** : si plusieurs cibles sont à portée, elles brillent et on touche celle qu’on vise.
+  3. Il lance le dé, avec le score à atteindre affiché (le dé n’est pas demandé pour une action sans dé).
+- Le **tour des monstres** : le poison les ronge, puis chacune **annonce sa cible** (flèche + phrase :
+  « Le brumelin grincheux semble se diriger vers Rose Violette »). Les héros qui ont une **capacité d’aggro**
+  (guerrier : Force, danseur de guerre : Charme) s’allument et peuvent **tenter de l’attirer** (jet de dé, une
+  tentative par héros et par créature). Puis chaque créature avance et frappe si elle atteint sa cible.
+- Cible d’une créature : celui qui l’a provoquée (Moquerie), sinon le guerrier si son **aura** l’emporte
+  (jet caché : 4 chances sur 6), sinon le héros le plus proche.
+- Chaque coup se **voit et s’entend** : le jeton tremble, les cœurs se vident (demi-cœurs possibles), un sort a son
+  propre son, un coup raté fend l’air ; la phrase d’action s’affiche au milieu du plateau.
+- Le récit des derniers coups reste affiché (dé + caractéristique = total, touché ou raté, riposte).
 - Un combat a toujours une autre issue possible que la force (parlementer, fuir, un objet…), et on ne meurt jamais.
+
+### Écrire un combat
+
+- `enemy` : le nom du groupe (« la bande de brumelins »), la difficulté, l’attaque racontée (lue par le Conteur
+  une fois par tour des monstres), les valeurs par défaut (dégâts, mouvement, portée, mal transmis).
+- `foes` : les créatures du groupe, chacune avec ses cœurs (6 au plus). Sans `foes`, une seule créature.
+- `afflict` : un mal laissé par les coups (brûlure, froid de brume…), avec une probabilité ; le barde l’enlève.
+- Les cœurs sont écrits **pour 4 héros** : le moteur les ajuste au groupe (¾ à 2 héros, +¼ à 6).
 
 ### Les classes et le combat
 
-| Classe | Profil | En combat |
-|---|---|---|
-| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3 d’armure | Frapper · Coup puissant (2 ♥, 1×/combat) · Intervention (se rue devant le groupe : la prochaine attaque est pour lui, −1 dégât) |
-| Danseur·se de guerre (corps à corps, gros dégâts) | +2 Agilité, +1 PV, aucune armure | Ambidextre, allure barbare : Deux haches (Agilité ; 1 ♥, 2 ♥ si le dé fait 4 ou plus) · Tourbillon d’acier (3 ♥, 1×/combat) |
-| Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1 d’armure | Tir à l’arc (Agilité) · Corps à corps (Force) · Seconde chance (relancer un dé, rechargée au repos) |
-| Mage | +2 Esprit | Deux sorts : Trait de lumière (Esprit) · Étincelle d’aube (touche à coup sûr, 2 ♥ contre la brume, 1×/combat) |
-| Barde | +1 Charme, +1 Esprit | Magie et contrôle : Note perçante (Charme) · Berceuse (le monstre passe son tour, 1×/combat) · Chant de courage (+2 PV au groupe, 1×/combat) |
+| Classe | Profil | Actions | Passifs |
+|---|---|---|---|
+| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3, 👣 2 | Frapper · Coup assommant (1 ♥ + la créature passe son tour, 1×) · Taillade (jusqu’à 3 créatures au contact, 1×) · Intervention (défend un compagnon au contact jusqu’à son prochain tour, −1 dégât) | Aura de bataille (les monstres l’attaquent) ; reprend l’aggro avec la Force |
+| Danseur·se de guerre (corps à corps) | +2 Agilité, +1 PV, aucune armure, 👣 4, initiative +1 | Double attaque (1 ♥ + ½ ♥) · Moquerie (une créature l’attaquera, même contre l’aura) · Tourbillon (toutes les créatures au contact : 1 ♥ ½, 1×) | Ambidextrie (deux coups) · Folie vengeresse (après un coup reçu : prochaine attaque critique) ; reprend l’aggro avec le Charme |
+| Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1, 👣 3, initiative +2 | Tir à l’arc (portée 5) · Flèche visée (+2 de difficulté, critique : 2 ♥) · Salve (3 cibles, 1×) · Filet (2 tours bloquée, 1×) · Flèche empoisonnée (1 ♥ + ½ ♥ par tour pendant 3 tours, 1×) | Seconde chance hors combat |
+| Mage | +2 Esprit, 👣 2 | Trait de lumière · Étincelle d’aube (sans dé, 2 ♥ contre la brume, 1×) · Pluie d’étoiles (une créature et ses voisines, 1×) · Bouclier de lune (absorbe 2 dégâts, 1×) · Lueur aveuglante (−1 dégât pendant 2 tours) | — |
+| Barde | +1 Charme, +1 Esprit, 👣 3 | Note perçante · Berceuse (passe son tour, 1×) · Chant de courage (+2 PV au groupe, 1×) · Chant de délivrance (enlève poison, brûlure, froid) | — |
 
 - **Endurance** : 5ᵉ caractéristique. PV = 6 + Endurance + bonus de classe (+2 par niveau). Les héros créés avant
   l’Endurance reçoivent leur Force à la place (`withEndurance`), pour garder les mêmes PV.
-- **Armure** : des points qui prennent les coups du monstre avant les PV, réparés au début de chaque combat
-  (`CombatState.armor`). Le guerrier en a 3, le rôdeur 1, les autres aucune.
-- **Initiative** : au début du combat, chacun lance un dé + Agilité (le monstre : dé + 2/4/5 selon la difficulté).
-  On joue dans cet ordre ; le monstre agit à sa place dans la file. La frise des tours reste affichée.
-- Durée visée (simulation avec des héros moyens) : 2 tours de table pour un petit combat, 4 pour un boss ;
-  quelques PV perdus, jamais de mort. Le règlage se fait par les cœurs du monstre (`enemy.hearts`).
-- Le code des classes et des actions est dans `engine/rules.ts` (`CLASSES`, `ABILITIES`).
+- **Armure** : des points qui prennent les coups avant les PV, réparés au début de chaque combat.
+- **Initiative** : dé + Agilité + bonus de classe (les créatures : dé + 2/4/5 selon la difficulté). On joue dans cet
+  ordre ; les créatures agissent ensemble à leur place dans la file. La frise des tours reste affichée.
+- **Dégâts** comptés en demi-cœurs : un coup normal = 1 ♥, le second coup de hache = ½ ♥, un critique double.
+- Durée visée (simulation, héros moyens) : 1 à 2 tours de table pour un petit combat, 3 à 6 pour le Loup selon la
+  taille du groupe ; quelques PV perdus, jamais de mort.
+- Le code : `engine/board.ts` (plateau), `engine/rules.ts` (`CLASSES`, `ABILITIES`), `engine/engine.ts` (combat).
 
 ### Les jonctions entre scènes
 
