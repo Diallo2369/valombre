@@ -35,7 +35,7 @@ export function fullPrompt(asset: MediaAsset, style: StyleGuide) {
 	// Les images commencent par le nom du fichier attendu (règle donnée à ChatGPT en ouverture).
 	const parts = asset.type === 'image' ? [`Fichier : ${asset.id}.webp`, asset.prompt] : [asset.prompt];
 	if (asset.composition) parts.push(`Composition : ${asset.composition}`);
-	if (asset.id === 'img-couverture' || asset.id === 'img-portail') parts.push('Format paysage 16:9. Aucun texte dans l’image.');
+	if (asset.id === 'img-couverture' || asset.id === 'img-portail' || asset.id === 'img-carte') parts.push('Format paysage 16:9. Aucun texte dans l’image.');
 	else if (asset.type === 'image' && asset.id.startsWith('img-'))
 		parts.push('Format paysage 16:9. Garder le bas de l’image (le cinquième inférieur) assez sombre et calme : le titre de la scène s’y affiche. Aucun texte dans l’image.');
 	parts.push(`Style : ${style[asset.type]}`);
