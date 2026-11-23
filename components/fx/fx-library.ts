@@ -624,6 +624,36 @@ const STEEL = ['#fff6dc', '#ffc76b', '#ff8a3c'];
 const FURY = ['#ffd2a8', '#ff6a3c', '#ff3d5a'];
 const ARROW = ['#fff4cf', '#ffd27a'];
 const MOON = 'rgb(170 205 255)';
+/** La magie des runes : violet et rose néon. */
+const RUNE = ['#ffffff', '#e0b8ff', '#b46bff', '#ff5ad1'];
+const RUNE_GLYPHS = ['ᚱ', 'ᚦ', 'ᛟ', 'ᚨ', 'ᛉ', 'ᛞ'];
+const glyph = () => RUNE_GLYPHS[Math.floor(Math.random() * RUNE_GLYPHS.length)];
+
+/** Un cercle de runes qui s'allume et tourne autour d'un point. */
+function runeCircle(eng: FxEngine, at: P, r: number, delay = 0, life = 700, color = '#b46bff') {
+	eng.draw({
+		life,
+		delay,
+		draw(ctx, t) {
+			const k = ease.out(Math.min(1, t * 2.2));
+			const fade = t < 0.7 ? 1 : (1 - t) / 0.3;
+			ctx.globalAlpha = fade;
+			ctx.beginPath();
+			ctx.arc(at.x, at.y, r * k, 0, Math.PI * 2);
+			glowStroke(ctx, color, 4, 2.5);
+			ctx.font = `900 ${Math.round(r * 0.28)}px serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			for (let i = 0; i < 6; i += 1) {
+				const a = t * 2.4 + (i * Math.PI) / 3;
+				ctx.shadowColor = color;
+				ctx.shadowBlur = 14;
+				ctx.fillStyle = '#f3e3ff';
+				ctx.fillText(RUNE_GLYPHS[i], at.x + Math.cos(a) * r * k * 0.78, at.y + Math.sin(a) * r * k * 0.78);
+			}
+		},
+	});
+}
 
 /** Un coup au contact : entaille (ou ratée), puis impact. */
 function melee(eng: FxEngine, c: FxCall, colors: string[], k = 1, angleShift = 0, delay = 0) {
@@ -669,10 +699,58 @@ const ABILITY_FX: Record<string, Fx> = {
 		return t;
 	},
 
+	'oeil-pour-oeil': (e, c) => {
+		// Le bouclier levé : un grand œil doré s'ouvre au-dessus du guerrier, puis un « ! » file sur chaque créature défiée.
+		const at = c.from;
+		runeCircle(e, at, 70, 0, 900, '#ffc76b');
+		e.draw({
+			life: 1000,
+			draw(ctx, t) {
+				const open = t < 0.3 ? ease.out(t / 0.3) : t > 0.8 ? 1 - (t - 0.8) / 0.2 : 1;
+				const y = at.y - 70;
+				ctx.beginPath();
+				ctx.moveTo(at.x - 34, y);
+				ctx.quadraticCurveTo(at.x, y - 26 * open, at.x + 34, y);
+				ctx.quadraticCurveTo(at.x, y + 26 * open, at.x - 34, y);
+				glowFill(ctx, '#ffe9b0', 2);
+				ctx.beginPath();
+				ctx.arc(at.x, y, 10 * open, 0, Math.PI * 2);
+				ctx.fillStyle = '#7a3a12';
+				ctx.fill();
+			},
+		});
+		c.foes.forEach((f, i) => {
+			const t = projectile(e, at, f, { color: '#ffc76b', head: 'glyph', glyph: '!', speed: 900, arc: 30, size: 8, delay: 250 + i * 90 });
+			rising(e, f, ['!'], '#ffb03f', 3, t, 22);
+		});
+		return 250;
+	},
+
 	/* Virevolteur */
 	'double-attaque': (e, c) => {
 		const t = melee(e, c, FURY, 1, -0.5);
 		melee(e, { ...c, crit: false }, FURY, 0.75, 2.6, 200);
+		return t;
+	},
+	bond: (e, c) => {
+		// Le bond : des traces de pattes jusqu'à la cible, puis les deux haches.
+		const to = c.foes[0] ?? c.from;
+		e.add({ x: c.from.x, y: c.from.y, life: 500, size: 20, sizeEnd: 90, color: '#ff9a4a', shape: 'ring', neon: true });
+		e.burst(c.from, 12, { speed: 220, life: 500, size: 6, sizeEnd: 2, color: ['#d9c2a0', '#a08060'], ay: 200, drag: 1.5 });
+		const t = melee(e, c, FURY, 1.1, -0.5, 120);
+		melee(e, { ...c, crit: false }, FURY, 0.9, 2.6, 300);
+		speedLines(e, to, 100, '#ffd2a8');
+		return t;
+	},
+	'fureur-ours': (e, c) => {
+		// La rage de l'ours : une gueule de braise qui mord, puis la vie qui revient au virevolteur.
+		const t = melee(e, c, FURY, 1.2, -0.5);
+		melee(e, { ...c, crit: false }, FURY, 1, 2.6, 200);
+		if (c.foes[0] && c.success) bite(e, c.foes[0], '#ff6a3c');
+		if (c.success) {
+			e.burst(c.from, 14, { speed: 70, life: 900, delay: t + 150, size: 5, color: ['#ffd2a8', '#ff8a4a'], ay: -200, neon: true });
+			rising(e, c.from, ['+'], '#8fffa0', 4, t + 200, 24);
+		}
 		return t;
 	},
 	moquerie: (e, c) => {
@@ -681,14 +759,6 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = projectile(e, c.from, to, { color: '#ff7a3c', head: 'glyph', glyph: '!', speed: 800, arc: 40, size: 9 });
 		if (c.success) rising(e, to, ['!'], '#ff6a3c', 4, t, 24);
 		else puff(e, to, t);
-		return t;
-	},
-	'lancer-hache': (e, c) => {
-		const to = c.foes[0];
-		const end = c.success ? to : beside(c.from, to);
-		const t = projectile(e, c.from, end, { color: '#ffb070', head: 'axe', speed: 900, arc: 26, size: 6, trail: '#ff8a4a' });
-		if (c.success) impact(e, to, FURY, c.crit ? 1.5 : 1, t);
-		else puff(e, end, t);
 		return t;
 	},
 	tourbillon: (e, c) => {
@@ -760,30 +830,6 @@ const ABILITY_FX: Record<string, Fx> = {
 
 	/* Rôdeur */
 	tir: (e, c) => shot(e, c.from, c.foes[0], c, '#ffd27a'),
-	'fleche-visee': (e, c) => {
-		// On vise : un réticule se resserre sur la cible, puis la flèche part, très vite.
-		const to = c.foes[0];
-		e.draw({
-			life: 380,
-			draw(ctx, t) {
-				const r = 60 - 36 * ease.out(t);
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.globalAlpha = 1 - t * 0.3;
-				ctx.beginPath();
-				ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
-				ctx.moveTo(to.x - r - 8, to.y);
-				ctx.lineTo(to.x - r + 8, to.y);
-				ctx.moveTo(to.x + r - 8, to.y);
-				ctx.lineTo(to.x + r + 8, to.y);
-				glowStroke(ctx, '#ffe28a', 4, 2.5);
-			},
-		});
-		const end = c.success ? to : beside(c.from, to);
-		const t = projectile(e, c.from, end, { color: '#ffe28a', head: 'arrow', speed: 1800, size: 6, delay: 360, trail: '#fff1b8' });
-		if (c.success) impact(e, to, ['#ffffff', '#ffe28a', '#ffb347'], 1.8, t);
-		else puff(e, end, t);
-		return t;
-	},
 	salve: (e, c) => {
 		let t = 0;
 		const list = c.foes.length ? c.foes : [c.from];
@@ -801,6 +847,16 @@ const ABILITY_FX: Record<string, Fx> = {
 		net(e, to, t);
 		return t;
 	},
+	'fleche-aveuglante': (e, c) => {
+		// Une flèche au suc d'herbe-aux-larmes : un nuage pâle éclate sur les yeux, et des larmes tombent.
+		const to = c.foes[0];
+		const t = shot(e, c.from, to, c, '#e6f0ff', 0, ['#ffffff', '#cfe0ff']);
+		if (!c.success) return t;
+		e.burst(to, 18, { speed: 120, life: 900, delay: t, size: 16, sizeEnd: 30, color: ['#eef2ff', '#c8d4ea'], drag: 2, alpha: 0.5 });
+		rising(e, to, ['💧', '💧'], '#9cc8ff', 3, t + 150, 18);
+		poisonCloud(e, to, t + 200, 0.7);
+		return t;
+	},
 	'fleche-empoisonnee': (e, c) => {
 		const to = c.foes[0];
 		const t = shot(e, c.from, to, c, '#8cff7a', 0, ['#d6ffcc', '#6fdc5a']);
@@ -808,81 +864,73 @@ const ABILITY_FX: Record<string, Fx> = {
 		return t;
 	},
 
-	/* Mage */
-	'chaine-eclairs': (e, c) => {
-		// Un éclair bleu-blanc qui saute de créature en créature : du mage à la première, puis de l'une à l'autre.
-		if (!c.success) {
-			const to = beside(c.from, c.foes[0]);
-			zap(e, c.from, to, '#9cd8ff', 0, 380, 10);
-			puff(e, to, 120);
-			return 120;
+	/* Mage : la magie des runes */
+	'projectiles-runes': (e, c) => {
+		// Trois runes violettes qui filent en serpentant, l'une après l'autre.
+		const to = c.foes[0];
+		let t = 0;
+		for (let i = 0; i < 3; i += 1) {
+			const end = c.success ? to : beside(c.from, to);
+			t = projectile(e, c.from, end, { color: RUNE[2], head: 'glyph', glyph: glyph(), speed: 900, size: 8, wobble: 14, arc: 20 * (i - 1), delay: i * 120, trail: RUNE[3] });
+			if (c.success) impact(e, to, RUNE, 0.7, t);
 		}
-		const chain = [c.from, ...c.foes];
-		for (let i = 1; i < chain.length; i += 1) {
-			const d = (i - 1) * 160;
-			zap(e, chain[i - 1], chain[i], '#9cd8ff', d, 420, 11 - i * 1.5);
-			impact(e, chain[i], ['#ffffff', '#9cd8ff', '#5aa8ff'], 1.1 - i * 0.1, d + 110);
-		}
-		return 110;
-	},
-	'trait-lumiere': (e, c) => {
-		// L'éclair jaune, du bâton jusqu'à la cible.
-		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
-		zap(e, c.from, to, '#ffe14a', 0, 420, 11);
-		if (c.success) impact(e, to, ['#ffffff', '#ffe14a', '#ffb347'], 1.2, 120);
-		else puff(e, to, 120);
-		return 120;
-	},
-	etincelle: (e, c) => {
-		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
-		const t = projectile(e, c.from, to, { color: '#ffb347', speed: 1300, size: 10, wobble: 6 });
-		if (c.success) {
-			impact(e, to, ['#fff2c4', '#ffb347', '#ff6a3c'], 1.5, t);
-			e.burst(to, 24, { speed: 380, life: 650, delay: t, size: 4.5, color: ['#ffe28a', '#ff8a3c'], shape: 'spark', ay: 300, drag: 1, neon: true });
-		} else puff(e, to, t);
+		if (!c.success) puff(e, beside(c.from, to), t);
 		return t;
 	},
-	'pluie-etoiles': (e, c) => {
-		let last = 0;
-		c.foes.forEach((f, j) => {
-			for (let i = 0; i < 6; i += 1) {
-				const delay = j * 80 + i * 70;
-				const x = f.x + (Math.random() - 0.5) * 60;
-				e.add({ x, y: f.y - 170, vy: 560, life: 300, delay, size: 13, color: i % 2 ? '#ffe28a' : '#cfe0ff', shape: 'star', vr: 6, neon: true });
-				if (c.success) e.burst({ x, y: f.y }, 5, { speed: 160, life: 320, delay: delay + 300, size: 4, color: '#ffe28a', shape: 'spark', neon: true });
-				last = Math.max(last, delay + 300);
-			}
-			if (c.success) impact(e, f, ['#ffffff', '#ffe28a', '#cfe0ff'], 0.9, j * 80 + 300);
-			else puff(e, f, j * 80 + 300);
-		});
-		return c.foes.length ? 300 : last;
+	'rune-eclat': (e, c) => {
+		// Une grande rune se dessine sur la créature, puis éclate.
+		const to = c.foes[0];
+		runeCircle(e, to, 50, 0, 650);
+		e.add({ x: to.x, y: to.y, life: 500, delay: 320, size: 30, sizeEnd: 120, color: RUNE[3], shape: 'ring', neon: true });
+		impact(e, to, RUNE, 1.5, 380);
+		e.burst(to, 22, { speed: 360, life: 650, delay: 380, size: 4.5, color: [RUNE[1], RUNE[3]], shape: 'spark', drag: 1, neon: true });
+		return 380;
+	},
+	'rune-ricochet': (e, c) => {
+		// Une rune qui saute de créature en créature, en laissant un trait violet.
+		if (!c.success) {
+			const to = beside(c.from, c.foes[0]);
+			const t = projectile(e, c.from, to, { color: RUNE[2], head: 'glyph', glyph: glyph(), speed: 1000, size: 9 });
+			puff(e, to, t);
+			return t;
+		}
+		const chain = [c.from, ...c.foes];
+		let first = 0;
+		let d = 0;
+		for (let i = 1; i < chain.length; i += 1) {
+			const t = projectile(e, chain[i - 1], chain[i], { color: RUNE[2], head: 'glyph', glyph: glyph(), speed: 1100, size: 9, arc: 30, delay: d, trail: RUNE[3] });
+			impact(e, chain[i], RUNE, 1.1 - i * 0.1, t);
+			if (i === 1) first = t;
+			d = t;
+		}
+		return first;
+	},
+	'orbe-runique': (e, c) => {
+		// Une boule de runes qui tourne en vol, puis éclate sur la créature et ses voisines.
+		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
+		const t = projectile(e, c.from, to, { color: RUNE[2], speed: 800, size: 14, wobble: 4, arc: 40, trail: RUNE[3] });
+		if (!c.success) {
+			puff(e, to, t);
+			return t;
+		}
+		runeCircle(e, to, 80, t, 600);
+		c.foes.forEach((f, i) => impact(e, f, RUNE, i ? 0.9 : 1.3, t + i * 60));
+		e.burst(to, 26, { speed: 300, life: 700, delay: t, size: 5, color: RUNE.slice(1), shape: 'twinkle', drag: 1.2, neon: true });
+		return t;
+	},
+	deflagration: (e, c) => {
+		// Le cercle de runes explose autour du mage : une onde violette qui repousse tout.
+		const at = c.from;
+		runeCircle(e, at, 60, 0, 500);
+		for (let i = 0; i < 3; i += 1) e.add({ x: at.x, y: at.y, life: 600, delay: 220 + i * 90, size: 20, sizeEnd: 190, color: RUNE[2 + (i % 2)], shape: 'ring', neon: true });
+		e.burst(at, 30, { speed: 520, life: 600, delay: 220, size: 4.5, color: RUNE.slice(1), shape: 'spark', drag: 1.6, neon: true });
+		c.foes.forEach((f, i) => (c.success ? impact(e, f, RUNE, 1.1, 300 + i * 50) : puff(e, f, 300)));
+		return 300;
 	},
 	'bouclier-lune': (e, c) => {
 		const to = c.allies[0] ?? c.from;
 		const t = to === c.from ? 0 : projectile(e, c.from, to, { color: MOON, speed: 700, arc: 30, size: 8 });
 		bubble(e, to, MOON, t);
-		return t;
-	},
-	lueur: (e, c) => {
-		const to = c.foes[0];
-		const t = projectile(e, c.from, c.success ? to : beside(c.from, to), { color: '#ffffff', speed: 1000, size: 6 });
-		if (!c.success) return t;
-		e.add({ x: to.x, y: to.y, life: 420, delay: t, size: 70, sizeEnd: 110, color: '#ffffff' });
-		e.draw({
-			life: 520,
-			delay: t,
-			draw(ctx, k) {
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.globalAlpha = 1 - k;
-				for (let i = 0; i < 12; i += 1) {
-					const a = (i * Math.PI) / 6 + k;
-					ctx.beginPath();
-					ctx.moveTo(to.x + Math.cos(a) * 22, to.y + Math.sin(a) * 22);
-					ctx.lineTo(to.x + Math.cos(a) * (42 + 60 * k), to.y + Math.sin(a) * (42 + 60 * k));
-					glowStroke(ctx, '#fff7d6', 6, 2.5);
-				}
-			},
-		});
 		return t;
 	},
 
@@ -928,9 +976,8 @@ const ABILITY_FX: Record<string, Fx> = {
 
 /** Couleur de l'éclair qui relie le mage ou le barde à sa cible (les sorts seulement). */
 const LINK: Record<string, string> = {
-	etincelle: '#ff9a3c',
-	'pluie-etoiles': '#fff1a8',
-	lueur: '#ffffff',
+	'rune-eclat': '#d08cff',
+	'orbe-runique': '#ff7ae0',
 	berceuse: '#9cc8ff',
 };
 
@@ -941,21 +988,23 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	taillade: { word: 'SHLAK !', fill: '#ffb03f', melee: true },
 	intervention: { word: 'HOP !', fill: '#ffe28a' },
 	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
-	'lancer-hache': { word: 'TCHONK !', fill: '#ff9a5a' },
+	'oeil-pour-oeil': { word: 'VIENS LÀ !', fill: '#ffc76b' },
+	bond: { word: 'HOP-TCHAK !', fill: '#ff9a5a', melee: true },
+	'fureur-ours': { word: 'GRAOU !', fill: '#ff7a4a', melee: true },
 	moquerie: { word: 'NANANÈRE !', fill: '#ff9a4a' },
 	tourbillon: { word: 'WHOOSH !', fill: '#7fe3ff', melee: true },
 	tir: { word: 'TCHAC !', fill: '#ffe28a' },
-	'fleche-visee': { word: 'PAF !!', fill: '#ffd23f' },
 	salve: { word: 'TAC TAC TAC !', fill: '#ffe28a' },
 	filet: { word: 'FLOP !', fill: '#e8dcb5' },
 	'fleche-empoisonnee': { word: 'BLURP !', fill: '#8cff7a' },
-	'trait-lumiere': { word: 'ZIIING !', fill: '#bcd6ff' },
-	etincelle: { word: 'BOUM !', fill: '#ffb347' },
-	'pluie-etoiles': { word: 'BLING !', fill: '#fff1a8' },
+	'fleche-aveuglante': { word: 'PSCHHT !', fill: '#e6f0ff' },
+	'projectiles-runes': { word: 'PIOU PIOU !', fill: '#e0b8ff' },
+	'rune-eclat': { word: 'KZZAM !', fill: '#d08cff' },
+	'rune-ricochet': { word: 'PING-PONG !', fill: '#e0b8ff' },
+	'orbe-runique': { word: 'BAOUM !', fill: '#ff9ae6' },
+	deflagration: { word: 'WHAM !', fill: '#d08cff' },
 	'bouclier-lune': { word: 'BLOING !', fill: '#bcd6ff' },
-	lueur: { word: 'FLASH !', fill: '#ffffff' },
 	'air-guerison': { word: 'AAAH !', fill: '#a8ffb4' },
-	'chaine-eclairs': { word: 'KRAKOOM !', fill: '#9cd8ff' },
 	berceuse: { word: 'ZZZ…', fill: '#cfe0ff' },
 	chant: { word: 'LA LA LAAA !', fill: '#b8f0c4' },
 	delivrance: { word: 'POUF !', fill: '#ffe28a' },
@@ -1037,7 +1086,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
 	let t: number;
-	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'delivrance', 'tourbillon'].includes(ability))) {
+	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'delivrance', 'tourbillon', 'deflagration', 'oeil-pour-oeil'].includes(ability))) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
 		t = 120;
 	} else t = fx(eng, c);
@@ -1049,11 +1098,11 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	if (!c.success || !w) return eng.real(t);
 	// La bulle sur la cible principale (le virevolteur pour le tourbillon, le barde pour un chant),
 	// et de plus petites sur les autres cibles.
-	const main = ability === 'tourbillon' || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
+	const main = ['tourbillon', 'deflagration', 'oeil-pour-oeil'].includes(ability) || (!c.foes.length && !c.allies.length) ? c.from : (c.foes[0] ?? c.allies[0]);
 	const word = c.crit ? w.word.replace(/ ?!*$/, ' !!!') : w.word;
 	kapow(eng, main, word, c.crit ? '#ff5a3c' : w.fill, t, c.crit ? 1.25 : 1);
 	if (w.melee) for (const f of c.foes.slice(0, 3)) speedLines(eng, f, t);
-	for (const f of c.foes.slice(ability === 'tourbillon' ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
+	if (ability !== 'oeil-pour-oeil') for (const f of c.foes.slice(['tourbillon', 'deflagration'].includes(ability) ? 0 : 1, 3)) kapow(eng, f, w.word.split(' ')[0], w.fill, t + 120, 0.7);
 	return eng.real(t);
 }
 
@@ -1078,6 +1127,13 @@ function clang(eng: FxEngine, at: P, delay: number) {
 	burstStar(eng, at, '#c9d2e0', '#ffffff', 40, delay, 260);
 }
 
+/** Œil pour œil : le coup revient sur la créature (un éclat doré) ; renvoie le moment (ms réelles) où elle perd ses PV. */
+export function playRiposte(eng: FxEngine, at: P) {
+	impact(eng, at, STEEL, 1.1, 100);
+	kapow(eng, at, 'BAM !', '#ffc76b', 100, 0.85);
+	return eng.real(100);
+}
+
 /** Le poison qui ronge une créature à son tour ; renvoie le moment (ms réelles) où elle perd ses PV. */
 export function playPoison(eng: FxEngine, at: P) {
 	return eng.real(poisonCloud(eng, at, 0, 1.1));
@@ -1091,4 +1147,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['chaine-eclairs', 'tourbillon', 'coup-assommant', 'etincelle', 'pluie-etoiles', 'fleche-visee', 'taillade']);
+export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'oeil-pour-oeil']);

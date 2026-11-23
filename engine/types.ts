@@ -138,6 +138,12 @@ export interface FoeDef {
 	afflict?: Affliction;
 	move?: number;
 	range?: number;
+	/** Coup balayé : frappe aussi les autres héros collés à elle. */
+	cleave?: boolean;
+	/** Attaques par tour (1 par défaut). */
+	attacks?: number;
+	/** Chance (0-1) qu'un coup qui porte assomme le héros : il passe son prochain tour. */
+	stun?: number;
 }
 
 export interface CombatDef {
@@ -158,6 +164,12 @@ export interface CombatDef {
 		/** Cases parcourues par tour (2 par défaut) et portée de ses coups (1 = au contact). */
 		move?: number;
 		range?: number;
+		/** Coup balayé (les gros monstres) : sa griffe frappe aussi les autres héros collés à elle. */
+		cleave?: boolean;
+		/** Attaques par tour (1 par défaut) : le Loup frappe deux fois. */
+		attacks?: number;
+		/** Gros coup : chance (0-1) qu'un coup qui porte assomme le héros, qui passe son prochain tour. */
+		stun?: number;
 	};
 	/**
 	 * Plusieurs créatures, chacune avec ses cœurs (sinon une seule : `enemy`).
@@ -361,12 +373,15 @@ export interface FoeState {
 	afflict?: Affliction;
 	move: number;
 	range: number;
+	cleave?: boolean;
+	attacks?: number;
+	stun?: number;
 	/** Tours qu'elle doit encore passer : sonnée (Coup assommant), prise au filet, endormie. */
 	stunned?: number;
 	stunKind?: StunKind;
 	/** Tours de poison restants (1 PV perdu à chacun de ses tours). */
 	poison?: number;
-	/** Tours d'aveuglement restants (ses coups font 1 dégât de moins). */
+	/** Tours d'aveuglement restants (elle rate un coup sur deux). */
 	blind?: number;
 	/** Héros qui l'a provoquée (Moquerie) : sa prochaine attaque est pour lui. */
 	taunt?: string;
@@ -382,6 +397,10 @@ export interface HeroCombatState {
 	shield?: number;
 	/** Folie vengeresse : il a reçu un coup, sa prochaine attaque est un coup critique. */
 	fury?: boolean;
+	/** Assommé par un gros coup : il passe son prochain tour. */
+	stunned?: boolean;
+	/** Œil pour œil : jusqu'à son prochain tour, il renvoie les coups reçus. */
+	riposte?: { damage: number; stunChance: number };
 	/** Le guerrier qui le protège (Intervention) jusqu'à son prochain tour. */
 	protectedBy?: string;
 	afflict?: Affliction;
@@ -494,7 +513,17 @@ export type GameEvent =
 			taunted?: boolean;
 			/** Mal transmis (brûlure…). */
 			afflict?: string;
+			/** Coup balayé : ce héros était collé à la créature, à côté de sa cible. */
+			cleave?: boolean;
+			/** Aveuglée, elle a frappé à côté. */
+			missed?: boolean;
+			/** Gros coup : le héros est assommé. */
+			stunned?: boolean;
 	  }
+	/** Un héros assommé passe son tour. */
+	| { kind: 'hero-skip'; heroId: string }
+	/** Œil pour œil : le guerrier renvoie le coup (et parfois assomme la créature). */
+	| { kind: 'riposte'; heroId: string; foeId: string; name: string; amount: number; stunned: boolean; dead: boolean }
 	/** Une créature passe son tour (sonnée, au filet, endormie). */
 	| { kind: 'foe-skip'; foeId: string; name: string; reason: StunKind }
 	/** Le poison ronge une créature. */
@@ -505,7 +534,8 @@ export type GameEvent =
 	| { kind: 'affliction'; heroId: string; name: string; amount: number }
 	/** Déplacements sur le plateau. */
 	| { kind: 'hero-move'; heroId: string; from: Hex; to: Hex }
-	| { kind: 'foe-move'; foeId: string; from: Hex; to: Hex }
+	/** `pushed` : repoussée par un héros (Déflagration runique), pas un déplacement à elle. */
+	| { kind: 'foe-move'; foeId: string; from: Hex; to: Hex; pushed?: boolean }
 	/** Les créatures annoncent leur cible. */
 	| { kind: 'intent'; intents: Intent[] }
 	/** Un héros tente de reprendre l'aggro. */
@@ -513,7 +543,7 @@ export type GameEvent =
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
-	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse'; targetId?: string; amount?: number }
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'riposte'; targetId?: string; amount?: number }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

@@ -41,28 +41,30 @@ export type AbilityId =
 	| 'coup-assommant'
 	| 'taillade'
 	| 'intervention'
+	| 'oeil-pour-oeil'
 	| 'aura'
 	// Virevolteur
 	| 'double-attaque'
 	| 'moquerie'
 	| 'tourbillon'
-	| 'lancer-hache'
+	| 'fureur-ours'
+	| 'bond'
 	| 'ambidextrie'
 	| 'folie'
 	// Rôdeur
 	| 'tir'
-	| 'fleche-visee'
 	| 'salve'
 	| 'filet'
 	| 'fleche-empoisonnee'
-	// Mage
-	| 'trait-lumiere'
-	| 'etincelle'
-	| 'pluie-etoiles'
-	| 'bouclier-lune'
-	| 'chaine-eclairs'
-	| 'lueur'
+	| 'fleche-aveuglante'
+	// Mage : la magie des runes
+	| 'projectiles-runes'
+	| 'rune-eclat'
+	| 'rune-ricochet'
+	| 'orbe-runique'
+	| 'deflagration'
 	// Barde
+	| 'bouclier-lune'
 	| 'berceuse'
 	| 'air-guerison'
 	| 'chant'
@@ -95,8 +97,19 @@ export interface Ability {
 	harder?: number;
 	/** Dégâts si ça touche, en PV. */
 	damage?: number;
-	/** Second coup, de l'autre main (Ambidextrie), en demi-cœurs. */
+	/** Second coup, de l'autre main (Ambidextrie), en PV. */
 	offhand?: number;
+	/** PV que le héros récupère si ça touche (Fureur de l'ours). */
+	lifesteal?: number;
+	/** Bondit jusqu'à la cible (sur une case libre collée à elle) avant de frapper (Bond sauvage). */
+	leap?: boolean;
+	/** Repousse d'une case les créatures touchées, loin du héros (Déflagration runique). */
+	push?: boolean;
+	/**
+	 * Œil pour œil : jusqu'au prochain tour du héros, chaque créature qui le frappe reçoit `damage` PV en retour,
+	 * avec `stunChance` d'être assommée ; les créatures à `provoke` cases ou moins sont provoquées.
+	 */
+	riposte?: { damage: number; stunChance: number; provoke: number };
 	/** Coup critique : dégâts doublés. */
 	crit?: boolean;
 	/** Dégâts doublés contre une créature de brume. */
@@ -157,6 +170,15 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		protect: true,
 		text: 'Défendre un compagnon collé à toi : jusqu’à ton prochain tour, les coups qui le visent sont pour toi, avec 1 dégât de moins.',
 	}),
+	'oeil-pour-oeil': A({
+		id: 'oeil-pour-oeil',
+		name: 'Œil pour œil',
+		icon: '👁️',
+		target: 'none',
+		riposte: { damage: 2, stunChance: 0.25, provoke: 2 },
+		every: 3,
+		text: 'Tu lèves ton bouclier et tu défies tout le monde : les créatures à 2 cases ou moins ne pensent plus qu’à toi. Jusqu’à ton prochain tour, chaque créature qui te frappe reçoit 2 PV en retour, et 1 fois sur 4 elle est assommée.',
+	}),
 	aura: A({
 		id: 'aura',
 		name: 'Aura de bataille',
@@ -174,8 +196,8 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'foe',
 		stat: 'agilite',
 		damage: 2,
-		offhand: 1,
-		text: 'Une hache, puis l’autre : 2 PV, et encore 1 PV si ça touche.',
+		offhand: 2,
+		text: 'Une hache, puis l’autre : 2 PV + 2 PV.',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,
@@ -183,16 +205,32 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '😜',
 		target: 'foe',
 		taunt: true,
-		text: 'Tu nargues une créature : elle ne pense plus qu’à toi et t’attaquera à son prochain tour (même l’aura du guerrier n’y peut rien).',
+		every: 3,
+		text: 'Tu nargues une créature : elle ne pense plus qu’à toi et t’attaquera à son prochain tour (même l’aura du guerrier n’y peut rien). Attention : sans armure, ça peut faire très mal.',
 	}),
-	'lancer-hache': A({
-		id: 'lancer-hache', range: 3,
-		name: 'Lancer de hache',
-		icon: '🪓',
+	'fureur-ours': A({
+		id: 'fureur-ours', range: 1,
+		name: 'Fureur de l’ours',
+		icon: '🐻',
 		target: 'foe',
 		stat: 'agilite',
 		damage: 2,
-		text: 'Une hache lancée en tournoyant, jusqu’à 3 cases : 2 PV. Pratique quand personne n’est au contact.',
+		offhand: 2,
+		lifesteal: 3,
+		every: 2,
+		text: 'La rage de l’ours te porte : 2 PV + 2 PV, et si ça touche tu récupères 3 PV.',
+	}),
+	bond: A({
+		id: 'bond', range: 3,
+		name: 'Bond sauvage',
+		icon: '🐾',
+		target: 'foe',
+		stat: 'agilite',
+		damage: 2,
+		offhand: 2,
+		leap: true,
+		every: 2,
+		text: 'Tu bondis sur une créature jusqu’à 3 cases (tu atterris collé à elle) et tu frappes des deux haches : 2 PV + 2 PV.',
 	}),
 	tourbillon: A({
 		id: 'tourbillon', range: 1,
@@ -201,9 +239,9 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'all',
 		stat: 'agilite',
 		damage: 2,
-		offhand: 1,
-		every: 3,
-		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 3 PV.',
+		offhand: 2,
+		every: 2,
+		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 2 PV + 2 PV.',
 	}),
 	ambidextrie: A({
 		id: 'ambidextrie',
@@ -211,7 +249,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '✋',
 		passive: true,
 		target: 'none',
-		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, le second coup un peu moins fort (1 PV).',
+		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, aussi fort d’une main que de l’autre.',
 	}),
 	folie: A({
 		id: 'folie',
@@ -219,22 +257,11 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🔥',
 		passive: true,
 		target: 'none',
-		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque est un coup critique (dégâts doublés).',
+		text: 'Quand tu reçois un coup, la fureur monte : ta prochaine attaque est un coup critique (les deux haches font double dégâts, même en Tourbillon).',
 	}),
 
 	/* ---- Rôdeur : à distance ---- */
 	tir: A({ id: 'tir', range: 5, name: 'Tir à l’arc', icon: '🏹', target: 'foe', stat: 'agilite', damage: 2, text: 'Une flèche bien ajustée, de loin : 2 PV.' }),
-	'fleche-visee': A({
-		id: 'fleche-visee', range: 5,
-		name: 'Flèche visée',
-		icon: '🎯',
-		target: 'foe',
-		stat: 'agilite',
-		harder: 2,
-		damage: 2,
-		crit: true,
-		text: 'Prendre le temps de viser le point faible : plus dur à réussir (+2), mais coup critique : 4 PV.',
-	}),
 	salve: A({
 		id: 'salve', range: 5,
 		name: 'Salve',
@@ -253,7 +280,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'foe',
 		stat: 'agilite',
 		stun: { kind: 'filet', turns: 2 },
-		every: 4,
+		every: 3,
 		text: 'Un filet lancé de loin : la créature, empêtrée, passe ses 2 prochains tours.',
 	}),
 	'fleche-empoisonnee': A({
@@ -267,40 +294,78 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: '2 PV, puis le poison ronge la créature : 1 PV à chacun de ses 3 prochains tours.',
 	}),
+	'fleche-aveuglante': A({
+		id: 'fleche-aveuglante', range: 5,
+		name: 'Flèche aveuglante',
+		icon: '🌫️',
+		target: 'foe',
+		stat: 'agilite',
+		damage: 1,
+		blind: 2,
+		poison: 2,
+		every: 3,
+		text: 'Une flèche trempée dans le suc piquant de l’herbe-aux-larmes : 1 PV, la créature pleure et n’y voit plus rien (elle rate un coup sur deux pendant 2 tours), et le poison la ronge (1 PV à ses 2 prochains tours).',
+	}),
 
-	/* ---- Mage ---- */
-	'trait-lumiere': A({
-		id: 'trait-lumiere', range: 4,
-		name: 'Trait de lumière',
-		icon: '✨',
+	/* ---- Mage : la magie des runes ---- */
+	'projectiles-runes': A({
+		id: 'projectiles-runes', range: 4,
+		name: 'Projectiles runiques',
+		icon: '✴️',
 		target: 'foe',
 		stat: 'esprit',
 		damage: 2,
 		spell: true,
-		text: 'Un rayon de lumière jaillit du bâton : 2 PV.',
+		text: 'Trois petites runes violettes filent du bout de tes doigts : 2 PV.',
 	}),
-	etincelle: A({
-		id: 'etincelle', range: 4,
-		name: 'Étincelle d’aube',
-		icon: '☀️',
+	'rune-eclat': A({
+		id: 'rune-eclat', range: 4,
+		name: 'Rune d’éclat',
+		icon: '💠',
 		target: 'foe',
 		damage: 2,
 		brumeBonus: true,
 		spell: true,
 		every: 3,
-		text: 'Touche à coup sûr, sans dé : 2 PV, et 4 PV contre une créature de brume.',
+		text: 'Une rune qui ne rate jamais, sans dé : 2 PV, et 4 PV contre une créature de brume (la magie pure déchire la brume).',
 	}),
-	'pluie-etoiles': A({
-		id: 'pluie-etoiles', range: 4, area: true,
-		name: 'Pluie d’étoiles',
-		icon: '🌠',
+	'rune-ricochet': A({
+		id: 'rune-ricochet', range: 4,
+		name: 'Rune ricochet',
+		icon: '🪬',
+		target: 'foe',
+		stat: 'esprit',
+		damage: 2,
+		chain: { jumps: 2, reach: 2 },
+		spell: true,
+		every: 3,
+		text: 'Une rune frappe une créature puis rebondit sur 2 autres proches d’elle : 2 PV chacune.',
+	}),
+	'orbe-runique': A({
+		id: 'orbe-runique', range: 4, area: true,
+		name: 'Orbe runique',
+		icon: '🔮',
 		target: 'foe',
 		stat: 'esprit',
 		damage: 2,
 		spell: true,
 		every: 3,
-		text: 'Des étoiles filantes tombent sur une créature et sur celles collées à elle : 2 PV chacune.',
+		text: 'Une boule de runes tourbillonnantes éclate sur une créature et sur celles collées à elle : 2 PV chacune.',
 	}),
+	deflagration: A({
+		id: 'deflagration', range: 1,
+		name: 'Déflagration runique',
+		icon: '💥',
+		target: 'all',
+		stat: 'esprit',
+		damage: 2,
+		push: true,
+		spell: true,
+		every: 2,
+		text: 'Un cercle de runes explose autour de toi : toutes les créatures collées à toi perdent 2 PV et sont repoussées d’une case.',
+	}),
+
+	/* ---- Barde : magie et contrôle ---- */
 	'bouclier-lune': A({
 		id: 'bouclier-lune', range: 4,
 		name: 'Bouclier de lune',
@@ -312,30 +377,6 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 3,
 		text: 'Une bulle argentée entoure un compagnon (ou toi) : elle absorbe les 2 prochains dégâts.',
 	}),
-	'chaine-eclairs': A({
-		id: 'chaine-eclairs', range: 4,
-		name: 'Chaîne d’éclairs',
-		icon: '⚡',
-		target: 'foe',
-		stat: 'esprit',
-		damage: 2,
-		chain: { jumps: 2, reach: 2 },
-		spell: true,
-		every: 3,
-		text: 'Un éclair frappe une créature puis rebondit sur 2 autres proches d’elle : 2 PV chacune.',
-	}),
-	lueur: A({
-		id: 'lueur', range: 4,
-		name: 'Lueur aveuglante',
-		icon: '🔆',
-		target: 'foe',
-		stat: 'esprit',
-		blind: 2,
-		spell: true,
-		text: 'Un éclair blanc dans les yeux : pendant 2 tours, les coups de la créature font 1 dégât de moins.',
-	}),
-
-	/* ---- Barde : magie et contrôle ---- */
 	berceuse: A({
 		id: 'berceuse', range: 4,
 		name: 'Berceuse',
@@ -419,8 +460,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 3,
 		move: 2,
 		aggro: 'force',
-		abilities: ['frapper', 'coup-assommant', 'taillade', 'intervention', 'aura'],
-		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +2 PV et 3 points d’armure. En combat, il s’interpose pour protéger ses amis.' },
+		abilities: ['frapper', 'coup-assommant', 'taillade', 'intervention', 'oeil-pour-oeil', 'aura'],
+		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +2 PV et 3 points d’armure. En combat, il attire les coups, les renvoie (Œil pour œil) et s’interpose pour protéger ses amis.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
 	},
 	danseur: {
@@ -434,7 +475,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		move: 4,
 		aggro: 'charme',
-		abilities: ['double-attaque', 'lancer-hache', 'moquerie', 'tourbillon', 'ambidextrie', 'folie'],
+		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
 	},
@@ -448,7 +489,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 1,
 		armor: 1,
 		move: 3,
-		abilities: ['tir', 'fleche-visee', 'salve', 'filet', 'fleche-empoisonnee'],
+		abilities: ['tir', 'salve', 'filet', 'fleche-empoisonnee', 'fleche-aveuglante'],
 		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
 		kit: ['Arc et flèches', 'Cape de laine', 'Silex'],
 	},
@@ -456,15 +497,15 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		id: 'mage',
 		name: 'Mage',
 		names: { f: 'Mage', m: 'Mage' },
-		tagline: 'Une étincelle d’aube au creux de la main.',
+		tagline: 'Des runes violettes qui s’allument au bout des doigts.',
 		stat: 'esprit',
 		bonus: { esprit: 2 },
 		pvBonus: 0,
 		armor: 0,
 		move: 2,
-		abilities: ['trait-lumiere', 'etincelle', 'pluie-etoiles', 'chaine-eclairs', 'lueur'],
-		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Chaîne d’éclairs un tour sur trois.' },
-		kit: ['Bâton noueux', 'Grimoire écorné', 'Bougie'],
+		abilities: ['projectiles-runes', 'rune-eclat', 'rune-ricochet', 'orbe-runique', 'deflagration'],
+		power: { name: 'La magie des runes', text: 'Projectiles runiques à volonté ; Rune d’éclat, Rune ricochet et Orbe runique un tour sur trois, Déflagration runique un tour sur deux.' },
+		kit: ['Bâton noueux', 'Grimoire de runes', 'Craie violette'],
 	},
 	barde: {
 		id: 'barde',

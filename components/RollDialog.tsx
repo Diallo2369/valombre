@@ -13,7 +13,7 @@ export interface RollRequest {
 	harder?: number;
 	/** Héros imposé (combat) ; sinon on demande « Qui tente ? ». */
 	heroId?: string;
-	/** Le mage peut réussir sans lancer (Étincelle d'aube) : géré par l'appelant. */
+	/** Le mage peut réussir sans lancer (Rune d'éclat) : géré par l'appelant. */
 	cancellable: boolean;
 }
 

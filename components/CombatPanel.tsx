@@ -9,7 +9,7 @@ import type { Character, CombatDef, CombatState, FoeState, GameEvent } from '@/e
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
-import { BIG_FX, celebrate, playAbility, playFoeAttack, playPoison } from './fx/fx-library';
+import { BIG_FX, celebrate, playAbility, playFoeAttack, playPoison, playRiposte } from './fx/fx-library';
 import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
 
@@ -72,6 +72,8 @@ type Beat =
 			heroId?: string;
 			/** Le poison ronge la créature : ses cœurs baissent à ce moment-là. */
 			poison?: boolean;
+			/** Œil pour œil : la créature reçoit ces PV en retour, à ce moment-là. */
+			riposte?: number;
 			amount?: number;
 			voice?: string;
 	  };
@@ -280,13 +282,21 @@ export function CombatPanel(props: Props) {
 				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 1900, text: `${STUN_ICON[e.reason]} ${cap(e.name)} ${STUN_TEXT[e.reason]} et passe son tour.` });
 			} else if (e.kind === 'foe-move') {
 				from[e.foeId] ??= e.from;
-				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, move: true, ms: 1100, text: `${cap(nameOf(e.foeId))} s’avance…` });
+				beats.push({ kind: 'say', tone: e.pushed ? 'hero' : 'foe', foeId: e.foeId, move: true, ms: 1100, text: e.pushed ? `💥 ${cap(nameOf(e.foeId))} est repoussée !` : `${cap(nameOf(e.foeId))} s’avance…` });
 			} else if (e.kind === 'foe-attack') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
 				const victim = nameOf(e.heroId);
 				// Court : le détail se voit sur le plateau (chiffre de dégâts, bulle « CLANG ! » si l'armure encaisse).
-				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
-				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.heroId, amount: e.amount, ms: 2000, text: `${cap(e.name)} frappe ${victim} !${extra}` });
+				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount && !e.stunned ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
+				const stun = e.stunned ? ` 💫 ${victim} est assommé·e !` : '';
+				const text = e.missed ? `🌫️ ${cap(e.name)}, aveuglée, frappe à côté de ${victim} !` : `${cap(e.name)} ${e.cleave ? 'balaie aussi' : 'frappe'} ${victim} !${extra}${stun}`;
+				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.missed ? undefined : e.heroId, amount: e.amount, ms: 2000, text });
+			} else if (e.kind === 'riposte') {
+				pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
+				const after = e.dead ? ', elle s’effondre !' : e.stunned ? ' 💫 Assommée !' : '';
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, riposte: e.amount, ms: 1900, text: `👁️ Œil pour œil : ${nameOf(e.heroId)} renvoie le coup, ${e.name} −${e.amount} PV${after}` });
+			} else if (e.kind === 'hero-skip') {
+				beats.push({ kind: 'say', tone: 'foe', ms: 1900, text: `💫 ${nameOf(e.heroId)}, encore sonné·e, passe son tour.` });
 			} else if (e.kind === 'affliction') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
 				beats.push({ kind: 'say', tone: 'foe', heroId: e.heroId, amount: e.amount, ms: 2000, text: `🔥 ${cap(e.name)} : ${nameOf(e.heroId)} perd ${e.amount} PV.` });
@@ -366,6 +376,12 @@ export function CombatPanel(props: Props) {
 						const id = b.foeId;
 						const hurtAt = fxEngine.current ? playPoison(fxEngine.current, center(combat.pos[id])) : 300;
 						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - 1) })), hurtAt));
+					}
+					if (b.riposte && b.foeId) {
+						const id = b.foeId;
+						const amount = b.riposte;
+						const hurtAt = fxEngine.current ? playRiposte(fxEngine.current, center(combat.pos[id])) : 300;
+						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - amount) })), hurtAt));
 					}
 					if (b.move && b.foeId) {
 						const id = b.foeId;
@@ -567,6 +583,8 @@ export function CombatPanel(props: Props) {
 							<span>👣 {mine && combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
 							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
 							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque critique !</span> : null}
+							{hs?.riposte ? <span className="is-hot">👁️ œil pour œil : renvoie les coups jusqu’à son tour</span> : null}
+							{hs?.stunned ? <span className="is-bad">💫 assommé·e : passe son prochain tour</span> : null}
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
 						</p>
@@ -800,7 +818,7 @@ export function CombatPanel(props: Props) {
 									<span className="token__icons" aria-hidden="true">
 										{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
 										{f.poison ? '🧪' : ''}
-										{f.blind ? '🔆' : ''}
+										{f.blind ? '🌫️' : ''}
 										{f.taunt ? '😜' : ''}
 									</span>
 									<HealthBar id={f.id} memo={hpMemo.current} value={hp} max={f.maxHp} tone="foe" />
@@ -813,7 +831,7 @@ export function CombatPanel(props: Props) {
 										</span>
 									) : status ? (
 										<span className="token__burst token__burst--status" aria-hidden="true">
-											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
+											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🌫️ Aveuglée' : `${STUN_ICON[status.what]}`}
 										</span>
 									) : null}
 								</button>
@@ -843,6 +861,8 @@ export function CombatPanel(props: Props) {
 										{st?.protectedBy ? '🛡️' : ''}
 										{st?.shield ? '🌕' : ''}
 										{st?.fury ? '🔥' : ''}
+										{st?.riposte ? '👁️' : ''}
+										{st?.stunned ? '💫' : ''}
 										{st?.afflict ? '🤒' : ''}
 									</span>
 									<HealthBar id={c.id} memo={hpMemo.current} value={pv} max={c.pvMax} tone="hero" shield={st?.shield ?? 0} />
