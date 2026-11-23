@@ -258,7 +258,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 3,
 		offhand: 2,
 		executeCrit: true,
-		text: 'Une hache, puis l’autre : 3 PV + 2 PV. Si elle achève la créature, ta prochaine attaque sur une seule cible est un coup critique assuré !',
+		text: 'Une hache, puis l’autre : 3 PV + 2 PV. Si elle achève la créature, ta prochaine attaque est un coup critique assuré (sur la première créature touchée).',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,

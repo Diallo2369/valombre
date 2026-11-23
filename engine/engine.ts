@@ -1264,15 +1264,15 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const hs = heroState(combat, hero.id);
 		const fury = Boolean(hs.fury);
 		if (fury) delete hs.fury;
-		// Exécution (Double attaque) : la prochaine attaque à une seule cible est un critique assuré.
-		const executed = Boolean(hs.executed) && ab.target === 'foe';
+		// Exécution (Double attaque) : la prochaine attaque est un critique assuré, sur la première créature touchée seulement.
+		const executed = Boolean(hs.executed);
 		if (executed) delete hs.executed;
 		const hits: string[] = [];
-		for (const foe of foes) {
+		for (const [i, foe] of foes.entries()) {
 			let main = ab.damage;
 			if (ab.brumeBonus && def.enemy.brume) main *= 2;
 			// Œil de lynx : une flèche sur 5 est un coup critique.
-			const crit = Boolean(ab.crit) || executed || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
+			const crit = Boolean(ab.crit) || (executed && i === 0) || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
 			// Critique : dégâts doublés (les deux mains). Folie vengeresse : +50 % (arrondi au-dessus), sans être un critique.
 			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
