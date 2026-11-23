@@ -511,6 +511,7 @@ function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
 		used: {},
 		guard: null,
 		asleep: false,
+		armor: Object.fromEntries(game.party.map((c) => [c.id, CLASSES[c.classId].armor])),
 	};
 	events.push({ kind: 'initiative', order: rolls });
 	log(game.state, 'combat', `Initiative : ${rolls.map((r) => `${r.name} ${r.total}`).join(', ')}.`);
@@ -531,10 +532,17 @@ function enemyAct(game: Game, def: CombatDef, events: GameEvent[]) {
 	const victim = guard ?? active[Math.floor(Math.random() * active.length)];
 	combat.guard = null;
 	if (!victim) return;
-	const amount = Math.max(0, def.enemy.damage - (guard ? 1 : 0));
+	const blow = Math.max(0, def.enemy.damage - (guard ? 1 : 0));
+	// L'armure prend les coups avant les PV.
+	const armor = combat.armor?.[victim.id] ?? 0;
+	const absorbed = Math.min(armor, blow);
+	if (absorbed) combat.armor = { ...combat.armor, [victim.id]: armor - absorbed };
+	const amount = blow - absorbed;
 	const attack = def.enemy.attack ?? `${capitalize(name)} attaque !`;
-	events.push({ kind: 'enemy-turn', name, attack, heroId: victim.id, amount, guarded: Boolean(guard) });
-	log(game.state, 'combat', guard ? `${attack} ${victim.name} s’est interposé·e : −${amount} PV seulement.` : `${attack} ${victim.name} perd ${amount} PV.`);
+	events.push({ kind: 'enemy-turn', name, attack, heroId: victim.id, amount, guarded: Boolean(guard), absorbed });
+	const armorText = absorbed ? ` L’armure de ${victim.name} encaisse ${absorbed === 1 ? 'le coup' : `${absorbed} coups`}.` : '';
+	const lost = amount ? ` ${victim.name} perd ${amount} PV.` : '';
+	log(game.state, 'combat', guard ? `${attack} ${victim.name} s’est interposé·e.${armorText}${lost}` : `${attack}${armorText}${lost}`);
 	if (amount > 0) hurt(game, victim, amount, events, false);
 }
 
@@ -618,15 +626,20 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
 		const how = action.roll ? `${ab.name} : ${rollText(action.roll)}` : ab.name;
 
-		if (ab.effect === 'hit' || ab.effect === 'hit2' || ab.effect === 'sure') {
+		if (ab.effect === 'hit' || ab.effect === 'hit2' || ab.effect === 'hit3' || ab.effect === 'double' || ab.effect === 'sure') {
 			const success = ab.effect === 'sure' || Boolean(action.roll?.success);
 			if (success) {
-				const base = ab.effect === 'hit2' ? 2 : ab.effect === 'sure' && def.enemy.brume ? 2 : 1;
+				const base =
+					ab.effect === 'hit3' ? 3
+					: ab.effect === 'hit2' ? 2
+					: ab.effect === 'double' ? ((action.roll?.die ?? 0) >= 4 ? 2 : 1)
+					: ab.effect === 'sure' && def.enemy.brume ? 2
+					: 1;
 				const dmg = Math.min(base, combat.hearts);
 				combat.hearts -= dmg;
 				events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 				events.push({ kind: 'hit', target: 'enemy', heroId: hero.id, amount: dmg, spell: ab.spell });
-				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} ! −${dmg} ♥`);
+				log(work.state, 'combat', `${hero.name} (${how}) touche ${def.enemy.name} !${ab.effect === 'double' && base === 2 ? ' Les deux lames font mouche !' : ''} −${dmg} ♥`);
 			} else {
 				events.push({ kind: 'sfx', id: 'sfx-rate' });
 				events.push({ kind: 'miss', heroId: hero.id });

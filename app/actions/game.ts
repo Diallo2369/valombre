@@ -28,6 +28,7 @@ function sanitizeCharacter(c: Character): Character {
 	const stats = {
 		force: clampStat(c.stats.force),
 		agilite: clampStat(c.stats.agilite),
+		endurance: clampStat(c.stats.endurance ?? c.stats.force),
 		esprit: clampStat(c.stats.esprit),
 		charme: clampStat(c.stats.charme),
 	};

@@ -1,6 +1,6 @@
 # Images de « Les Brumes de Valombre » pour ChatGPT
 
-58 images, dans l’ordre où on les découvre en jouant. Commencez par le chapitre 1 : c’est ce que les enfants voient en premier.
+60 images, dans l’ordre où on les découvre en jouant. Commencez par le chapitre 1 : c’est ce que les enfants voient en premier.
 
 ## Comment faire
 
@@ -62,7 +62,7 @@ Composition : Image de fond plein écran : garder une grande zone calme et sombr
 Format paysage 16:9. Aucun texte dans l’image.
 ```
 
-### ⬜ Portrait — Guerrière
+### ✅ Portrait — Guerrière
 
 Fichier : `classe-guerrier-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -76,7 +76,7 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ Portrait — Guerrier
+### ✅ Portrait — Guerrier
 
 Fichier : `classe-guerrier-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -90,7 +90,35 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ Portrait — Rôdeuse
+### ⬜ Portrait — Danseuse de guerre
+
+Fichier : `classe-danseur-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
+
+```
+Fichier : classe-danseur-f.webp
+
+Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Danseuse de guerre » : deux sabres courbes croisés devant elle, un dans chaque main, longs rubans rouge sombre noués aux poignets qui flottent comme en plein mouvement, tunique légère sans armure, grelots de cuivre, cheveux tressés, regard vif et concentré. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
+
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
+
+Format carré.
+```
+
+### ⬜ Portrait — Danseur de guerre
+
+Fichier : `classe-danseur-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
+
+```
+Fichier : classe-danseur-m.webp
+
+Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Danseur de guerre » : deux sabres courbes croisés devant lui, un dans chaque main, longs rubans rouge sombre noués aux poignets qui flottent comme en plein mouvement, tunique légère sans armure, grelots de cuivre, cheveux attachés, regard vif et concentré. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
+
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
+
+Format carré.
+```
+
+### ✅ Portrait — Rôdeuse
 
 Fichier : `classe-rodeur-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -104,7 +132,7 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ Portrait — Rôdeur
+### ✅ Portrait — Rôdeur
 
 Fichier : `classe-rodeur-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -118,7 +146,7 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ Portrait — Mage (fille)
+### ✅ Portrait — Mage (fille)
 
 Fichier : `classe-mage-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -127,12 +155,12 @@ Fichier : classe-mage-f.webp
 
 Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Mage » : bâton noueux dont l’extrémité brille d’une petite flamme dorée comme un lever de soleil, grimoire serré contre la poitrine, lunettes rondes, manteau bleu nuit étoilé. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
-Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins. Lunettes et aura magique autour.
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 
 Format carré.
 ```
 
-### ⬜ Portrait — Mage (garçon)
+### ✅ Portrait — Mage (garçon)
 
 Fichier : `classe-mage-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -141,12 +169,12 @@ Fichier : classe-mage-m.webp
 
 Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Mage » : bâton noueux dont l’extrémité brille d’une petite flamme dorée comme un lever de soleil, grimoire serré contre la poitrine, lunettes rondes, manteau bleu nuit étoilé. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
-Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins. Lunettes et aura magique autour.
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 
 Format carré.
 ```
 
-### ⬜ Portrait — Barde (fille)
+### ✅ Portrait — Barde (fille)
 
 Fichier : `classe-barde-f.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -155,12 +183,12 @@ Fichier : classe-barde-f.webp
 
 Portrait en buste d’une jeune fille d’environ 14 ans, aventurière de la classe « Barde » : petit luth de voyage, chapeau à large bord avec un ruban rouge, joues rosies, air joyeux et rassurant. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
-Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins. Sourit et joue d'un instrument, avec comme de la musique soigneuse qui sort de l'instrument.
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 
 Format carré.
 ```
 
-### ⬜ Portrait — Barde (garçon)
+### ✅ Portrait — Barde (garçon)
 
 Fichier : `classe-barde-m.webp` · apparaît dans : Création des héros · à déposer dans la collection « Commun » de l’atelier
 
@@ -169,7 +197,7 @@ Fichier : classe-barde-m.webp
 
 Portrait en buste d’un jeune garçon d’environ 14 ans, aventurier de la classe « Barde » : petit luth de voyage, chapeau à large bord avec un ruban rouge, joues rosies, air joyeux et rassurant. Fond uni brume bleutée. Format carré 1:1, cadrage centré.
 
-Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins. Sourit et joue d'un instrument, avec comme de la musique soigneuse qui sort de l'instrument.
+Composition : Portrait en buste, format carré : le visage bien au centre, cadrage serré (de la tête aux épaules), fond sombre et simple. L’image sera découpée en rond : rien d’important dans les coins.
 
 Format carré.
 ```
@@ -218,7 +246,7 @@ Composition : Portrait en buste, format carré : le visage bien au centre, cadra
 Format carré.
 ```
 
-### ⬜ La salle commune
+### ✅ La salle commune
 
 Fichier : `img-salle-commune.webp` · apparaît dans : Une soirée qui tourne mal
 

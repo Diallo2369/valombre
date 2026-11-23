@@ -2,16 +2,18 @@ import type { Character, ClassId, Difficulty, Gender, StatKey, Stats } from './t
 
 /**
  * Règles « Valombre » pensées pour une première initiation :
- * - 4 caractéristiques, tirées chacune avec 1 dé à 6 faces (un 1 compte comme 2) ;
+ * - 5 caractéristiques, tirées chacune avec 1 dé à 6 faces (un 1 compte comme 2) ;
  * - +1 dans la caractéristique favorite de la classe ;
  * - un test = 1 dé + la caractéristique, à comparer à la difficulté ;
  * - un 6 naturel réussit toujours (« coup de chance ! ») ;
+ * - les PV dépendent de l'Endurance ; l'armure prend les coups avant les PV (réparée à chaque combat) ;
  * - personne ne meurt : à 0 PV, un héros est épuisé jusqu'au prochain soin.
  */
 
 export const STATS: { key: StatKey; label: string; short: string; hint: string }[] = [
 	{ key: 'force', label: 'Force', short: 'FOR', hint: 'Soulever, frapper fort, grimper à la corde.' },
 	{ key: 'agilite', label: 'Agilité', short: 'AGI', hint: 'Courir, se cacher, viser, sauter.' },
+	{ key: 'endurance', label: 'Endurance', short: 'END', hint: 'Encaisser les coups, résister au froid : donne les points de vie.' },
 	{ key: 'esprit', label: 'Esprit', short: 'ESP', hint: 'Observer, réfléchir, lancer un sort.' },
 	{ key: 'charme', label: 'Charme', short: 'CHA', hint: 'Convaincre, rassurer, amadouer une bête.' },
 ];
@@ -19,6 +21,7 @@ export const STATS: { key: StatKey; label: string; short: string; hint: string }
 export const STAT_LABEL: Record<StatKey, string> = {
 	force: 'Force',
 	agilite: 'Agilité',
+	endurance: 'Endurance',
 	esprit: 'Esprit',
 	charme: 'Charme',
 };
@@ -34,6 +37,8 @@ export type AbilityId =
 	| 'frapper'
 	| 'coup-puissant'
 	| 'intervention'
+	| 'deux-lames'
+	| 'tourbillon'
 	| 'tir'
 	| 'corps-a-corps'
 	| 'trait-lumiere'
@@ -49,8 +54,11 @@ export interface Ability {
 	text: string;
 	/** Caractéristique du jet ; sans `stat`, pas de dé. */
 	stat?: StatKey;
-	/** Effet : toucher (1 cœur, 2 pour `hit2`), toucher à coup sûr, protéger, endormir, soigner. */
-	effect: 'hit' | 'hit2' | 'sure' | 'guard' | 'sleep' | 'heal';
+	/**
+	 * Effet : toucher (1 cœur, 2 pour `hit2`, 3 pour `hit3`), deux lames (1 cœur, 2 si le dé fait 4 ou plus),
+	 * toucher à coup sûr, protéger, endormir, soigner.
+	 */
+	effect: 'hit' | 'hit2' | 'hit3' | 'double' | 'sure' | 'guard' | 'sleep' | 'heal';
 	spell?: boolean;
 	/** Une seule fois par combat. */
 	perCombat?: boolean;
@@ -74,8 +82,25 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		effect: 'guard',
 		text: 'Se ruer devant ses amis et provoquer le monstre : sa prochaine attaque est pour lui, et le bouclier en absorbe 1 dégât.',
 	},
+	'deux-lames': {
+		id: 'deux-lames',
+		name: 'Deux lames',
+		icon: '🗡️',
+		stat: 'agilite',
+		effect: 'double',
+		text: 'Une lame dans chaque main : 1 cœur si ça touche, et si le dé fait 4 ou plus, la seconde lame frappe aussi : 2 cœurs.',
+	},
+	tourbillon: {
+		id: 'tourbillon',
+		name: 'Tourbillon d’acier',
+		icon: '🌀',
+		stat: 'agilite',
+		effect: 'hit3',
+		perCombat: true,
+		text: 'Une danse folle, les deux lames tournoient : 3 cœurs d’un coup si ça touche. Une fois par combat.',
+	},
 	tir: { id: 'tir', name: 'Tir à l’arc', icon: '🏹', stat: 'agilite', effect: 'hit', text: 'Une flèche bien ajustée, de loin.' },
-	'corps-a-corps': { id: 'corps-a-corps', name: 'Corps à corps', icon: '🗡️', stat: 'force', effect: 'hit', text: 'Au contact, avec le couteau de chasse.' },
+	'corps-a-corps': { id: 'corps-a-corps', name: 'Corps à corps', icon: '🔪', stat: 'force', effect: 'hit', text: 'Au contact, avec le couteau de chasse.' },
 	'trait-lumiere': {
 		id: 'trait-lumiere',
 		name: 'Trait de lumière',
@@ -134,8 +159,10 @@ export interface ClassDef {
 	stat: StatKey;
 	/** Bonus de classe ajoutés aux dés de création. */
 	bonus: Partial<Stats>;
-	/** PV en plus (endurance). */
+	/** PV en plus. */
 	pvBonus: number;
+	/** Armure : elle prend les coups avant les PV, et se répare à chaque combat. */
+	armor: number;
 	/** Actions en combat. */
 	abilities: AbilityId[];
 	/** Pouvoir hors combat, rechargé au repos. */
@@ -150,11 +177,25 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		names: { f: 'Guerrière', m: 'Guerrier' },
 		tagline: 'Un bouclier cabossé, un cœur solide.',
 		stat: 'force',
-		bonus: { force: 2 },
-		pvBonus: 3,
+		bonus: { force: 1, endurance: 2 },
+		pvBonus: 2,
+		armor: 3,
 		abilities: ['frapper', 'coup-puissant', 'intervention'],
-		power: { name: 'Endurance', text: '+3 PV : le plus solide du groupe. En combat, il peut s’interposer pour protéger ses amis.' },
+		power: { name: 'Le rempart', text: 'Le plus solide du groupe : +2 Endurance, +2 PV et 3 points d’armure. En combat, il s’interpose pour protéger ses amis.' },
 		kit: ['Épée courte', 'Bouclier cabossé', 'Gourde'],
+	},
+	danseur: {
+		id: 'danseur',
+		name: 'Danseur·se de guerre',
+		names: { f: 'Danseuse de guerre', m: 'Danseur de guerre' },
+		tagline: 'Deux lames, un seul mouvement.',
+		stat: 'agilite',
+		bonus: { agilite: 2 },
+		pvBonus: 1,
+		armor: 0,
+		abilities: ['deux-lames', 'tourbillon'],
+		power: { name: 'Ambidextre', text: 'Frappe des deux mains : beaucoup de dégâts, mais aucune armure. Il faut frapper vite, avant d’être touché.' },
+		kit: ['Deux sabres courbes', 'Rubans de danse', 'Grelots de cheville'],
 	},
 	rodeur: {
 		id: 'rodeur',
@@ -164,6 +205,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		stat: 'agilite',
 		bonus: { agilite: 1, force: 1 },
 		pvBonus: 1,
+		armor: 1,
 		abilities: ['tir', 'corps-a-corps'],
 		power: { name: 'Seconde chance', text: 'Après un dé raté (le tien ou celui d’un ami), tu peux le relancer. Rechargé au repos.' },
 		kit: ['Arc et flèches', 'Cape de laine', 'Silex'],
@@ -176,6 +218,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		stat: 'esprit',
 		bonus: { esprit: 2 },
 		pvBonus: 0,
+		armor: 0,
 		abilities: ['trait-lumiere', 'etincelle'],
 		power: { name: 'Deux sorts', text: 'Trait de lumière à volonté, et l’Étincelle d’aube qui touche à coup sûr, une fois par combat.' },
 		kit: ['Bâton noueux', 'Grimoire écorné', 'Bougie'],
@@ -188,6 +231,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		stat: 'charme',
 		bonus: { charme: 1, esprit: 1 },
 		pvBonus: 0,
+		armor: 0,
 		abilities: ['note-percante', 'berceuse', 'chant'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
@@ -211,7 +255,15 @@ export function levelFromXp(xp: number): number {
 }
 
 export function computePvMax(stats: Stats, xp: number, classId?: ClassId): number {
-	return 6 + stats.force + 2 * (levelFromXp(xp) - 1) + (classId ? CLASSES[classId].pvBonus : 0);
+	return 6 + (stats.endurance ?? stats.force) + 2 * (levelFromXp(xp) - 1) + (classId ? CLASSES[classId].pvBonus : 0);
+}
+
+/**
+ * Les héros créés avant l'Endurance n'en ont pas : on reprend leur Force (c'est elle qui donnait leurs PV).
+ */
+export function withEndurance(c: Character): Character {
+	if (typeof c.stats.endurance === 'number') return c;
+	return { ...c, stats: { ...c.stats, endurance: c.stats.force } };
 }
 
 export function finalStats(classId: ClassId, base: Stats): Stats {

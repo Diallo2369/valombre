@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { availableAbilities } from '@/engine/engine';
-import { DIFFICULTY, STAT_LABEL, classWithArticle, className, type AbilityId } from '@/engine/rules';
+import { CLASSES, DIFFICULTY, STAT_LABEL, classWithArticle, className, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, GameEvent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { MediaView } from './MediaView';
@@ -227,7 +227,14 @@ export function CombatPanel(props: Props) {
 								{c.name}
 							</span>
 							<span className="fighter__meta">
-								{c.pv}/{c.pvMax} PV{c.pv === 0 ? ` · ${c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e'}` : ''}
+								{c.pv}/{c.pvMax} PV
+								{CLASSES[c.classId].armor ? (
+									<span className="fighter__armor" title="Armure : elle prend les coups avant les PV">
+										{' '}
+										· 🛡️ {combat.armor?.[c.id] ?? CLASSES[c.classId].armor}/{CLASSES[c.classId].armor}
+									</span>
+								) : null}
+								{c.pv === 0 ? ` · ${c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e'}` : ''}
 							</span>
 							<span className="fighter__pv" aria-label={`${c.pv} PV sur ${c.pvMax}`}>
 								<span className="fighter__bar" style={{ width: `${(c.pv / c.pvMax) * 100}%` }} />
@@ -333,7 +340,8 @@ export function CombatPanel(props: Props) {
 							<strong>
 								{' '}
 								{enemyBeat.guarded ? `${nameOf(enemyBeat.heroId)} s’interpose : ` : `${nameOf(enemyBeat.heroId)} `}
-								{enemyBeat.amount > 0 ? `perd ${enemyBeat.amount} PV !` : 'ne perd rien !'}
+								{enemyBeat.absorbed ? `${enemyBeat.guarded ? '' : ': '}son armure encaisse ${enemyBeat.absorbed === 1 ? 'le coup' : `${enemyBeat.absorbed} coups`}${enemyBeat.amount > 0 ? ', ' : ' !'}` : ''}
+								{enemyBeat.amount > 0 ? `perd ${enemyBeat.amount} PV !` : enemyBeat.absorbed ? '' : 'ne perd rien !'}
 							</strong>
 						) : null}
 					</p>

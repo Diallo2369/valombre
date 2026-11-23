@@ -17,8 +17,8 @@ export default function RulesPage() {
 				</p>
 
 				<section className="card rules__block">
-					<h2>1. Les quatre caractéristiques</h2>
-					<p>Chaque héros a quatre talents, notés avec un chiffre. Plus le chiffre est grand, plus le héros est doué.</p>
+					<h2>1. Les cinq caractéristiques</h2>
+					<p>Chaque héros a cinq talents, notés avec un chiffre. Plus le chiffre est grand, plus le héros est doué.</p>
 					<ul className="rules__stats">
 						{STATS.map((s) => (
 							<li key={s.key}>
@@ -27,8 +27,9 @@ export default function RulesPage() {
 						))}
 					</ul>
 					<p>
-						À la création, on lance <strong>un dé pour chaque caractéristique</strong>. Un 1 compte comme un 2. Ensuite, la classe donne +1
-						dans son talent préféré, et on peut échanger deux caractéristiques une fois.
+						À la création, on lance <strong>un dé pour chaque caractéristique</strong>. Un 1 compte comme un 2. Ensuite, la classe donne ses
+						bonus (par exemple +2 en Endurance pour le guerrier), et on peut échanger deux caractéristiques une fois. Les points de vie
+						valent 6 + l’Endurance, plus le bonus de la classe.
 					</p>
 				</section>
 
@@ -54,9 +55,10 @@ export default function RulesPage() {
 				<section className="card rules__block">
 					<h2>3. Les combats</h2>
 					<p>
-						Chacun son tour, un héros attaque : avec sa Force (frapper), son Agilité (tirer, esquiver) ou son Esprit (un sort). Si c’est
-						réussi, l’ennemi perd un cœur ♥. Si c’est raté, le héros perd des points de vie. On peut parfois parler ou s’enfuir au lieu de
-						se battre.
+						Au début, chacun lance l’<strong>initiative</strong> (un dé + l’Agilité) : on joue dans cet ordre, le monstre à sa place.
+						À son tour, chaque héros choisit une action de sa classe : un coup, un tir, un sort… Si c’est réussi, le monstre perd un ou
+						plusieurs cœurs ♥. Quand vient son tour, le monstre attaque un héros. L’<strong>armure</strong> prend les coups avant les points
+						de vie, et elle est réparée à chaque nouveau combat. On peut parfois parler ou s’enfuir au lieu de se battre.
 					</p>
 					<p>
 						<strong>Personne ne meurt à Valombre.</strong> À 0 PV, un héros est épuisé : il ne peut plus agir jusqu’à ce qu’on le soigne

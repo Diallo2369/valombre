@@ -3,9 +3,9 @@
  * Une campagne est un graphe de scènes écrit à l'avance : le moteur ne fait que le dérouler.
  */
 
-export type StatKey = 'force' | 'agilite' | 'esprit' | 'charme';
+export type StatKey = 'force' | 'agilite' | 'endurance' | 'esprit' | 'charme';
 export type Stats = Record<StatKey, number>;
-export type ClassId = 'guerrier' | 'rodeur' | 'mage' | 'barde';
+export type ClassId = 'guerrier' | 'danseur' | 'rodeur' | 'mage' | 'barde';
 export type Gender = 'f' | 'm';
 export type Difficulty = 'facile' | 'moyen' | 'difficile';
 export type QuestStatus = 'active' | 'done' | 'failed';
@@ -31,7 +31,7 @@ export interface Character {
 	powerReady: boolean;
 	/** Équipement de départ (texte libre, pour la fiche). */
 	kit: string[];
-	/** Les 4 jets de création, pour la fiche. */
+	/** Les jets de création (un par caractéristique), pour la fiche. */
 	rolls: number[];
 	notes: string;
 }
@@ -323,6 +323,8 @@ export interface CombatState {
 	guard?: string | null;
 	/** Le monstre dort (Berceuse) : il passe son prochain tour. */
 	asleep?: boolean;
+	/** Armure restante de chaque héros (elle prend les coups avant les PV, réparée à chaque combat). */
+	armor?: Record<string, number>;
 }
 
 export interface LogEntry {
@@ -371,7 +373,7 @@ export type GameEvent =
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
 	/** Tour du monstre : il attaque un héros (ou il dort, ou un héros s'interpose). */
-	| { kind: 'enemy-turn'; name: string; attack: string; heroId: string; amount: number; asleep?: boolean; guarded?: boolean }
+	| { kind: 'enemy-turn'; name: string; attack: string; heroId: string; amount: number; asleep?: boolean; guarded?: boolean; absorbed?: number }
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : s'interposer, endormir le monstre, soigner le groupe. */

@@ -113,11 +113,16 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
 
 | Classe | Profil | En combat |
 |---|---|---|
-| Guerrier·ère | +2 Force, +3 PV | Frapper · Coup puissant (2 ♥, 1×/combat) · Intervention (se rue devant le groupe : la prochaine attaque est pour lui, −1 dégât) |
-| Rôdeur·se | +1 Agilité, +1 Force, +1 PV | Tir à l’arc (Agilité) · Corps à corps (Force) · Seconde chance (relancer un dé, rechargée au repos) |
+| Guerrier·ère (le tank) | +1 Force, +2 Endurance, +2 PV, 🛡️ 3 d’armure | Frapper · Coup puissant (2 ♥, 1×/combat) · Intervention (se rue devant le groupe : la prochaine attaque est pour lui, −1 dégât) |
+| Danseur·se de guerre (corps à corps, gros dégâts) | +2 Agilité, +1 PV, aucune armure | Ambidextre : Deux lames (Agilité ; 1 ♥, 2 ♥ si le dé fait 4 ou plus) · Tourbillon d’acier (3 ♥, 1×/combat) |
+| Rôdeur·se (distance) | +1 Agilité, +1 Force, +1 PV, 🛡️ 1 d’armure | Tir à l’arc (Agilité) · Corps à corps (Force) · Seconde chance (relancer un dé, rechargée au repos) |
 | Mage | +2 Esprit | Deux sorts : Trait de lumière (Esprit) · Étincelle d’aube (touche à coup sûr, 2 ♥ contre la brume, 1×/combat) |
 | Barde | +1 Charme, +1 Esprit | Magie et contrôle : Note perçante (Charme) · Berceuse (le monstre passe son tour, 1×/combat) · Chant de courage (+2 PV au groupe, 1×/combat) |
 
+- **Endurance** : 5ᵉ caractéristique. PV = 6 + Endurance + bonus de classe (+2 par niveau). Les héros créés avant
+  l’Endurance reçoivent leur Force à la place (`withEndurance`), pour garder les mêmes PV.
+- **Armure** : des points qui prennent les coups du monstre avant les PV, réparés au début de chaque combat
+  (`CombatState.armor`). Le guerrier en a 3, le rôdeur 1, les autres aucune.
 - **Initiative** : au début du combat, chacun lance un dé + Agilité (le monstre : dé + 2/4/5 selon la difficulté).
   On joue dans cet ordre ; le monstre agit à sa place dans la file. La frise des tours reste affichée.
 - Durée visée (simulation avec des héros moyens) : 2 tours de table pour un petit combat, 4 pour un boss ;

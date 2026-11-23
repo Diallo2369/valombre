@@ -47,6 +47,12 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 					</p>
 				</div>
 				<div className="sheet__box">
+					<h4>Armure</h4>
+					<p className="sheet__big">
+						{cls.armor ? `🛡️ ${cls.armor}` : '—'} <span>{cls.armor ? 'prend les coups avant les PV' : 'aucune : il faut esquiver !'}</span>
+					</p>
+				</div>
+				<div className="sheet__box">
 					<h4>Expérience</h4>
 					<p className="sheet__big">
 						{c.xp} <span>/ {nextLevelXp} pour le niveau {level + 1}</span>
@@ -89,7 +95,11 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 
 			{c.rolls.length ? (
 				<p className="sheet__small">
-					Dés de création : {c.rolls.join(', ')} (un 1 compte comme 2, +1 en {STATS.find((s) => s.key === cls.stat)?.label})
+					Dés de création : {c.rolls.join(', ')} (un 1 compte comme 2, puis bonus de classe :{' '}
+						{Object.entries(cls.bonus)
+							.map(([k, v]) => `+${v} ${STAT_LABEL[k as keyof typeof STAT_LABEL]}`)
+							.join(', ')}
+						)
 				</p>
 			) : null}
 

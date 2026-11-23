@@ -28,7 +28,7 @@ interface Draft {
 	swap: [StatKey, StatKey] | null;
 }
 
-const EMPTY: Draft = { player: '', gender: null, name: '', classId: null, rolls: [null, null, null, null], swap: null };
+const EMPTY: Draft = { player: '', gender: null, name: '', classId: null, rolls: STATS.map(() => null), swap: null };
 const MAX = 6;
 
 const NAME_IDEAS = ['Arwel', 'Brune', 'Cassian', 'Doria', 'Elouan', 'Fenna', 'Gwen', 'Hugo le Hardi', 'Isaure', 'Jorik', 'Lune', 'Maël', 'Nell', 'Oriane', 'Perrin', 'Sacha', 'Tanaïs', 'Ysolde'];
@@ -237,6 +237,7 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 												.map(([k, v]) => `+${v} ${STATS.find((s) => s.key === k)?.label}`)
 												.join(' · ')}
 											{c.pvBonus ? ` · +${c.pvBonus} PV` : ''}
+											{c.armor ? ` · 🛡️ ${c.armor} d’armure` : ' · aucune armure'}
 										</span>
 										<span className="class-card__power">
 											<strong>En combat :</strong> {c.abilities.map((id) => `${ABILITIES[id].icon} ${ABILITIES[id].name}`).join(' · ')}
@@ -319,7 +320,7 @@ export function PartyCreator({ campaignId, campaignTitle, existing, media }: Pro
 										{STATS.map((s) => (
 											<button key={s.key} type="button" className={`swap__stat${swapPick === s.key ? ' is-on' : ''}`} onClick={() => pickSwap(s.key)}>
 												{s.label} <strong>{baseFromDraft(draft)?.[s.key]}</strong>
-												{s.key === CLASSES[preview.classId].stat ? <small> (+1 de classe)</small> : null}
+												{CLASSES[preview.classId].bonus[s.key] ? <small> (+{CLASSES[preview.classId].bonus[s.key]} de classe)</small> : null}
 											</button>
 										))}
 									</div>
