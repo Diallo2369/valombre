@@ -7,7 +7,8 @@ import type { Light } from '@/engine/types';
  * Lumières vivantes posées par-dessus l'image fixe d'une scène : feu qui vacille, lanterne qui tremble, bougie, yeux qui guettent, ronds dans les flaques,
  * brume qui glisse, éclairs, lueur magique qui respire. Un seul canevas, fusionné en « screen »
  * (il ne fait qu'éclairer l'image, jamais l'assombrir).
- * Avec « réduire les animations » activé dans le système, on dessine une lueur fixe, sans mouvement.
+ * Avec « réduire les animations » activé dans le système, rien ne bouge (pluie, brume, braises),
+ * mais les flammes vacillent encore, doucement.
  */
 
 const DEFAULT_COLOR: Record<Light['kind'], string> = {
@@ -80,6 +81,7 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 		const ctx = el?.getContext('2d');
 		if (!el || !ctx || !lights.length) return;
 		const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const flames = lights.some((l) => l.kind === 'feu' || l.kind === 'lanterne' || l.kind === 'bougie');
 
 		let w = 0;
 		let h = 0;
@@ -149,7 +151,7 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 				const radius = (l.size ?? 0.3) * Math.max(w, h);
 
 				if (l.kind === 'feu') {
-					const f = still ? 0.75 : flicker(t, i * 3.1, 1.4);
+					const f = still ? 0.75 + 0.3 * (flicker(t, i * 3.1, 0.6) - 0.5) : flicker(t, i * 3.1, 1.4);
 					glow(x, y, radius * (0.85 + 0.2 * f), color, 0.4 * k * (0.45 + 0.55 * f));
 					// Une lueur douce sur toute la pièce, qui suit le feu : les murs « respirent » avec lui.
 					ctx.fillStyle = `rgba(${color},${0.08 * k * f})`;
@@ -158,7 +160,7 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 						embers.push({ x: x + (Math.random() - 0.5) * radius * 0.4, y, vy: -(20 + Math.random() * 30), vx: (Math.random() - 0.5) * 12, life: 1 });
 				} else if (l.kind === 'bougie') {
 					// Une flamme de bougie : vive, nerveuse, avec de petits creux comme un courant d'air.
-					const f = still ? 0.8 : flicker(t, i * 4.7, 2.4) * (0.75 + 0.25 * flicker(t, i * 1.3, 0.35));
+					const f = still ? 0.8 + 0.3 * (flicker(t, i * 4.7, 0.8) - 0.5) : flicker(t, i * 4.7, 2.4) * (0.75 + 0.25 * flicker(t, i * 1.3, 0.35));
 					glow(x, y, radius * (0.85 + 0.25 * f), color, 0.42 * k * (0.45 + 0.55 * f));
 				} else if (l.kind === 'yeux') {
 					const e = eyes.get(i)!;
@@ -202,7 +204,7 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 					}
 				} else if (l.kind === 'lanterne') {
 					// La flamme vacille derrière la vitre : plus calme qu'une bougie, mais bien vivante.
-					const f = still ? 0.8 : flicker(t, i * 2.3, 1.5) * (0.8 + 0.2 * flicker(t, i * 1.7, 0.4));
+					const f = still ? 0.8 + 0.3 * (flicker(t, i * 2.3, 0.6) - 0.5) : flicker(t, i * 2.3, 1.5) * (0.8 + 0.2 * flicker(t, i * 1.7, 0.4));
 					glow(x, y, radius * (0.88 + 0.16 * f), color, 0.36 * k * (0.5 + 0.5 * f));
 				} else if (l.kind === 'magie') {
 					const p = still ? 0.6 : 0.5 + 0.5 * Math.sin(t * 1.4 + i);
@@ -301,7 +303,8 @@ export function LightLayer({ lights }: { lights: Light[] }) {
 				ctx.fill();
 			}
 
-			if (!still) raf = requestAnimationFrame(draw);
+			// « Réduire les animations » : rien ne bouge, mais les flammes vacillent encore doucement.
+			if (!still || flames) raf = requestAnimationFrame(draw);
 		};
 		raf = requestAnimationFrame(draw);
 
