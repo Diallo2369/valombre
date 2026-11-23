@@ -496,10 +496,16 @@ const epuise = (c: Character) => (c.gender === 'm' ? 'épuisé' : c.gender === '
 
 /**
  * Les créatures du combat : un groupe (`foes`) ou une seule (`enemy`).
- * Les cœurs sont écrits pour 4 héros : à 2 héros, ¾ des cœurs ; à 6, un quart de plus.
+ * Les cœurs et les dégâts sont écrits pour 4 héros, et suivent la taille du groupe :
+ * chaque héros de plus, c'est un coup de plus par tour, donc des PV en plus pour les créatures ;
+ * et plus de héros à abattre, donc des coups plus forts.
  */
+export function foeScale(partySize: number) {
+	return { hp: (partySize * partySize + 4 * partySize) / 32, damage: 0.1 + partySize * 0.225 };
+}
+
 function foesOf(def: CombatDef, partySize: number): FoeState[] {
-	const scale = 0.5 + partySize / 8;
+	const { hp: scale, damage: hit } = foeScale(partySize);
 	const list = def.foes?.length ? def.foes : [{ name: def.enemy.name, hearts: def.enemy.hearts }];
 	return list.map((f, i) => {
 		const afflict = 'afflict' in f && f.afflict ? f.afflict : def.enemy.afflict;
@@ -509,7 +515,7 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 			hp: Math.max(2, Math.round(f.hearts * 2 * scale)),
 			maxHp: Math.max(2, Math.round(f.hearts * 2 * scale)),
 			image: ('image' in f && f.image) || def.enemy.image,
-			damage: ('damage' in f && f.damage) || def.enemy.damage,
+			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * hit)),
 			move: ('move' in f && f.move) || def.enemy.move || 2,
 			range: ('range' in f && f.range) || def.enemy.range || 1,
 			...(afflict ? { afflict } : {}),
@@ -572,7 +578,7 @@ function startCombat(game: Game, def: CombatDef, events: GameEvent[]) {
 		order: rolls.map((r) => r.id),
 		turn: -1,
 		initiative: Object.fromEntries(rolls.map((r) => [r.id, { die: r.die, bonus: r.bonus, total: r.total }])),
-		used: {},
+		ready: {},
 		heroes: Object.fromEntries(game.party.map((c) => [c.id, { armor: CLASSES[c.classId].armor }])),
 		pos,
 		moved: false,
@@ -771,10 +777,15 @@ export type CombatAction =
 	| { kind: 'talk'; roll: RollResult; rerollBy?: string }
 	| { kind: 'flee'; roll: RollResult; rerollBy?: string };
 
-/** Actions possibles pour un héros (les « une fois par combat » disparaissent une fois utilisées ; les passives ne sont pas des boutons). */
+/** Actions d'un héros en combat (les passives ne sont pas des boutons). */
 export function availableAbilities(state: CombatState, hero: Character): Ability[] {
-	const used = state.used?.[hero.id] ?? [];
-	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => !a.passive && !(a.perCombat && used.includes(a.id)));
+	return CLASSES[hero.classId].abilities.map((id) => ABILITIES[id]).filter((a) => !a.passive);
+}
+
+/** Tours à attendre avant de pouvoir relancer une compétence (0 : prête). */
+export function cooldownLeft(combat: CombatState, hero: Character, ab: Ability): number {
+	const at = combat.ready?.[hero.id]?.[ab.id];
+	return at ? Math.max(0, at - combat.round) : 0;
 }
 
 export function passiveAbilities(hero: Character): Ability[] {
@@ -795,6 +806,7 @@ export function targetsFor(combat: CombatState, party: Character[], hero: Charac
 
 /** Une action peut-elle être lancée maintenant (quelqu'un à portée) ? */
 export function canUse(combat: CombatState, party: Character[], hero: Character, ab: Ability): boolean {
+	if (cooldownLeft(combat, hero, ab)) return false;
 	if (ab.target === 'party' || ab.target === 'none') return true;
 	const t = targetsFor(combat, party, hero, ab);
 	return ab.target === 'ally' ? t.allies.length > 0 : t.foes.length > 0;
@@ -835,8 +847,9 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	const ally = ab.target === 'ally' ? inRange.allies.find((c) => c.id === action.targets?.[0]) : undefined;
 	if (ab.target === 'ally' && !ally) throw new Error('Compagnon hors de portée');
 
-	if (ab.perCombat) {
-		combat.used = { ...combat.used, [hero.id]: [...(combat.used[hero.id] ?? []), ab.id] };
+	if (cooldownLeft(combat, hero, ab)) throw new Error('Compétence pas encore prête');
+	if (ab.every) {
+		combat.ready = { ...combat.ready, [hero.id]: { ...combat.ready?.[hero.id], [ab.id]: combat.round + ab.every } };
 		events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
 	}
 	if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });

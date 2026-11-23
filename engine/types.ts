@@ -394,8 +394,8 @@ export interface CombatState {
 	turn: number;
 	/** Jets d'initiative (dé + bonus), pour les afficher. */
 	initiative: Record<string, { die: number; bonus: number; total: number }>;
-	/** Actions « une fois par combat » déjà utilisées, par héros. */
-	used: Record<string, string[]>;
+	/** Délais de récupération : pour chaque héros, le tour (round) où chaque compétence redevient utilisable. */
+	ready: Record<string, Record<string, number>>;
 	heroes: Record<string, HeroCombatState>;
 	/** Position de chacun sur le plateau (héros et créatures). */
 	pos: Record<string, Hex>;

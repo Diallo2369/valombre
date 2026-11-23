@@ -369,11 +369,11 @@ export const CH2_CH3: Scene[] = [
 		media: { image: 'img-brumelins', music: 'mus-combat', ambience: 'amb-clairiere', sfx: ['sfx-ricanement'] },
 		lines: [{ who: 'narrateur', text: 'Les brumelins vous encerclent en ricanant. Ils sont nombreux, rapides, et ils mordillent les chevilles !' }],
 		combat: {
-			enemy: { name: 'la bande de brumelins', hearts: 7, difficulty: 'moyen', damage: 1, move: 3, brume: true, image: 'img-brumelins', attack: 'La ronde des brumelins se resserre : ça pince, ça chatouille, ça mordille de partout !', afflict: { name: 'le froid de brume', damage: 1, turns: 2, chance: 0.3 } },
+			enemy: { name: 'la bande de brumelins', hearts: 13, difficulty: 'moyen', damage: 2, move: 3, brume: true, image: 'img-brumelins', attack: 'La ronde des brumelins se resserre : ça pince, ça chatouille, ça mordille de partout !', afflict: { name: 'le froid de brume', damage: 1, turns: 2, chance: 0.3 } },
 			foes: [
-				{ name: 'le grand brumelin', hearts: 3 },
-				{ name: 'le brumelin siffleur', hearts: 2 },
-				{ name: 'le petit brumelin', hearts: 2 },
+				{ name: 'le grand brumelin', hearts: 5, damage: 3 },
+				{ name: 'le brumelin siffleur', hearts: 4 },
+				{ name: 'le petit brumelin', hearts: 4 },
 			],
 			victory: { to: 'clairiere-libre', effects: [{ xp: 2 }] },
 			defeat: { to: 'defaite-foret' },
@@ -520,7 +520,7 @@ export const CH2_CH3: Scene[] = [
 		media: { image: 'img-loup', music: 'mus-boss', ambience: 'amb-sanctuaire', sfx: ['sfx-grondement'] },
 		lines: [{ who: 'narrateur', text: 'Le Loup de Cendre est puissant ! Chaque coup de patte soulève des étincelles. Il faudra rester unis.' }],
 		combat: {
-			enemy: { name: 'le Loup de Cendre', hearts: 9, difficulty: 'moyen', damage: 2, move: 3, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !', afflict: { name: 'la brûlure', damage: 1, turns: 2, chance: 0.5 } },
+			enemy: { name: 'le Loup de Cendre', hearts: 20, difficulty: 'moyen', damage: 7, move: 3, image: 'img-loup', attack: 'Le Loup de Cendre bondit et donne un grand coup de griffes de braise !', afflict: { name: 'la brûlure', damage: 1, turns: 2, chance: 0.5 } },
 			victory: { to: 'loup-vaincu', effects: [{ xp: 3 }] },
 			defeat: { to: 'defaite-foret' },
 			talk: {

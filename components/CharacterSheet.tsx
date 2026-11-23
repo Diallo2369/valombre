@@ -1,4 +1,4 @@
-import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, initiativeOf, levelFromXp } from '@/engine/rules';
+import { ABILITIES, CLASSES, STATS, STAT_LABEL, className, everyText, initiativeOf, levelFromXp } from '@/engine/rules';
 import type { Character } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { HeroPortrait } from './HeroPortrait';
@@ -77,7 +77,7 @@ export function CharacterSheet({ character: c, media, print = false, children }:
 									{a.icon} {a.name}
 								</strong>{' '}
 								<span className="sheet__small">
-									{a.passive ? '(passif, toujours actif)' : a.stat ? `(${STAT_LABEL[a.stat]})` : '(sans dé)'} {a.perCombat ? '· une fois par combat' : ''}
+									{a.passive ? '(passif, toujours actif)' : a.stat ? `(${STAT_LABEL[a.stat]})` : '(sans dé)'} {a.every ? `· ${everyText(a)}` : ''}
 								</span>
 								<br />
 								{a.text}

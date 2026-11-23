@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOARD, BOARD_H, BOARD_W, HEX_W, center, distance, hexKey, hexPoints, type Hex } from '@/engine/board';
-import { availableAbilities, canUse, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
-import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, heartsText, type Ability, type AbilityId } from '@/engine/rules';
+import { availableAbilities, canUse, cooldownLeft, moveOptions, passiveAbilities, reclaimers, targetsFor } from '@/engine/engine';
+import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, heartsText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
@@ -602,12 +602,13 @@ export function CombatPanel(props: Props) {
 						<div className="choices hero-card__actions">
 							{abilities.map((a) => {
 								const ok = mine && canUse(combat, party, actor, a);
+								const wait = cooldownLeft(combat, shown, a);
 								const stat = a.stat ? shown.stats[a.stat] : 0;
 								return (
 									<button
 										key={a.id}
 										type="button"
-										className={`choice${a.perCombat ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}`}
+										className={`choice${a.every ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}`}
 										disabled={busy || !ok}
 										onClick={() => pickAbility(a)}
 									>
@@ -616,7 +617,9 @@ export function CombatPanel(props: Props) {
 										</span>
 										<span className="choice__desc">{a.text}</span>
 										<span className="choice__tag">
-											{mine && !ok
+											{wait
+												? `Encore ${wait} tour${wait > 1 ? 's' : ''} avant de pouvoir la relancer`
+												: mine && !ok
 												? a.range === 1
 													? 'Personne au contact : approche-toi'
 													: 'Personne à portée : approche-toi'
@@ -624,7 +627,7 @@ export function CombatPanel(props: Props) {
 													? `${STAT_LABEL[a.stat]} ${stat}${a.harder ? ` (+${a.harder} de difficulté)` : ''} : ${need(stat, difficulty + (a.harder ?? 0))}`
 													: 'Sans dé'}
 											{a.range ? ` · portée ${a.range === 1 ? 'au contact' : `${a.range} cases`}` : ''}
-											{a.perCombat ? ' · une fois par combat' : ''}
+											{a.every ? ` · ${everyText(a)}` : ''}
 										</span>
 									</button>
 								);

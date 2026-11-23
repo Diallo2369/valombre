@@ -109,8 +109,11 @@ export interface Ability {
 	/** Enlève les maux (poison, brûlure…) du groupe. */
 	cleanse?: boolean;
 	spell?: boolean;
-	/** Une seule fois par combat. */
-	perCombat?: boolean;
+	/**
+	 * Délai de récupération : utilisable 1 tour sur `every` (3 : on la relance au 3e tour suivant).
+	 * Réservé aux coups puissants ; les autres sont à volonté.
+	 */
+	every?: number;
 }
 
 const A = (a: Ability) => a;
@@ -126,7 +129,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'force',
 		damage: 2,
 		stun: { kind: 'assomme', turns: 1 },
-		perCombat: true,
+		every: 3,
 		text: 'Un coup de pommeau sur le crâne : 1 ♥, et la créature, sonnée, passe son prochain tour.',
 	}),
 	taillade: A({
@@ -137,7 +140,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		maxTargets: 3,
 		stat: 'force',
 		damage: 2,
-		perCombat: true,
+		every: 3,
 		text: 'Un grand revers d’épée : jusqu’à 3 créatures collées à toi perdent 1 ♥.',
 	}),
 	intervention: A({
@@ -184,7 +187,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		offhand: 1,
-		perCombat: true,
+		every: 3,
 		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 1 ♥ ½.',
 	}),
 	ambidextrie: A({
@@ -225,7 +228,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		maxTargets: 3,
 		stat: 'agilite',
 		damage: 2,
-		perCombat: true,
+		every: 3,
 		text: 'Trois flèches d’affilée : jusqu’à 3 créatures à portée perdent 1 ♥.',
 	}),
 	filet: A({
@@ -235,7 +238,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'foe',
 		stat: 'agilite',
 		stun: { kind: 'filet', turns: 2 },
-		perCombat: true,
+		every: 4,
 		text: 'Un filet lancé de loin : la créature, empêtrée, passe ses 2 prochains tours.',
 	}),
 	'fleche-empoisonnee': A({
@@ -246,7 +249,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 2,
 		poison: 3,
-		perCombat: true,
+		every: 3,
 		text: '1 ♥, puis le poison ronge la créature : ½ ♥ à chacun de ses 3 prochains tours.',
 	}),
 
@@ -269,8 +272,8 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		damage: 2,
 		brumeBonus: true,
 		spell: true,
-		perCombat: true,
-		text: 'Touche à coup sûr, sans dé : 1 ♥, et 2 ♥ contre une créature de brume. Une fois par combat.',
+		every: 3,
+		text: 'Touche à coup sûr, sans dé : 1 ♥, et 2 ♥ contre une créature de brume.',
 	}),
 	'pluie-etoiles': A({
 		id: 'pluie-etoiles', range: 4, area: true,
@@ -280,7 +283,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'esprit',
 		damage: 2,
 		spell: true,
-		perCombat: true,
+		every: 3,
 		text: 'Des étoiles filantes tombent sur une créature et sur celles collées à elle : 1 ♥ chacune.',
 	}),
 	'bouclier-lune': A({
@@ -291,7 +294,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		self: true,
 		shield: 2,
 		spell: true,
-		perCombat: true,
+		every: 3,
 		text: 'Une bulle argentée entoure un compagnon (ou toi) : elle absorbe les 2 prochains dégâts.',
 	}),
 	lueur: A({
@@ -324,7 +327,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'charme',
 		stun: { kind: 'sommeil', turns: 1 },
 		spell: true,
-		perCombat: true,
+		every: 3,
 		text: 'La créature s’endort et passe son prochain tour.',
 	}),
 	chant: A({
@@ -334,7 +337,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		target: 'party',
 		heal: 2,
 		spell: true,
-		perCombat: true,
+		every: 4,
 		text: 'Tout le groupe récupère 2 PV.',
 	}),
 	delivrance: A({
@@ -347,6 +350,9 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		text: 'Une mélodie claire qui chasse les maux : poison, brûlure et froid quittent tout le groupe.',
 	}),
 };
+
+/** Le délai d'une compétence, en texte : « 1 tour sur 3 ». */
+export const everyText = (ab: Ability) => (ab.every ? `1 tour sur ${ab.every}` : '');
 
 /** Demi-cœurs en texte : 1 → « ½ ♥ », 3 → « 1 ♥ ½ ». */
 export function heartsText(half: number): string {
@@ -443,7 +449,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		initiative: 0,
 		move: 2,
 		abilities: ['trait-lumiere', 'etincelle', 'pluie-etoiles', 'bouclier-lune', 'lueur'],
-		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Bouclier de lune une fois par combat.' },
+		power: { name: 'Cinq sorts', text: 'Trait de lumière et Lueur aveuglante à volonté ; Étincelle d’aube, Pluie d’étoiles et Bouclier de lune un tour sur trois.' },
 		kit: ['Bâton noueux', 'Grimoire écorné', 'Bougie'],
 	},
 	barde: {
