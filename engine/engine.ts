@@ -841,7 +841,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	}
 	if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
 	const success = !ab.stat || Boolean(action.roll?.success);
-	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && (ab.crit || Boolean(heroState(combat, hero.id).fury)) });
+	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && (ab.crit || Boolean(heroState(combat, hero.id).fury)), roll: action.roll });
 	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
 	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
 
@@ -935,7 +935,11 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	if ('rerollBy' in action && action.rerollBy) spendPower(work, action.rerollBy);
 	const rollText = (r: RollResult) => `${r.die} + ${r.stat} = ${r.total}`;
 
+	/** Le combat se termine : on garde une photo du plateau pour en jouer la fin à l'écran. */
+	const ended = (result: 'victory' | 'defeat' | 'peace' | 'escape') =>
+		events.push({ kind: 'combat-end', result, name: def.enemy.name, combat: clone(work.state.combat!) });
 	const finish = (result: 'hero' | 'intent' | 'defeat' | 'victory'): StepResult => {
+		if (result === 'victory' || result === 'defeat') ended(result);
 		if (result === 'victory') {
 			log(work.state, 'combat', `Victoire contre ${def.enemy.name}`);
 			if (def.victory.text) events.push({ kind: 'narration', text: def.victory.text });
@@ -1000,6 +1004,7 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		log(work.state, 'combat', `${hero.name} tente de parlementer (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
 			events.push({ kind: 'sfx', id: 'sfx-succes' });
+			ended('peace');
 			if (def.talk.outcome.text) events.push({ kind: 'narration', text: def.talk.outcome.text });
 			applyEffects(campaign, work, def.talk.outcome.effects, events);
 			nextSpokes(work);
@@ -1012,6 +1017,7 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	if (action.kind === 'flee' && def.flee) {
 		log(work.state, 'combat', `${hero.name} tente de fuir (${rollText(action.roll)}) : ${action.roll.success ? 'ça marche !' : 'raté…'}`);
 		if (action.roll.success) {
+			ended('escape');
 			if (def.flee.outcome.text) events.push({ kind: 'narration', text: def.flee.outcome.text });
 			applyEffects(campaign, work, def.flee.outcome.effects, events);
 			nextSpokes(work);

@@ -9,7 +9,7 @@ import type { Character, CombatDef, CombatState, FoeState, GameEvent, Intent } f
 import type { MediaMap } from '@/lib/media-types';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
-import { playAbility, playFoeAttack, playPoison } from './fx/fx-library';
+import { celebrate, playAbility, playFoeAttack, playPoison } from './fx/fx-library';
 import { HeroPortrait } from './HeroPortrait';
 import { MediaView } from './MediaView';
 
@@ -48,6 +48,8 @@ interface Props {
 	/** Images du fondu d'entrée en combat : la scène, puis le combat (URL). */
 	introFrom?: string;
 	introTo?: string;
+	/** Appelé quand la mise en scène de l'étape est finie (fin de combat : on passe alors à la suite). */
+	onSequenceEnd?: () => void;
 }
 
 /** Une étape de la mise en scène : bandeau plein écran, ou phrase d'action sur le plateau. */
@@ -57,7 +59,7 @@ type Beat =
 	| { kind: 'intro'; ms: number }
 	/** Une compétence part : effet animé, puis impact. */
 	| { kind: 'act'; ms: number; ev: Ev<'ability'> }
-	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe'; ms: number }
+	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe' | 'win'; ms: number }
 	| {
 			kind: 'say';
 			text: string;
@@ -157,6 +159,8 @@ export function CombatPanel(props: Props) {
 	/** L'action du héros a touché (les bulles de dégâts et les cœurs qui tombent n'apparaissent qu'à l'impact). */
 	const [landed, setLanded] = useState(false);
 	const [shake, setShake] = useState(false);
+	/** Le jet automatique, affiché au-dessus du héros qui agit. */
+	const [dice, setDice] = useState<{ heroId: string; roll: NonNullable<Ev<'ability'>['roll']> } | null>(null);
 	const timers = useRef<number[]>([]);
 	const fxCanvas = useRef<HTMLCanvasElement>(null);
 	const fxEngine = useRef<FxEngine | null>(null);
@@ -196,6 +200,7 @@ export function CombatPanel(props: Props) {
 		setSelected(null);
 		setLanded(false);
 		setShake(false);
+		setDice(null);
 		const beats: Beat[] = [];
 		const pending: Record<string, number> = {};
 		const from: Record<string, Hex> = {};
@@ -213,7 +218,8 @@ export function CombatPanel(props: Props) {
 					ms: 4200,
 				});
 			} else if (e.kind === 'ability') {
-				beats.push({ kind: 'act', ev: e, ms: 1900 });
+				// Avec un jet : on montre d'abord le dé, puis le coup part.
+				beats.push({ kind: 'act', ev: e, ms: e.roll ? 2500 : 1900 });
 				acted = true;
 			} else if (e.kind === 'hit' || e.kind === 'miss' || e.kind === 'support' || e.kind === 'foe-status') {
 				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
@@ -254,6 +260,14 @@ export function CombatPanel(props: Props) {
 			} else if (e.kind === 'affliction') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
 				beats.push({ kind: 'say', tone: 'foe', heroId: e.heroId, amount: e.amount, ms: 2000, text: `🔥 ${cap(e.name)} : ${nameOf(e.heroId)} perd ${e.amount} PV.` });
+			} else if (e.kind === 'combat-end') {
+				const end = {
+					victory: { title: 'Victoire !', subtitle: `${cap(e.name)} ${/^les\s/i.test(e.name) ? 'sont vaincus' : 'est vaincu'} !`, tone: 'win' as const },
+					defeat: { title: 'Le groupe est épuisé…', subtitle: 'Mais l’aventure n’est pas finie.', tone: 'foe' as const },
+					peace: { title: 'La paix est faite', subtitle: 'Le combat s’arrête là.', tone: 'win' as const },
+					escape: { title: 'Fuite réussie !', subtitle: 'Le groupe s’échappe.', tone: 'hero' as const },
+				}[e.result];
+				beats.push({ kind: 'banner', ...end, ms: 3000 });
 			} else if (e.kind === 'turn') {
 				const hero = heroById(e.heroId);
 				if (hero)
@@ -274,25 +288,32 @@ export function CombatPanel(props: Props) {
 			timers.current.push(
 				window.setTimeout(() => {
 					setBeat(b.kind === 'wait' ? null : b);
+					if (b.kind === 'banner' && b.tone === 'win' && fxEngine.current) {
+						const eng = fxEngine.current;
+						for (const c of party) if (c.pv > 0) celebrate(eng, center(combat.pos[c.id]));
+					}
 					if (b.kind === 'act') {
 						const ev = b.ev;
 						const at = (id: string) => center(combat.pos[id]);
 						const allies = ev.allyId ? [at(ev.allyId)] : ev.foeIds.length ? [] : party.filter((c) => c.pv > 0).map((c) => at(c.id));
-						const eng = fxEngine.current;
-						const hitAt = eng
-							? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) })
-							: 350;
-						timers.current.push(
-							window.setTimeout(() => {
-								setLanded(true);
-								if (ev.crit) setShake(true);
-								setDmgLeft((d) => {
-									const next = { ...d };
-									for (const id of ev.foeIds) delete next[id];
-									return next;
-								});
-							}, hitAt),
-						);
+						const lead = ev.roll ? 650 : 0;
+						if (ev.roll) setDice({ heroId: ev.heroId, roll: ev.roll });
+						const land = () => {
+							setLanded(true);
+							if (ev.crit) setShake(true);
+							setDmgLeft((d) => {
+								const next = { ...d };
+								for (const id of ev.foeIds) delete next[id];
+								return next;
+							});
+						};
+						const run = () => {
+							const eng = fxEngine.current;
+							const hitAt = eng ? playAbility(eng, ev.ability, { from: at(ev.heroId), foes: ev.foeIds.map(at), allies, success: ev.success, crit: Boolean(ev.crit) }) : 350;
+							timers.current.push(window.setTimeout(land, hitAt));
+						};
+						if (lead) timers.current.push(window.setTimeout(run, lead));
+						else run();
 						return;
 					}
 					if (b.kind !== 'say') return;
@@ -347,6 +368,8 @@ export function CombatPanel(props: Props) {
 				setHurtId(null);
 				setDmgLeft({});
 				setPosFrom({});
+				setDice(null);
+				props.onSequenceEnd?.();
 			}, t),
 		);
 		return () => timers.current.forEach(clearTimeout);
@@ -749,6 +772,11 @@ export function CombatPanel(props: Props) {
 									<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
 								</span>
 								<span className="token__name">{c.name}</span>
+							{dice?.heroId === c.id ? (
+								<span className={`token__dice ${dice.roll.success ? 'is-ok' : 'is-ko'}`} aria-hidden="true">
+									🎲 {dice.roll.die} + {dice.roll.stat} = {dice.roll.total} {dice.roll.success ? '✓' : '✗'} <small>(il fallait {dice.roll.target})</small>
+								</span>
+							) : null}
 								{hurtId === c.id && say?.amount ? <HeartPop count={Math.min(4, say.amount)} /> : null}
 								{hurtId === c.id && say?.amount ? (
 									<span className="token__burst token__burst--hurt" aria-hidden="true">

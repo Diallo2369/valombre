@@ -15,8 +15,8 @@ import {
 	visibleChoices,
 	visibleLines,
 } from '@/engine/engine';
-import { ABILITIES, CLASSES, DIFFICULTY, STAT_LABEL, type AbilityId, type RollResult } from '@/engine/rules';
-import type { Campaign, Game, GameEvent, StatKey, StepResult } from '@/engine/types';
+import { ABILITIES, CLASSES, DIFFICULTY, STAT_LABEL, evaluateRoll, rollD6, type AbilityId, type RollResult } from '@/engine/rules';
+import type { Campaign, Character, CombatDef, CombatState, Game, GameEvent, StatKey, StepResult } from '@/engine/types';
 import { AudioDirector } from '@/lib/audio';
 import { mediaVariants, type MediaMap } from '@/lib/media-types';
 import { DEFAULT_PREFS, fxLevel, loadPrefs, savePrefs, type Prefs } from '@/lib/prefs';
@@ -107,6 +107,11 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const [combatSide, setCombatSide] = useState<HTMLDivElement | null>(null);
 	/** Héros dont on regarde les compétences en combat (null : celui qui joue). On revient à lui à chaque étape. */
 	const [viewId, setViewId] = useState<string | null>(null);
+	/**
+	 * Fin de combat : la partie est déjà sauvegardée, mais on garde le plateau à l'écran le temps de jouer
+	 * le dernier coup et le bandeau « Victoire ! », puis on passe à la suite.
+	 */
+	const [finale, setFinale] = useState<{ result: StepResult; combat: CombatState; def: CombatDef; actor: Character } | null>(null);
 	useEffect(() => setViewId(null), [step.seq]);
 	const [playerState, setPlayerState] = useState<PlayerState>('idle');
 	/** Répliques jamais entendues dans la scène actuelle ('all' : on vient d'ouvrir la partie, tout est lu). */
@@ -253,6 +258,28 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	};
 
 	const apply = (result: StepResult) => {
+		const end = result.events.find((e): e is Extract<GameEvent, { kind: 'combat-end' }> => e.kind === 'combat-end');
+		if (end && combatDef && actor) {
+			player.current?.stop();
+			setFinale({ result, combat: end.combat, def: combatDef, actor });
+			setStep((st) => ({ events: result.events, seq: st.seq + 1 }));
+			for (const e of result.events) if (e.kind === 'sfx') playSfx(e.id);
+			persist(result);
+			return;
+		}
+		show(result);
+		for (const e of result.events) if (e.kind === 'sfx') playSfx(e.id);
+		persist(result);
+	};
+
+	/** La fin du combat est jouée : on affiche la suite (nouvelle scène, récit, messages). */
+	const endFinale = () => {
+		if (!finale) return;
+		setFinale(null);
+		show(finale.result);
+	};
+
+	const show = (result: StepResult) => {
 		player.current?.stop();
 		const changedScene = result.state.turn !== game.state.turn;
 		setGame({ state: result.state, party: result.party });
@@ -264,7 +291,9 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		}
 		pushToasts(result.events);
 		setStep((st) => ({ events: result.events, seq: st.seq + 1 }));
-		for (const e of result.events) if (e.kind === 'sfx') playSfx(e.id);
+	};
+
+	const persist = (result: StepResult) => {
 		if (sandbox) return;
 		setSave('saving');
 		saveGameAction(adventureId, result.state, result.party)
@@ -290,7 +319,23 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const onResolve = (heroId: string, roll: RollResult, rerollBy?: string) => {
 		const p = pending;
 		setPending(null);
-		if (!p) return;
+		if (p) resolveWith(p, heroId, roll, rerollBy);
+	};
+
+	/**
+	 * Un jet de combat : il se lance tout seul (le résultat s'affiche sur le plateau). La fenêtre du dé ne sert
+	 * qu'avec de vrais dés (on saisit le résultat). Hors combat, on garde toujours le dé à l'écran.
+	 */
+	const askRoll = (p: PendingRoll) => {
+		const hero = party.find((c) => c.id === p.request.heroId);
+		if (p.kind === 'check' || prefs.realDice || !hero) {
+			setPending(p);
+			return;
+		}
+		resolveWith(p, hero.id, evaluateRoll(rollD6(), hero.stats[p.request.stat], p.request.difficulty, p.request.harder ?? 0));
+	};
+
+	const resolveWith = (p: PendingRoll, heroId: string, roll: RollResult, rerollBy?: string) => {
 		if (p.kind === 'check') apply(resolveCheck(campaign, game, p.choiceIndex, heroId, roll, rerollBy));
 		else if (p.kind === 'ability') apply(combatTurn(campaign, game, { kind: 'ability', ability: p.ability, targets: p.targets, roll, rerollBy }));
 		else if (p.kind === 'reclaim') apply(combatTurn(campaign, game, { kind: 'reclaim', foeId: p.foeId, heroId: p.heroId, roll, rerollBy }));
@@ -307,7 +352,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			apply(combatTurn(campaign, game, { kind: 'ability', ability: id, targets, roll: null }));
 			return;
 		}
-		setPending({
+		askRoll({
 			kind: 'ability',
 			ability: id,
 			targets,
@@ -321,7 +366,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		const stat = hero && CLASSES[hero.classId].aggro;
 		if (!hero || !stat || !combatDef || !combat) return;
 		const foe = combat.foes.find((f) => f.id === foeId);
-		setPending({
+		askRoll({
 			kind: 'reclaim',
 			foeId,
 			heroId,
@@ -489,10 +534,11 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 						</section>
 					) : combat && combatDef && actor ? (
 						<CombatPanel
-							def={combatDef}
-							combat={combat}
-							party={party}
-							actor={actor}
+							def={finale?.def ?? combatDef}
+							combat={finale?.combat ?? combat}
+							party={finale?.result.party ?? party}
+							actor={finale?.actor ?? actor}
+							onSequenceEnd={finale ? endFinale : undefined}
 							media={media}
 							events={step.events}
 							seq={step.seq}
@@ -509,13 +555,13 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							onReclaim={reclaim}
 							onResolve={() => apply(combatTurn(campaign, game, { kind: 'resolve' }))}
 							onTalk={() =>
-								setPending({
+								askRoll({
 									kind: 'talk',
 									request: { title: combatDef.talk!.label, stat: combatDef.talk!.stat, difficulty: combatDef.talk!.difficulty, heroId: actor.id, cancellable: true },
 								})
 							}
 							onFlee={() =>
-								setPending({
+								askRoll({
 									kind: 'flee',
 									request: { title: combatDef.flee!.label, stat: combatDef.flee!.stat, difficulty: combatDef.flee!.difficulty, heroId: actor.id, cancellable: true },
 								})

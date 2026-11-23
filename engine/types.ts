@@ -4,6 +4,7 @@
  */
 
 import type { Hex } from './board';
+import type { RollResult } from './rules';
 
 export type StatKey = 'force' | 'agilite' | 'endurance' | 'esprit' | 'charme';
 export type Stats = Record<StatKey, number>;
@@ -466,7 +467,9 @@ export type GameEvent =
 	/** Un héros rate son action (le coup fend l'air). */
 	| { kind: 'miss'; heroId: string }
 	/** Une compétence part (pour les effets visuels) : qui, laquelle, vers qui, et si elle réussit. */
-	| { kind: 'ability'; heroId: string; ability: string; foeIds: string[]; allyId?: string; success: boolean; crit?: boolean }
+	| { kind: 'ability'; heroId: string; ability: string; foeIds: string[]; allyId?: string; success: boolean; crit?: boolean; roll?: RollResult | null }
+	/** Fin du combat (victoire, défaite, paix ou fuite), avec le plateau tel qu'il était au dernier coup. */
+	| { kind: 'combat-end'; result: 'victory' | 'defeat' | 'peace' | 'escape'; name: string; combat: CombatState }
 	/** Début du tour des monstres (l'attaque du groupe, racontée par le conteur). */
 	| { kind: 'enemy-turn'; name: string; attack: string }
 	/** Une créature attaque un héros. */

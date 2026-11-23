@@ -64,10 +64,11 @@ export class FxEngine {
 
 	/** À appeler quand le plateau change de taille. */
 	resize() {
-		const rect = this.canvas.getBoundingClientRect();
+		// Taille de mise en page (offsetWidth), pas getBoundingClientRect : la table est penchée en 3D,
+		// et la boîte projetée ne correspond plus aux coordonnées du plateau.
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
-		this.canvas.width = Math.max(1, Math.round(rect.width * dpr));
-		this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
+		this.canvas.width = Math.max(1, Math.round(this.canvas.offsetWidth * dpr));
+		this.canvas.height = Math.max(1, Math.round(this.canvas.offsetHeight * dpr));
 		this.scale = this.canvas.width / this.boardW;
 	}
 

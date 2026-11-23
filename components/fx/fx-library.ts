@@ -594,3 +594,10 @@ export function playPoison(eng: FxEngine, at: P) {
 		eng.add({ x: at.x + (Math.random() - 0.5) * 50, y: at.y + 14, vy: -50 - Math.random() * 40, life: 800, delay: i * 50, size: 5, sizeEnd: 10, color: '#6fdc5a', shape: 'ring' });
 	return 300;
 }
+
+/** Victoire : une gerbe dorée qui jaillit de chaque héros debout. */
+export function celebrate(eng: FxEngine, at: P) {
+	eng.burst(at, 26, { speed: 300, angle: -Math.PI / 2, spread: Math.PI * 0.9, life: 1300, size: 3.5, color: ['#ffe28a', '#fff6dc', '#8fe0a0', '#ffb347'], shape: 'spark', ay: 380, drag: 0.6 });
+	for (let i = 0; i < 4; i += 1)
+		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 9, color: '#ffe28a', shape: 'star', vr: 4 });
+}
