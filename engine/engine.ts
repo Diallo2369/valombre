@@ -665,7 +665,8 @@ export const threatOf = (foe: FoeState, heroId: string) => foe.threat?.[heroId] 
 
 /** Guerriers qui peuvent s'interposer devant le héros visé par cette créature (Intervention : à 2 cases au plus). */
 export function interveners(combat: CombatState | null, party: Character[], intent: Intent): Character[] {
-	if (!combat || intent.why === 'spell' || !intent.heroId) return [];
+	// Une créature moquée frappe le moqueur, quoi qu'il arrive : personne ne s'interpose.
+	if (!combat || intent.why === 'spell' || intent.why === 'taunt' || !intent.heroId) return [];
 	const target = combat.pos[intent.heroId];
 	if (!target || combat.heroes[intent.heroId]?.protectedBy) return [];
 	return activeHeroes(party).filter(
@@ -802,7 +803,13 @@ function castSpell(game: Game, foe: FoeState, events: GameEvent[]) {
 	}
 	events.push({ kind: 'foe-cast', foeId: foe.id, name: foe.name, spell: sp.name, icon: sp.icon, spellKind: sp.kind });
 	const active = activeHeroes(game.party);
-	const target = active.find((c) => c.id === ch.heroId);
+	// Moquée entre-temps : un sort qui vise quelqu'un part sur le moqueur.
+	const taunter = foe.taunt ? active.find((c) => c.id === foe.taunt) : undefined;
+	const target = (sp.kind === 'bolt' || sp.kind === 'sleep') && taunter ? taunter : active.find((c) => c.id === ch.heroId);
+	if (taunter && (sp.kind === 'bolt' || sp.kind === 'sleep')) {
+		delete foe.taunt;
+		delete foe.enraged;
+	}
 	const inReach = (c: Character) => distance(combat.pos[foe.id], combat.pos[c.id]) <= sp.range + 1;
 	if (sp.kind === 'rally') {
 		for (const f of livingFoes(combat)) if (f.id !== foe.id) f.rallied = (f.rallied ?? 0) + (sp.damage ?? 1);
@@ -923,7 +930,8 @@ function foeAttack(game: Game, foe: FoeState, target: Character, events: GameEve
 	const cleave = Boolean(o.cleave);
 	let victim = target;
 	let guarded = false;
-	const protector = o.guardable === false ? undefined : combat.heroes[target.id]?.protectedBy;
+	// La Moquerie ne se détourne jamais : le coup est pour le moqueur, même si le guerrier le défendait.
+	const protector = o.guardable === false || taunted ? undefined : combat.heroes[target.id]?.protectedBy;
 	const guard = protector ? activeHeroes(game.party).find((c) => c.id === protector && c.id !== target.id) : undefined;
 	if (guard) {
 		victim = guard;
@@ -1124,23 +1132,13 @@ export function targetsFor(combat: CombatState, party: Character[], hero: Charac
 	// Rien ne traverse une Ronde enchantée (sauf la Ronde elle-même, qui se pose où elle veut).
 	const across = (h: Hex) => ab.barrier || sameSide(combat, here, h);
 	const foes = ['foe', 'foes', 'all'].includes(ab.target)
-		? livingFoes(combat).filter((f) => distance(here, combat.pos[f.id]) <= range && across(combat.pos[f.id]) && (!ab.leap || Boolean(landing(combat, hero, f))))
+		? livingFoes(combat).filter((f) => distance(here, combat.pos[f.id]) <= range && across(combat.pos[f.id]))
 		: [];
 	const allies =
 		ab.target === 'ally'
 			? (ab.revive ? party : activeHeroes(party)).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range && across(combat.pos[c.id])))
 			: [];
 	return { foes: foes.sort((a, b) => distance(here, combat.pos[a.id]) - distance(here, combat.pos[b.id])), allies };
-}
-
-/** Bond sauvage : la case où le héros atterrit, collée à la créature (la plus proche de lui ; la sienne s'il y est déjà). */
-function landing(combat: CombatState, hero: Character, foe: FoeState): Hex | undefined {
-	const here = combat.pos[hero.id];
-	if (distance(here, combat.pos[foe.id]) <= 1) return here;
-	const taken = blockedFor(combat, hero.id);
-	return neighbors(combat.pos[foe.id])
-		.filter((h) => !taken.has(hexKey(h)))
-		.sort((a, b) => distance(here, a) - distance(here, b))[0];
 }
 
 /** Déflagration : la case d'à côté qui l'éloigne le plus du héros, si elle est libre. */
@@ -1211,7 +1209,8 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const chosen = inRange.foes.filter((f) => action.targets?.includes(f.id));
 		foes = (chosen.length ? chosen : inRange.foes).slice(0, ab.maxTargets ?? 3);
 	} else if (ab.target === 'all') foes = inRange.foes;
-	else if (ab.rally) foes = livingFoes(combat).filter((f) => sameSide(combat, combat.pos[hero.id], combat.pos[f.id]));
+	// Cri de rage : toutes les créatures, sauf celles qu'un autre a moquées (la Moquerie ne se détourne jamais).
+	else if (ab.rally) foes = livingFoes(combat).filter((f) => sameSide(combat, combat.pos[hero.id], combat.pos[f.id]) && (!f.taunt || f.taunt === hero.id));
 	// Une case (Ronde enchantée) : à portée, sur le plateau.
 	let at: Hex | undefined;
 	if (ab.target === 'hex') {
@@ -1246,14 +1245,6 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		events.push({ kind: 'sfx', id: 'sfx-pouvoir' });
 	}
 	if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
-	if (ab.leap && foes[0]) {
-		const from = combat.pos[hero.id];
-		const to = landing(combat, hero, foes[0]);
-		if (to && !sameHex(from, to)) {
-			combat.pos[hero.id] = to;
-			events.push({ kind: 'hero-move', heroId: hero.id, from, to });
-		}
-	}
 	// Une créature prise au filet est touchée à coup sûr ; l'Écho ne rate jamais.
 	const netted = foes.length > 0 && foes.every((f) => f.stunned && f.stunKind === 'filet');
 	const success = free || !ab.stat || Boolean(action.roll?.success) || netted;
@@ -1283,7 +1274,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
 			// Menace : les dégâts énervent, un critique deux fois plus.
-			addThreat(foe, hero, amount * (crit ? 2 : 1));
+			addThreat(foe, hero, amount * (crit ? 2 : 1) * (ab.threatMul ?? 1));
 			events.push({ kind: 'hit', heroId: hero.id, foeId: foe.id, amount, spell: ab.spell, crit, offhand: Boolean(ab.offhand) });
 			hits.push(`${foe.name} −${amount} PV${foe.hp <= 0 ? ' (vaincue !)' : ''}`);
 		}

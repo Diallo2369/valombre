@@ -760,14 +760,17 @@ const ABILITY_FX: Record<string, Fx> = {
 		melee(e, { ...c, crit: false }, FURY, 0.75, 2.6, 200);
 		return t;
 	},
-	bond: (e, c) => {
-		// Le bond : des traces de pattes jusqu'à la cible, puis les deux haches.
-		const to = c.foes[0] ?? c.from;
-		e.add({ x: c.from.x, y: c.from.y, life: 500, size: 20, sizeEnd: 90, color: '#ff9a4a', shape: 'ring', neon: true });
-		e.burst(c.from, 12, { speed: 220, life: 500, size: 6, sizeEnd: 2, color: ['#d9c2a0', '#a08060'], ay: 200, drag: 1.5 });
-		const t = melee(e, c, FURY, 1.1, -0.5, 120);
-		melee(e, { ...c, crit: false }, FURY, 0.9, 2.6, 300);
-		speedLines(e, to, 100, '#ffd2a8');
+	'revers-sauvage': (e, c) => {
+		// Un grand revers : deux haches qui balaient les deux créatures d'un même geste.
+		let t = 0;
+		c.foes.forEach((f, i) => {
+			slash(e, f, c.success ? '#ff8a4a' : '#9aa3b5', angleTo(c.from, f) + Math.PI / 2, i * 110, 1.25);
+			slash(e, f, c.success ? '#ffd2a8' : '#9aa3b5', angleTo(c.from, f) - Math.PI / 2, i * 110 + 60, 1);
+			if (c.success) impact(e, f, FURY, 1.15, i * 110 + 180);
+			else puff(e, f, i * 110 + 180);
+			t = i * 110 + 180;
+		});
+		if (c.success) for (const f of c.foes) rising(e, f, ['!'], '#ff6a3c', 2, t + 80, 22);
 		return t;
 	},
 	'fureur-ours': (e, c) => {
@@ -1058,7 +1061,7 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	'double-attaque': { word: 'TCHAK-TCHAK !', fill: '#ff7a4a', melee: true },
 	'onde-de-choc': { word: 'BOOOM !', fill: '#e8e0d0', melee: true },
 	'cri-de-rage': { word: 'RAAAAH !', fill: '#ff7a4a' },
-	bond: { word: 'HOP-TCHAK !', fill: '#ff9a5a', melee: true },
+	'revers-sauvage': { word: 'SHWAAK !', fill: '#ff8a4a', melee: true },
 	'fureur-ours': { word: 'GRAOU !', fill: '#ff7a4a', melee: true },
 	moquerie: { word: 'NANANÈRE !', fill: '#ff9a4a' },
 	tourbillon: { word: 'WHOOSH !', fill: '#7fe3ff', melee: true },
@@ -1266,4 +1269,4 @@ export function celebrate(eng: FxEngine, at: P) {
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */
-export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'bond', 'fureur-ours', 'onde-de-choc', 'pieges', 'cri-de-rage']);
+export const BIG_FX = new Set(['rune-ricochet', 'tourbillon', 'coup-assommant', 'rune-eclat', 'orbe-runique', 'deflagration', 'taillade', 'revers-sauvage', 'fureur-ours', 'onde-de-choc', 'pieges', 'cri-de-rage']);

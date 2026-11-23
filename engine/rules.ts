@@ -51,7 +51,7 @@ export type AbilityId =
 	| 'moquerie'
 	| 'tourbillon'
 	| 'fureur-ours'
-	| 'bond'
+	| 'revers-sauvage'
 	| 'ambidextrie'
 	| 'folie'
 	| 'coeur-battant'
@@ -122,8 +122,8 @@ export interface Ability {
 	lifesteal?: number;
 	/** Mélodie apaisante : chaque héros du groupe reprend `amount` PV au début de ses `turns` prochains tours. */
 	regen?: { amount: number; turns: number };
-	/** Bondit jusqu'à la cible (sur une case libre collée à elle) avant de frapper (Bond sauvage). */
-	leap?: boolean;
+	/** Multiplie la menace des dégâts (Revers sauvage : les créatures touchées enragent contre lui). */
+	threatMul?: number;
 	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
 	barrier?: boolean;
 	/** Repousse d'une case les créatures touchées, loin du héros (Déflagration runique). */
@@ -280,17 +280,18 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		every: 2,
 		text: 'La rage de l’ours te porte : 2 PV + 2 PV, et si ça touche tu récupères 2 PV.',
 	}),
-	bond: A({
-		id: 'bond', range: 3,
-		name: 'Bond sauvage',
-		icon: '🐾',
-		target: 'foe',
+	'revers-sauvage': A({
+		id: 'revers-sauvage', range: 1,
+		name: 'Revers sauvage',
+		icon: '🪓',
+		target: 'foes',
+		maxTargets: 2,
 		stat: 'agilite',
 		damage: 2,
 		offhand: 2,
-		leap: true,
+		threatMul: 2,
 		every: 2,
-		text: 'Tu bondis sur une créature jusqu’à 3 cases (tu atterris collé à elle) et tu frappes des deux haches : 2 PV + 2 PV.',
+		text: 'Un grand revers des deux haches sur deux créatures collées à toi (au choix) : 2 PV + 2 PV chacune. Ça les met dans une rage folle contre toi (menace doublée) !',
 	}),
 	tourbillon: A({
 		id: 'tourbillon', range: 1,
@@ -623,7 +624,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		threat: 1.7,
 		move: 4,
-		abilities: ['double-attaque', 'bond', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie', 'coeur-battant'],
+		abilities: ['double-attaque', 'revers-sauvage', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie', 'coeur-battant'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
 	},
