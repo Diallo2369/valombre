@@ -465,13 +465,6 @@ export function CombatPanel(props: Props) {
 			setDrag(null);
 		},
 	};
-	const rangeSet = useMemo(() => {
-		const set = new Set<string>();
-		if (!ability?.range) return set;
-		const here = combat.pos[actor.id];
-		for (let r = 0; r < BOARD.rows; r += 1) for (let c = 0; c < BOARD.cols; c += 1) if (distance(here, { c, r }) <= ability.range) set.add(hexKey({ c, r }));
-		return set;
-	}, [ability, combat.pos, actor.id]);
 	const intents = phase === 'intent' && !busy ? combat.intents : [];
 	const aggroHeroes = new Set(intents.flatMap((i) => reclaimers(combat, party, i).map((c) => c.id)));
 	const posOf = (id: string) => posFrom[id] ?? combat.pos[id];
@@ -752,7 +745,7 @@ export function CombatPanel(props: Props) {
 			{/* ---------- Le plateau ---------- */}
 			{/* Le texte d'action est posé hors du plateau penché : en 3D, les jetons et les effets passeraient devant lui. */}
 			<div className="board-wrap">
-				<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+				<div className={`board${ability && mine ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
 					{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
 					<div className="board__table">
 						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
@@ -774,7 +767,7 @@ export function CombatPanel(props: Props) {
 										<polygon
 											key={k}
 											points={hexPoints(h)}
-											className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}${drag?.over === k ? ' is-drop' : ''}`}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}`}
 											data-hex={k}
 											onClick={canMove ? () => moveTo(h) : undefined}
 											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h) : undefined}

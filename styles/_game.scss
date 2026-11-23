@@ -1335,6 +1335,12 @@
 		}
 	}
 
+	/* On vise avec un sort : seuls les jetons qu'on peut toucher restent vifs, les autres s'effacent. */
+	&.is-aiming .token:not(.is-target) {
+		opacity: 0.4;
+		filter: grayscale(0.6);
+	}
+
 	/* La table penchée, façon plateau vu de biais ; les jetons restent debout (voir .token). */
 	&__table {
 		position: absolute;
@@ -1394,11 +1400,6 @@
 
 	&.is-hero-zone {
 		fill: rgb(127 182 230 / 6%);
-	}
-
-	&.is-range {
-		fill: rgb(246 194 127 / 10%);
-		stroke: rgb(246 194 127 / 35%);
 	}
 
 	/* Une case où l'on peut aller : elle s'allume. */
