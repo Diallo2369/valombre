@@ -14,49 +14,104 @@
 	}
 }
 
-/* Le titre écrit à la plume : le contour se trace, puis les lettres se remplissent et s'illuminent. */
-.written-title {
-	&__svg {
-		display: block;
-		width: 100%;
-		height: auto;
-		overflow: visible;
-	}
+/*
+ * Le titre façon cinématique de jeu : or métallique ; il arrive grand, flou et espacé, se resserre avec un éclat,
+ * puis un reflet de lumière le traverse de temps en temps. Un trait d'or s'ouvre dessous.
+ */
+.legend-title {
+	display: grid;
+	justify-items: start;
+	gap: 6px;
 
-	&__text {
+	&__word {
+		position: relative;
+		display: inline-block;
 		font-family: var(--font-title);
-		font-size: 170px;
+		font-size: clamp(3.2rem, 11vw, 7rem);
 		font-weight: 700;
-		fill: var(--parchment-100);
-		fill-opacity: 0;
-		stroke: var(--ember-300);
-		stroke-width: 2.5px;
-		stroke-dasharray: 1400;
-		stroke-dashoffset: 1400;
-		animation:
-			title-write 2.2s cubic-bezier(0.55, 0.1, 0.35, 1) 0.6s forwards,
-			title-fill 1s ease 2.4s forwards;
+		line-height: 1;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: transparent;
+		background: linear-gradient(180deg, #fff6dc 0%, #f0d9a0 30%, #c8aa6e 55%, #8a6a30 78%, #d9bc7a 100%);
+		background-clip: text;
+		-webkit-background-clip: text;
+		/* Même liste de filtres que dans legend-in, pour une transition sans à-coup. */
+		filter: blur(0) brightness(1) drop-shadow(0 2px 0 rgb(40 26 8 / 90%)) drop-shadow(0 0 24px rgb(200 170 110 / 35%));
+		animation: legend-in 1.6s cubic-bezier(0.16, 0.8, 0.3, 1) 0.5s both;
+
+		/* Le reflet de lumière qui balaie les lettres. */
+		&::after {
+			content: attr(data-text);
+			position: absolute;
+			inset: 0;
+			color: transparent;
+			background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 95%) 50%, transparent 62%);
+			background-size: 300% 100%;
+			background-position: 160% 0;
+			background-clip: text;
+			-webkit-background-clip: text;
+			animation: legend-shine 6s ease-in-out 2s infinite;
+		}
+	}
+
+	/* Le trait d'or, avec une petite gemme au milieu. */
+	&__rule {
+		position: relative;
+		width: min(100%, 520px);
+		height: 2px;
+		background: linear-gradient(90deg, transparent, #c8aa6e 20%, #f0d9a0 50%, #c8aa6e 80%, transparent);
+		transform-origin: 50% 50%;
+		animation: legend-rule 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) 1.5s both;
+	}
+
+	&__gem {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 10px;
+		height: 10px;
+		translate: -50% -50%;
+		rotate: 45deg;
+		border: 2px solid #f0d9a0;
+		background: #1a1408;
+		box-shadow: 0 0 10px rgb(240 217 160 / 70%);
 	}
 }
 
-@keyframes title-write {
-	to {
-		stroke-dashoffset: 0;
-	}
-}
-
-@keyframes title-fill {
+@keyframes legend-in {
 	0% {
-		fill-opacity: 0;
-		filter: drop-shadow(0 0 0 rgb(246 194 127 / 0%));
+		opacity: 0;
+		scale: 1.35;
+		letter-spacing: 0.4em;
+		filter: blur(14px) brightness(2.2) drop-shadow(0 2px 0 rgb(40 26 8 / 0%)) drop-shadow(0 0 0 rgb(255 230 170 / 0%));
 	}
-	50% {
-		filter: drop-shadow(0 0 18px rgb(246 194 127 / 80%));
+	55% {
+		opacity: 1;
+		filter: blur(0) brightness(1.8) drop-shadow(0 2px 0 rgb(40 26 8 / 90%)) drop-shadow(0 0 34px rgb(255 230 170 / 90%));
 	}
 	100% {
-		fill-opacity: 1;
-		stroke-opacity: 0.35;
-		filter: drop-shadow(0 0 6px rgb(246 194 127 / 35%));
+		opacity: 1;
+		scale: 1;
+		letter-spacing: 0.06em;
+	}
+}
+
+@keyframes legend-shine {
+	0%,
+	55% {
+		background-position: 160% 0;
+	}
+	85%,
+	100% {
+		background-position: -60% 0;
+	}
+}
+
+@keyframes legend-rule {
+	from {
+		opacity: 0;
+		scale: 0 1;
 	}
 }
 
@@ -100,6 +155,11 @@
 
 /* « Réduire les animations » : on garde les effets doux (flou, fondus, écriture du titre), sans mouvement. */
 @media (prefers-reduced-motion: reduce) {
+	/* Le titre apparaît en fondu, sans grossir ni se resserrer. */
+	.legend-title__word {
+		animation-name: home-fade;
+	}
+
 	.home__bg {
 		animation-name: home-unblur-still;
 	}
@@ -181,9 +241,7 @@
 	}
 
 	&__title {
-		width: min(100%, 620px);
-		margin: 0.1em 0 0.2em;
-		filter: drop-shadow(0 4px 24px rgb(0 0 0 / 60%));
+		margin: 0.1em 0 0.3em;
 	}
 
 	&__lead {

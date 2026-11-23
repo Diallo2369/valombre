@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { COMMON_MEDIA, PORTAL_LIGHTS } from '@/campaigns';
 import { LightLayer } from '@/components/LightLayer';
 import { RoomLink } from '@/components/home/RoomLink';
-import { WrittenTitle } from '@/components/home/WrittenTitle';
+import { LegendTitle } from '@/components/home/LegendTitle';
 import { MediaView } from '@/components/MediaView';
 import { SiteHeader } from '@/components/SiteHeader';
 import { currentUser } from '@/lib/auth';
@@ -27,7 +27,7 @@ export default function HomePage() {
 					</div>
 					<div className="home__content container">
 						<p className="home__eyebrow">Jeu de rôle familial</p>
-						<WrittenTitle className="home__title" text="Valombre" />
+						<LegendTitle className="home__title" text="Valombre" />
 						<p className="home__lead">
 							Une vallée noyée de brume, une auberge au coin du feu, des héros tirés aux dés.
 							<br />
