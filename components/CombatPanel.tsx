@@ -77,8 +77,9 @@ type Beat =
 			heroId?: string;
 			/** Le poison ronge la créature : ses cœurs baissent à ce moment-là. */
 			poison?: boolean;
-			/** Œil pour œil : la créature reçoit ces PV en retour, à ce moment-là. */
+			/** Œil pour œil : la créature reçoit ces PV en retour, à ce moment-là, du guerrier `riposteBy`. */
 			riposte?: number;
+			riposteBy?: string;
 			/** Le coup est un sort de la créature (effet magique, pas de griffes). */
 			spell?: boolean;
 			/** Une créature lance son sort (pour un sort sans cible : le cri de ralliement). */
@@ -197,6 +198,8 @@ export function CombatPanel(props: Props) {
 	const [hurtId, setHurtId] = useState<string | null>(null);
 	/** Le héros qui prend son élan (il grossit avant de frapper, façon jeu de tactique). */
 	const [castId, setCastId] = useState<string | null>(null);
+	/** Œil pour œil : le guerrier fait un aller-retour vers la créature qui l'a frappé (direction en px). */
+	const [lunge, setLunge] = useState<{ id: string; dx: number; dy: number } | null>(null);
 	/** Glisser-déposer du héros qui joue : décalage depuis sa case, et case survolée. */
 	const [drag, setDrag] = useState<{ dx: number; dy: number; over: string | null } | null>(null);
 	const dragStart = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -309,7 +312,7 @@ export function CombatPanel(props: Props) {
 			} else if (e.kind === 'riposte') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				const after = e.dead ? ', elle s’effondre !' : e.stunned ? ' 💫 Assommée !' : '';
-				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, riposte: e.amount, ms: 1900, text: `👁️ Œil pour œil : ${nameOf(e.heroId)} renvoie le coup, ${e.name} −${e.amount} PV${after}` });
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, riposte: e.amount, riposteBy: e.heroId, ms: 1900, text: `👁️ Œil pour œil : ${nameOf(e.heroId)} renvoie le coup, ${e.name} −${e.amount} PV${after}` });
 			} else if (e.kind === 'hero-skip') {
 				beats.push({ kind: 'say', tone: 'foe', ms: 1900, text: `💫 ${nameOf(e.heroId)}, encore sonné·e, passe son tour.` });
 			} else if (e.kind === 'affliction') {
@@ -396,7 +399,15 @@ export function CombatPanel(props: Props) {
 					if (b.riposte && b.foeId) {
 						const id = b.foeId;
 						const amount = b.riposte;
-						const hurtAt = fxEngine.current ? playRiposte(fxEngine.current, center(combat.pos[id])) : 300;
+						// Le guerrier s'élance vers la créature et revient (sur le plateau, la distance en pourcentage du jeton).
+						if (b.riposteBy) {
+							const a = center(combat.pos[b.riposteBy]);
+							const f = center(combat.pos[id]);
+							const len = Math.hypot(f.x - a.x, f.y - a.y) || 1;
+							setLunge({ id: b.riposteBy, dx: ((f.x - a.x) / len) * 38, dy: ((f.y - a.y) / len) * 38 });
+							timers.current.push(window.setTimeout(() => setLunge(null), 650));
+						}
+						const hurtAt = fxEngine.current ? playRiposte(fxEngine.current, center(combat.pos[id]), b.riposteBy ? center(combat.pos[b.riposteBy]) : undefined) : 300;
 						timers.current.push(window.setTimeout(() => setDmgLeft((d) => ({ ...d, [id]: Math.max(0, (d[id] ?? 0) - amount) })), hurtAt));
 					}
 					if (b.move && b.foeId) {
@@ -880,8 +891,14 @@ export function CombatPanel(props: Props) {
 								<button
 									key={`${c.id}-${landed && ((support?.what === 'heal' && !support.targetId) || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
 									type="button"
-									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${guard?.id === c.id ? ' is-aggro' : ''}`}
-									style={c.id === actor.id && drag ? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties) : place(combat.pos[c.id])}
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${guard?.id === c.id ? ' is-aggro' : ''}${lunge?.id === c.id ? ' is-lunging' : ''}`}
+									style={
+										c.id === actor.id && drag
+											? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties)
+											: lunge?.id === c.id
+												? ({ ...place(combat.pos[c.id]), '--lx': `${lunge.dx}%`, '--ly': `${lunge.dy}%` } as React.CSSProperties)
+												: place(combat.pos[c.id])
+									}
 									{...(c.id === actor.id ? dragHandlers : {})}
 									data-tuto={c.id === actor.id ? 'actif' : undefined}
 									disabled={ability ? !targetable : false}
@@ -890,8 +907,11 @@ export function CombatPanel(props: Props) {
 									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${guardable && guard ? ` — ${guard.name} se jette devant` : targetable ? ' — choisir' : ' — voir ses compétences'}`}
 									title={`${c.name} (${className(c)})`}
 								>
+									{/* Bouclier de lune : une bulle argentée qui miroite autour du héros ; défendu par le guerrier : un halo doré. */}
+									{st?.shield ? <span className="token__aura token__aura--moon" aria-hidden="true" /> : st?.protectedBy ? <span className="token__aura token__aura--guard" aria-hidden="true" /> : null}
 									<HeroPortrait className="token__img" character={c} media={media} />
 									<span className="token__icons" aria-hidden="true">
+										{CLASSES[c.classId].abilities.includes('oeil-pour-oeil') ? <span className="token__passive" title="Œil pour œil : renvoie les coups reçus au contact">👁️</span> : null}
 										{st?.protectedBy ? '🛡️' : ''}
 										{st?.shield ? '🌕' : ''}
 										{st?.fury ? '🔥' : ''}

@@ -1183,10 +1183,42 @@ export function playRally(eng: FxEngine, at: P) {
 }
 
 /** Œil pour œil : le coup revient sur la créature (un éclat doré) ; renvoie le moment (ms réelles) où elle perd ses PV. */
-export function playRiposte(eng: FxEngine, at: P) {
-	impact(eng, at, STEEL, 1.1, 100);
-	kapow(eng, at, 'BAM !', '#ffc76b', 100, 0.85);
-	return eng.real(100);
+export function playRiposte(eng: FxEngine, at: P, from?: P) {
+	// L'œil doré qui s'ouvre au-dessus du guerrier, puis le coup de bouclier qui part vers la créature.
+	if (from) {
+		eng.draw({
+			life: 700,
+			draw(ctx, t) {
+				const open = t < 0.25 ? ease.out(t / 0.25) : t > 0.75 ? 1 - (t - 0.75) / 0.25 : 1;
+				const x = from.x;
+				const y = from.y - 64 - 10 * ease.out(Math.min(1, t * 2));
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.globalAlpha = open;
+				ctx.beginPath();
+				ctx.moveTo(x - 26, y);
+				ctx.quadraticCurveTo(x, y - 22 * open, x + 26, y);
+				ctx.quadraticCurveTo(x, y + 22 * open, x - 26, y);
+				ctx.fillStyle = '#fff6dc';
+				ctx.fill();
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = INK;
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.arc(x, y, 9 * open, 0, Math.PI * 2);
+				ctx.fillStyle = '#ffb03f';
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(x, y, 4 * open, 0, Math.PI * 2);
+				ctx.fillStyle = INK;
+				ctx.fill();
+			},
+		});
+		slash(eng, at, '#ffc76b', angleTo(from, at) + Math.PI / 2, 140, 1.1);
+	}
+	impact(eng, at, STEEL, 1.2, 220);
+	speedLines(eng, at, 220, '#ffe28a');
+	kapow(eng, at, 'ŒIL POUR ŒIL !', '#ffc76b', 220, 0.9);
+	return eng.real(220);
 }
 
 /** Le poison qui ronge une créature à son tour ; renvoie le moment (ms réelles) où elle perd ses PV. */

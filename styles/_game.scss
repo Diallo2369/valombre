@@ -1836,6 +1836,57 @@
 		filter: drop-shadow(0 1px 2px rgb(0 0 0 / 80%));
 	}
 
+	/* Un passif toujours là (Œil pour œil) : une petite pastille. */
+	&__passive {
+		display: inline-grid;
+		place-items: center;
+		width: 1.5em;
+		height: 1.5em;
+		margin-right: 2px;
+		border-radius: 50%;
+		background: rgb(13 17 27 / 85%);
+		box-shadow: 0 0 0 2px #ffc76b;
+		font-size: 0.85em;
+	}
+
+	/*
+	 * L'aura de protection, façon bouclier de prêtre : une bulle qui miroite autour du jeton.
+	 * Argentée pour le Bouclier de lune, dorée quand le guerrier le défend (Intervention).
+	 */
+	&__aura {
+		--aura: 170 205 255;
+		position: absolute;
+		inset: -16%;
+		z-index: 2;
+		border-radius: 50%;
+		pointer-events: none;
+		background:
+			radial-gradient(circle at 32% 26%, rgb(255 255 255 / 55%), transparent 18%),
+			radial-gradient(circle, transparent 52%, rgb(var(--aura) / 28%) 66%, rgb(var(--aura) / 65%) 74%, transparent 76%);
+		box-shadow: 0 0 22px 4px rgb(var(--aura) / 45%), inset 0 0 18px rgb(var(--aura) / 45%);
+		animation: aura-pulse 2.2s ease-in-out infinite;
+
+		/* Le reflet qui tourne sur la bulle. */
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			border-radius: 50%;
+			background: conic-gradient(from 0deg, transparent 0 70%, rgb(255 255 255 / 55%) 80%, transparent 90%);
+			mask: radial-gradient(circle, transparent 62%, #000 66%, #000 74%, transparent 76%);
+			animation: aura-spin 3s linear infinite;
+		}
+
+		&--guard {
+			--aura: 255 199 107;
+		}
+	}
+
+	/* Œil pour œil : le guerrier s'élance vers la créature qui l'a frappé, et revient. */
+	&.is-lunging {
+		animation: riposte-lunge 0.6s cubic-bezier(0.3, 0.7, 0.4, 1);
+	}
+
 	&__name {
 		position: absolute;
 		top: 100%;
@@ -2496,6 +2547,25 @@
 	}
 }
 
+@keyframes aura-pulse {
+	50% {
+		scale: 1.05;
+		opacity: 0.85;
+	}
+}
+
+@keyframes aura-spin {
+	to {
+		rotate: 360deg;
+	}
+}
+
+@keyframes riposte-lunge {
+	35% {
+		translate: calc(-50% + var(--lx, 0%)) calc(-50% + var(--ly, 0%));
+	}
+}
+
 @keyframes turn-pulse {
 	50% {
 		box-shadow: 0 0 0 8px rgb(255 226 138 / 85%), 0 0 48px 16px rgb(255 226 138 / 45%);
@@ -2504,8 +2574,15 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.tuto__bubble,
-	.token.is-turn .token__img {
+	.token.is-turn .token__img,
+	.token__aura,
+	.token__aura::after {
 		animation: none;
+	}
+
+	/* Le va-et-vient est court et utile (on voit qui riposte) : on le garde, en plus doux. */
+	.token.is-lunging {
+		animation-duration: 0.9s;
 	}
 
 	.tuto__spot {
