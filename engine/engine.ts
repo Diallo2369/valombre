@@ -1155,7 +1155,10 @@ function pushAway(combat: CombatState, from: Hex, foe: FoeState): Hex | undefine
 
 /** Une action peut-elle être lancée maintenant (quelqu'un à portée) ? */
 export function canUse(combat: CombatState, party: Character[], hero: Character, ab: Ability): boolean {
-	if (cooldownLeft(combat, hero, ab)) return false;
+	// Écho : seul le sort qui résonne peut repartir (gratuitement, même s'il attend son délai).
+	if (combat.echo?.heroId === hero.id) {
+		if (ab.id !== combat.echo.ability) return false;
+	} else if (cooldownLeft(combat, hero, ab)) return false;
 	if (ab.target === 'party' || ab.target === 'none' || ab.target === 'hex') return true;
 	const t = targetsFor(combat, party, hero, ab);
 	return ab.target === 'ally' ? t.allies.length > 0 : t.foes.length > 0;
@@ -1524,7 +1527,10 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		return { ...work, events };
 	}
 	if (action.kind === 'wait') {
-		log(work.state, 'combat', `${hero.name} attend son heure.`);
+		if (combat.echo) {
+			delete combat.echo;
+			log(work.state, 'combat', `${hero.name} laisse l’écho s’éteindre.`);
+		} else log(work.state, 'combat', `${hero.name} attend son heure.`);
 		return afterHero();
 	}
 	if (action.kind === 'talk' && def.talk) {
@@ -1557,17 +1563,34 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 	if (action.kind === 'ability') {
 		const ab = ABILITIES[action.ability];
 		if (!ab || !availableAbilities(combat, hero).some((a) => a.id === ab.id)) throw new Error('Action impossible');
-		resolveAbility(work, def, hero, ab, action, events);
-		// Écho (mage, barde) : 1 chance sur 4 que le sort reparte, gratuitement, sur les mêmes cibles.
-		if (ab.spell && hasAbility(hero, 'echo') && hero.pv > 0 && livingFoes(combat).length && Math.random() < 0.25) {
-			const mark = events.length;
+		// Le second lancer de l'Écho : gratuit, sans dé, sur la cible choisie ; il ne résonne pas à son tour.
+		const echoing = combat.echo?.heroId === hero.id;
+		if (echoing && combat.echo!.ability !== ab.id) throw new Error('L’écho ne relance que le même sort');
+		resolveAbility(work, def, hero, ab, echoing ? { ...action, roll: null } : action, events, echoing);
+		delete combat.echo;
+		if (echoing || !livingFoes(combat).length) return afterHero();
+		// Écho (mage, barde) : 1 chance sur 4 que le sort résonne. Un sort qui vise : le héros choisit la nouvelle cible
+		// (son tour continue) ; un sort sans cible (chant, mélodie) repart tout seul.
+		if (ab.spell && hasAbility(hero, 'echo') && hero.pv > 0 && Math.random() < 0.25) {
 			events.push({ kind: 'proc', heroId: hero.id, name: 'Écho', icon: '🔁' });
-			try {
-				resolveAbility(work, def, hero, ab, { ...action, roll: null }, events, true);
-				log(work.state, 'combat', `Écho : le sort de ${hero.name} repart !`);
-			} catch {
-				// Plus de cible (elle est tombée) : l'écho s'éteint.
-				events.splice(mark);
+			const aimed = ab.target === 'foe' || ab.target === 'foes' || ab.target === 'ally' || ab.target === 'hex';
+			if (aimed) {
+				combat.echo = { heroId: hero.id, ability: ab.id };
+				if (canUse(combat, work.party, hero, ab)) {
+					log(work.state, 'combat', `Écho ! ${hero.name} peut relancer ${ab.name}, gratuitement, sur la cible de son choix.`);
+					return { ...work, events };
+				}
+				delete combat.echo;
+				events.pop();
+			} else {
+				const mark = events.length - 1;
+				try {
+					resolveAbility(work, def, hero, ab, { ...action, roll: null }, events, true);
+					log(work.state, 'combat', `Écho : le sort de ${hero.name} repart !`);
+				} catch {
+					// Plus personne à toucher (tout est tombé) : l'écho s'éteint.
+					events.splice(mark);
+				}
 			}
 		}
 		return afterHero();

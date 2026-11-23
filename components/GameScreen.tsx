@@ -374,7 +374,9 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const useAbility = (id: AbilityId, targets?: string[]) => {
 		if (!actor || !combatDef) return;
 		const ab = ABILITIES[id];
-		if (!ab.stat) {
+		// Le second lancer de l'Écho est gratuit : pas de dé.
+		const echo = combat?.echo?.heroId === actor.id && combat.echo.ability === id;
+		if (!ab.stat || echo) {
 			apply(combatTurn(campaign, game, { kind: 'ability', ability: id, targets, roll: null }));
 			return;
 		}

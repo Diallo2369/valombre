@@ -465,7 +465,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🔁',
 		passive: true,
 		target: 'none',
-		text: 'Ta magie résonne : chaque sort a 1 chance sur 4 de repartir une seconde fois, gratuitement (sans dé, sur les mêmes cibles).',
+		text: 'Ta magie résonne : chaque sort a 1 chance sur 4 de pouvoir repartir aussitôt, gratuitement et sans dé, sur la cible de ton choix (un chant repart tout seul).',
 	}),
 	'boule-de-neige': A({
 		id: 'boule-de-neige',

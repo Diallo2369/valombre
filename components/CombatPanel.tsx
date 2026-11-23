@@ -477,6 +477,11 @@ export function CombatPanel(props: Props) {
 	}, [seq]);
 
 	const busy = beat !== null;
+	/** Écho : le héros relance son sort, gratuitement, sur la cible de son choix. */
+	const echo = combat.echo?.heroId === actor.id && combat.phase === 'hero' ? combat.echo.ability : null;
+	useEffect(() => {
+		if (echo && !busy) setSelected(echo as AbilityId);
+	}, [echo, busy]);
 	const phase = combat.phase;
 	const say = beat?.kind === 'say' ? beat : null;
 	const ability = selected ? availableAbilities(combat, actor).find((a) => a.id === selected) : undefined;
@@ -705,6 +710,8 @@ export function CombatPanel(props: Props) {
 								? phase === 'hero'
 									? `Ce n’est pas son tour : c’est à ${actor.name} de jouer.`
 									: `Les monstres jouent.`
+								: ability && echo === ability.id
+								? `🔁 Écho ! ${ability.name} résonne : relance-le gratuitement, sans dé, sur la cible de ton choix.`
 								: ability
 								? ability.target === 'ally'
 									? `Touche sur le plateau le compagnon à aider (il brille).`
@@ -726,16 +733,22 @@ export function CombatPanel(props: Props) {
 									{ability.icon} {ability.name} : {picks.length === 1 ? 'sur cette créature' : `sur ces ${picks.length} créatures`}
 								</button>
 							) : null}
-							<button
-								type="button"
-								className="btn btn--ghost"
-								onClick={() => {
-									setSelected(null);
-									setPicks([]);
-								}}
-							>
-								← Choisir une autre action
-							</button>
+							{echo ? (
+								<button type="button" className="btn btn--ghost" onClick={props.onWait}>
+									Laisser l’écho s’éteindre
+								</button>
+							) : (
+								<button
+									type="button"
+									className="btn btn--ghost"
+									onClick={() => {
+										setSelected(null);
+										setPicks([]);
+									}}
+								>
+									← Choisir une autre action
+								</button>
+							)}
 						</div>
 					) : (
 						<div className="choices hero-card__actions" data-tuto="actions">

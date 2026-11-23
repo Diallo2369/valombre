@@ -476,6 +476,8 @@ export interface CombatState {
 	intents: Intent[];
 	/** Guerriers qui se sont déjà interposés (Intervention) pendant ce tour des monstres. */
 	reclaimed: string[];
+	/** Écho : le héros relance gratuitement ce sort, sur la cible de son choix (son tour continue). */
+	echo?: { heroId: string; ability: string };
 	/** Ronde enchantée du barde : une barrière de notes autour de ces cases, jusqu'à son prochain tour. Rien ne la traverse. */
 	barriers?: { heroId: string; zone: Hex[] }[];
 }
