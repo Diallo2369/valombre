@@ -140,6 +140,13 @@ On peut avoir un peu peur, jamais être dégoûté. Le mystère est le moteur : 
   Par classe (dégâts par combat, PV restants à la fin) : cœur-sauvage ~14, ~58 %, le plus souvent épuisé ; guerrier ~13
   (dont Œil pour œil), ~60 %, 2 à 3 fois plus de coups reçus ; rôdeur ~13 et mage ~12.5, ~82 % ; le barde soigne.
 
+### Le tutoriel du premier combat
+
+- `components/CombatTutorial.tsx` : au premier combat (n’importe lequel) tant que le compte ne l’a pas terminé ou passé
+  (table `user_flags`, drapeau `tutoriel-combat`). Projecteur sur l’élément expliqué (`data-tuto="…"` dans CombatPanel),
+  bulle entre deux animations ; il attend que le joueur se déplace, choisisse et vise. Le héros actif ressort (halo qui pulse).
+- « Revoir le tutoriel du combat » dans les réglages ; en test (atelier), rien n’est retenu sur le compte.
+
 ### La menace (l’aggro)
 
 - Chaque créature retient la menace de chaque héros (`FoeState.threat`) : 1 par PV infligé (×2 sur un coup critique),

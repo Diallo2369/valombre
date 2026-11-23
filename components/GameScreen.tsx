@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { saveGameAction, saveNotesAction } from '@/app/actions/game';
+import { saveGameAction, saveNotesAction, setTutorialDoneAction } from '@/app/actions/game';
 import {
 	activeHeroes,
 	combatTurn,
@@ -43,6 +43,8 @@ interface Props {
 	voices: MediaMap;
 	/** Mode test (atelier) : rien n'est sauvegardé. */
 	sandbox?: boolean;
+	/** Le tutoriel du premier combat est encore à faire (retenu sur le compte). */
+	tutorial?: boolean;
 }
 
 interface Toast {
@@ -80,12 +82,14 @@ function useWideScreen() {
 	return wide;
 }
 
-export function GameScreen({ adventureId, adventureName, campaign, initial, media, voices, sandbox = false }: Props) {
+export function GameScreen({ adventureId, adventureName, campaign, initial, media, voices, sandbox = false, tutorial: tutorialTodo = false }: Props) {
 	const [game, setGame] = useState<Game>(initial);
 	const [narration, setNarration] = useState<{ who: string; text: string }[]>([]);
 	const [toasts, setToasts] = useState<Toast[]>([]);
 	const [pending, setPending] = useState<PendingRoll | null>(null);
 	const [panel, setPanel] = useState<Panel>(null);
+	/** Le tutoriel du combat est encore à faire : il se lance au prochain combat. */
+	const [tutorial, setTutorial] = useState(tutorialTodo);
 	const [started, setStarted] = useState(false);
 	/** « Commencer l'aventure » : on plonge dans l'image de la scène (shader), puis l'histoire démarre. */
 	const [diving, setDiving] = useState(false);
@@ -540,6 +544,12 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							onMove={(to) => apply(combatTurn(campaign, game, { kind: 'move', to }))}
 							onWait={() => apply(combatTurn(campaign, game, { kind: 'wait' }))}
 							onIntervene={(heroId, allyId) => apply(combatTurn(campaign, game, { kind: 'intervene', heroId, allyId }))}
+							tutorial={tutorial}
+							onTutorialDone={() => {
+								setTutorial(false);
+								// En test (atelier), rien n'est retenu sur le compte.
+								if (!sandbox) void setTutorialDoneAction(true);
+							}}
 							onResolve={() => apply(combatTurn(campaign, game, { kind: 'resolve' }))}
 							onTalk={() =>
 								askRoll({
@@ -643,7 +653,16 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			) : null}
 			{panel === 'reglages' ? (
 				<Drawer title="Réglages" onClose={() => setPanel(null)}>
-					<SettingsContent prefs={prefs} onChange={updatePrefs} speech={speechSupported()} />
+					<SettingsContent
+						prefs={prefs}
+						onChange={updatePrefs}
+						speech={speechSupported()}
+						onReplayTutorial={() => {
+							setTutorial(true);
+							if (!sandbox) void setTutorialDoneAction(false);
+							setPanel(null);
+						}}
+					/>
 				</Drawer>
 			) : null}
 			{sheetHero ? (

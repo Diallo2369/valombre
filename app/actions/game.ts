@@ -17,6 +17,8 @@ import {
 	getCharacters,
 	isUnlocked,
 	saveCharacter,
+	setUserFlag,
+	TUTORIAL_FLAG,
 	unlock,
 	unlockWithCode,
 	updateAdventureState,
@@ -93,6 +95,12 @@ export async function createAdventureAction(input: {
 		state: start.state,
 	});
 	redirect(`/aventure/${id}`);
+}
+
+/** Le tutoriel du premier combat : fait (ou passé), ou à revoir. Retenu sur le compte. */
+export async function setTutorialDoneAction(done: boolean) {
+	const user = requireUser();
+	setUserFlag(user.id, TUTORIAL_FLAG, done);
 }
 
 /** Sauvegarde automatique après chaque action de jeu. */

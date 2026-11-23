@@ -2182,3 +2182,102 @@
 		display: none;
 	}
 }
+
+/* ---------- Tutoriel du premier combat ---------- */
+
+/* Le projecteur : tout s'assombrit sauf l'élément expliqué. Rien n'arrête les clics (on joue à travers). */
+.tuto {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+	pointer-events: none;
+
+	&__spot {
+		position: fixed;
+		border-radius: 16px;
+		box-shadow: 0 0 0 9999px rgb(6 8 14 / 62%), 0 0 0 3px #ffe28a, 0 0 28px 6px rgb(255 226 138 / 55%);
+		transition: left 0.35s ease, top 0.35s ease, width 0.35s ease, height 0.35s ease;
+
+		/* Pas d'élément à éclairer : tout l'écran est voilé (la bulle de fin). */
+		&.is-full {
+			inset: 0;
+			border-radius: 0;
+			box-shadow: inset 0 0 0 9999px rgb(6 8 14 / 62%);
+		}
+	}
+
+	&__bubble {
+		position: fixed;
+		pointer-events: auto;
+		padding: 16px 18px;
+		border-color: #ffe28a;
+		box-shadow: 0 0 0 1px rgb(255 226 138 / 40%), 0 18px 44px rgb(0 0 0 / 65%);
+		animation: tuto-in 0.3s ease both;
+	}
+
+	&__step {
+		margin: 0 0 4px;
+		font-size: 0.8rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ember-300);
+	}
+
+	&__title {
+		margin: 0 0 6px;
+		font-size: 1.2rem;
+	}
+
+	&__body {
+		margin: 0 0 12px;
+		line-height: 1.5;
+	}
+
+	&__actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 12px;
+	}
+
+	&__skip {
+		margin-left: auto;
+	}
+}
+
+@keyframes tuto-in {
+	from {
+		opacity: 0;
+		translate: 0 8px;
+	}
+}
+
+/* Pendant le tutoriel, le héros qui joue ressort nettement : halo doré qui pulse, les autres plus ternes. */
+.board.is-tuto {
+	.token.is-turn .token__img {
+		border-color: #ffe28a;
+		box-shadow: 0 0 0 5px #ffe28a, 0 0 34px 10px rgb(255 226 138 / 75%);
+		animation: tuto-pulse 1.3s ease-in-out infinite;
+	}
+
+	.token--hero:not(.is-turn) .token__img {
+		filter: saturate(0.55) brightness(0.75);
+	}
+}
+
+@keyframes tuto-pulse {
+	50% {
+		box-shadow: 0 0 0 8px rgb(255 226 138 / 85%), 0 0 48px 16px rgb(255 226 138 / 45%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tuto__bubble,
+	.board.is-tuto .token.is-turn .token__img {
+		animation: none;
+	}
+
+	.tuto__spot {
+		transition: none;
+	}
+}

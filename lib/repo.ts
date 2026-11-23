@@ -2,7 +2,7 @@ import 'server-only';
 import { CAMPAIGNS, getCampaign } from '@/campaigns';
 import { withStats } from '@/engine/rules';
 import type { Campaign, Character, GameState } from '@/engine/types';
-import { db } from './db';
+import { db, ensureSchema } from './db';
 
 /* ------------------------------------------------------------------ */
 /* Campagnes débloquées                                                */
@@ -26,6 +26,21 @@ export function unlock(userId: string, campaignId: string) {
 }
 
 /** Code saisi sur le portail : renvoie la campagne débloquée, ou null. */
+/** Le tutoriel du premier combat est fait (ou passé) : il ne revient plus. */
+export const TUTORIAL_FLAG = 'tutoriel-combat';
+
+/** Ce que le compte a déjà fait (ex. « tutoriel-combat »). */
+export function userFlag(userId: string, flag: string): boolean {
+	ensureSchema();
+	return Boolean(db().prepare('SELECT 1 FROM user_flags WHERE user_id = ? AND flag = ?').get(userId, flag));
+}
+
+export function setUserFlag(userId: string, flag: string, on: boolean) {
+	ensureSchema();
+	if (on) db().prepare('INSERT OR IGNORE INTO user_flags (user_id, flag, set_at) VALUES (?, ?, ?)').run(userId, flag, Date.now());
+	else db().prepare('DELETE FROM user_flags WHERE user_id = ? AND flag = ?').run(userId, flag);
+}
+
 export function unlockWithCode(userId: string, rawCode: string): Campaign | null {
 	const code = rawCode.trim().toUpperCase();
 	if (!code) return null;

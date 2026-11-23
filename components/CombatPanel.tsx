@@ -7,6 +7,7 @@ import { availableAbilities, canUse, cooldownLeft, interveners, moveOptions, pas
 import { CLASSES, DIFFICULTY, STATS, STAT_LABEL, className, classWithArticle, everyText, type Ability, type AbilityId } from '@/engine/rules';
 import type { Character, CombatDef, CombatState, FoeState, GameEvent } from '@/engine/types';
 import type { MediaMap } from '@/lib/media-types';
+import { CombatTutorial } from './CombatTutorial';
 import { CombatIntro } from './fx/CombatIntro';
 import { FxEngine } from './fx/fx-engine';
 import { BIG_FX, celebrate, playAbility, playFoeAttack, playFoeSpell, playPoison, playRally, playRiposte } from './fx/fx-library';
@@ -35,6 +36,9 @@ interface Props {
 	onWait: () => void;
 	/** Intervention : le guerrier se jette devant un compagnon visé. */
 	onIntervene: (heroId: string, allyId: string) => void;
+	/** Le tutoriel du premier combat est à faire (sur le compte) ; il est fini ou passé. */
+	tutorial?: boolean;
+	onTutorialDone?: () => void;
 	onResolve: () => void;
 	onTalk: () => void;
 	onFlee: () => void;
@@ -537,7 +541,7 @@ export function CombatPanel(props: Props) {
 		if (!intentOpen) setPassed([]);
 	}, [intentOpen]);
 	const intentBar = intentOpen ? (
-		<div className="intent-bar card" role="region" aria-label="Tour des monstres">
+		<div className="intent-bar card" role="region" aria-label="Tour des monstres" data-tuto="monstres">
 			{guard ? (
 				<>
 					<p className="intent-bar__text">
@@ -567,7 +571,7 @@ export function CombatPanel(props: Props) {
 		<>
 			{/* ---------- La carte du héros : celui dont c'est le tour, ou celui qu'on regarde ---------- */}
 			{phase === 'hero' || shown.id !== actor.id ? (
-				<section className={`hero-card card${busy && mine ? ' is-waiting' : ''}${mine ? '' : ' is-preview'}`} aria-labelledby="hero-card-title">
+				<section className={`hero-card card${busy && mine ? ' is-waiting' : ''}${mine ? '' : ' is-preview'}`} aria-labelledby="hero-card-title" data-tuto="fiche">
 					<HeroPortrait className="hero-card__portrait" character={shown} media={media} />
 					<div className="hero-card__head">
 						<h3 id="hero-card-title">
@@ -664,7 +668,7 @@ export function CombatPanel(props: Props) {
 							</button>
 						</div>
 					) : (
-						<div className="choices hero-card__actions">
+						<div className="choices hero-card__actions" data-tuto="actions">
 							{abilities.map((a) => {
 								const ok = mine && canUse(combat, party, actor, a);
 								const wait = cooldownLeft(combat, shown, a);
@@ -732,7 +736,7 @@ export function CombatPanel(props: Props) {
 				Combat contre {def.enemy.name}
 			</h2>
 
-			<ol className="fight__order" aria-label="Ordre de jeu (initiative)">
+			<ol className="fight__order" aria-label="Ordre de jeu (initiative)" data-tuto="ordre">
 				{order.map((id, i) => {
 					const down = id !== 'enemy' && (heroById(id)?.pv ?? 0) === 0;
 					return (
@@ -751,7 +755,7 @@ export function CombatPanel(props: Props) {
 			{/* ---------- Le plateau ---------- */}
 			{/* Le texte d'action est posé hors du plateau penché : en 3D, les jetons et les effets passeraient devant lui. */}
 			<div className="board-wrap">
-				<div className={`board${(ability && mine) || protectable.size ? ' is-aiming' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+				<div data-tuto="plateau" className={`board${(ability && mine) || protectable.size ? ' is-aiming' : ''}${props.tutorial ? ' is-tuto' : ''}`} style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
 					{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
 					<div className="board__table">
 						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
@@ -879,6 +883,7 @@ export function CombatPanel(props: Props) {
 									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${castId === c.id ? ' is-casting' : ''}${c.id === actor.id && canDrag ? ' is-draggable' : ''}${c.id === actor.id && drag ? ' is-dragging' : ''}${landId === c.id ? ' is-landing' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${guard?.id === c.id ? ' is-aggro' : ''}`}
 									style={c.id === actor.id && drag ? ({ ...place(combat.pos[c.id]), '--dx': `${drag.dx}px`, '--dy': `${drag.dy}px` } as React.CSSProperties) : place(combat.pos[c.id])}
 									{...(c.id === actor.id ? dragHandlers : {})}
+									data-tuto={c.id === actor.id ? 'actif' : undefined}
 									disabled={ability ? !targetable : false}
 									aria-pressed={!ability ? shown.id === c.id : undefined}
 									onClick={() => (ability ? fire(ability, [c.id]) : guardable && guard ? props.onIntervene(guard.id, c.id) : props.onView(c.id === actor.id ? null : c.id))}
@@ -940,6 +945,21 @@ export function CombatPanel(props: Props) {
 
 			{props.sideEl ? createPortal(side, props.sideEl) : side}
 			{intentBar && typeof document !== 'undefined' ? createPortal(intentBar, document.body) : null}
+			{props.tutorial && props.onTutorialDone ? (
+				<CombatTutorial
+					busy={busy}
+					phase={phase}
+					actorName={actor.name}
+					moved={combat.moved}
+					canMove={moves.length > 0}
+					aiming={Boolean(ability)}
+					seq={seq}
+					acted={events.some((e) => e.kind === 'ability')}
+					hasGuard={party.some((c) => c.classId === 'guerrier' && c.pv > 0)}
+					spellComing={combat.foes.some((f) => f.hp > 0 && f.charging)}
+					onDone={props.onTutorialDone}
+				/>
+			) : null}
 
 			{beat?.kind === 'intro' ? <CombatIntro from={props.introFrom} to={props.introTo ?? props.introFrom} ms={beat.ms} /> : null}
 

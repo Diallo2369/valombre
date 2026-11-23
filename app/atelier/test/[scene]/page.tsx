@@ -3,6 +3,7 @@ import { COMMON_MEDIA, getCampaign } from '@/campaigns';
 import { GameScreen } from '@/components/GameScreen';
 import { requireUser } from '@/lib/auth';
 import { scanMedia, voiceStatus } from '@/lib/media';
+import { TUTORIAL_FLAG, userFlag } from '@/lib/repo';
 import { sandboxGame } from '@/lib/sandbox';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export default function TestScenePage({ params, searchParams }: { params: { scen
 			media={media}
 			voices={voiceStatus(campaign).usable}
 			sandbox
+			tutorial={!userFlag(user.id, TUTORIAL_FLAG)}
 		/>
 	);
 }

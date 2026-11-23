@@ -206,7 +206,18 @@ export function VolumeControls({ prefs, onChange }: { prefs: Prefs; onChange: (p
 /* Réglages (propres à cet appareil)                                   */
 /* ------------------------------------------------------------------ */
 
-export function SettingsContent({ prefs, onChange, speech }: { prefs: Prefs; onChange: (p: Prefs) => void; speech: boolean }) {
+export function SettingsContent({
+	prefs,
+	onChange,
+	speech,
+	onReplayTutorial,
+}: {
+	prefs: Prefs;
+	onChange: (p: Prefs) => void;
+	speech: boolean;
+	/** Relancer le tutoriel du combat (il reviendra au prochain combat). */
+	onReplayTutorial?: () => void;
+}) {
 	const check = (label: string, value: boolean, set: (v: boolean) => void, hint?: string) => (
 		<label className="settings__check">
 			<input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
@@ -253,6 +264,14 @@ export function SettingsContent({ prefs, onChange, speech }: { prefs: Prefs; onC
 					<option value="simple">Simples (les jetons réagissent, sans animation)</option>
 				</select>
 			</label>
+			{onReplayTutorial ? (
+				<p className="settings__row">
+					<button type="button" className="btn btn--small btn--ghost" onClick={onReplayTutorial}>
+						🎓 Revoir le tutoriel du combat
+					</button>
+					<small> Il reviendra au prochain combat (ou tout de suite, si un combat est en cours).</small>
+				</p>
+			) : null}
 
 			<h3>Table</h3>
 			{check('On lance de vrais dés', prefs.realDice, (realDice) => onChange({ ...prefs, realDice }), 'Vous saisissez le résultat au lieu de lancer à l’écran.')}

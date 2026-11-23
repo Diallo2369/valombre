@@ -56,11 +56,29 @@ CREATE TABLE IF NOT EXISTS adventures (
 	updated_at INTEGER NOT NULL
 );
 
+-- Ce que le compte a déjà vu ou fait (le tutoriel du premier combat…).
+CREATE TABLE IF NOT EXISTS user_flags (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	flag TEXT NOT NULL,
+	set_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, flag)
+);
+
 CREATE INDEX IF NOT EXISTS adventures_user ON adventures(user_id);
 CREATE INDEX IF NOT EXISTS characters_user ON characters(user_id);
 `;
 
-const globalForDb = globalThis as unknown as { __valombreDb?: DatabaseSync };
+const globalForDb = globalThis as unknown as { __valombreDb?: DatabaseSync; __valombreSchema?: boolean };
+
+/**
+ * Le schéma à jour, même sur une connexion ouverte avant qu'on l'ait enrichi (serveur de dev qui tourne déjà) :
+ * il ne fait qu'ajouter ce qui manque (CREATE … IF NOT EXISTS).
+ */
+export function ensureSchema() {
+	if (globalForDb.__valombreSchema) return;
+	db().exec(SCHEMA);
+	globalForDb.__valombreSchema = true;
+}
 
 export function db(): DatabaseSync {
 	if (!globalForDb.__valombreDb) {
