@@ -47,7 +47,7 @@ export const MEDIA: MediaAsset[] = [
 	),
 	img(
 		'img-carte',
-		'La carte de la vallée de Valombre',
+		'Écran de chargement : la carte de la vallée de Valombre',
 		'Carte ancienne dessinée à la main sur un parchemin jauni, vue du dessus, style carte de conte illustrée et colorée à l’aquarelle. Une vallée entourée de collines brumeuses. On y voit : une route de terre qui entre par le bas à gauche et serpente ; sur une petite colline, une auberge au toit de chaume avec une enseigne en forme de chaudron ; un petit village aux toits rouges, un moulin et un puits, au bord d’une rivière ; une grande forêt sombre aux arbres serrés qui couvre le haut et la droite de la carte ; tout au fond de la forêt, une clairière avec un petit temple de pierre blanche qui brille doucement. Bancs de brume légers entre les collines. Une rose des vents dessinée dans un coin, de petits ornements dans les marges. Aucun personnage.',
 		'Écran de chargement : on zoome sur l’endroit où se trouve le groupe. Les positions des lieux comptent (voir la composition).',
 	),

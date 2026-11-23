@@ -51,6 +51,7 @@ export function atelierCollections(): AtelierCollection[] {
 	};
 	for (const c of CAMPAIGNS) {
 		use(c.cover, `${c.title} (couverture)`);
+		use(c.map?.image, `${c.title} (écran de chargement : carte du monde)`);
 		for (const s of Object.values(c.scenes)) {
 			const m = s.media ?? {};
 			[m.image, m.video, m.music, m.ambience, ...(m.sfx ?? []), s.combat?.enemy.image, ...(s.combat?.foes ?? []).map((f) => f.image)].forEach((id) => use(id, s.title));
