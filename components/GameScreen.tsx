@@ -254,7 +254,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		for (const e of events) if (e.kind === 'toast') fresh.push({ id: ++toastSeq, text: e.text, tone: e.tone });
 		if (!fresh.length) return;
 		setToasts((t) => [...t, ...fresh].slice(-5));
-		for (const t of fresh) window.setTimeout(() => setToasts((all) => all.filter((x) => x.id !== t.id)), 5000);
+		for (const t of fresh) window.setTimeout(() => setToasts((all) => all.filter((x) => x.id !== t.id)), Math.max(6000, readMs(t.text) + 2000));
 	};
 
 	const apply = (result: StepResult) => {

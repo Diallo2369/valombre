@@ -145,6 +145,9 @@ function place(h: Hex) {
  * et touche sa cible sur le plateau. Au tour des monstres, chacun annonce sa cible (flèche) : le guerrier ou
  * le danseur de guerre peuvent tenter de reprendre l'aggro avant qu'ils frappent.
  */
+/** Durée de lecture confortable d'un texte (lecture à voix haute en famille). */
+const readMs = (text: string) => 1500 + text.length * 60;
+
 export function CombatPanel(props: Props) {
 	const { def, combat, party, actor, media, events, seq, log, onSfx, voiceFor, voiceVolume } = props;
 	const difficulty = DIFFICULTY[def.enemy.difficulty].target;
@@ -279,6 +282,11 @@ export function CombatPanel(props: Props) {
 						ms: 2200,
 					});
 			}
+		}
+		// Le temps de lire : chaque texte reste affiché selon sa longueur (jamais moins que prévu).
+		for (const b of beats) {
+			const text = b.kind === 'say' ? b.text : b.kind === 'banner' ? [b.title, b.subtitle, ...(b.lines ?? [])].join(' ') : '';
+			if (text && !(b.kind === 'say' && b.move)) b.ms = Math.max(b.ms, readMs(text));
 		}
 		setDmgLeft(pending);
 		setPosFrom(from);
