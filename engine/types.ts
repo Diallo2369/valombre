@@ -341,6 +341,8 @@ export interface Campaign {
 	media: MediaAsset[];
 	/** Lumières vivantes par image (clé : identifiant de l'image). À ajuster quand l'illustration existe. */
 	lights?: Record<string, Light[]>;
+	/** Carte du monde (écran de chargement au début de l'aventure) : son image, et la position de chaque zone en %. */
+	map?: { image: string; zones: Record<string, [number, number]> };
 	style: StyleGuide;
 }
 

@@ -46,6 +46,12 @@ export const MEDIA: MediaAsset[] = [
 		'Sert aussi de vignette sur le portail. Garder le haut de l’image dégagé pour le titre.',
 	),
 	img(
+		'img-carte',
+		'La carte de la vallée de Valombre',
+		'Carte ancienne dessinée à la main sur un parchemin jauni, vue du dessus, style carte de conte illustrée et colorée à l’aquarelle. Une vallée entourée de collines brumeuses. On y voit : une route de terre qui entre par le bas à gauche et serpente ; sur une petite colline, une auberge au toit de chaume avec une enseigne en forme de chaudron ; un petit village aux toits rouges, un moulin et un puits, au bord d’une rivière ; une grande forêt sombre aux arbres serrés qui couvre le haut et la droite de la carte ; tout au fond de la forêt, une clairière avec un petit temple de pierre blanche qui brille doucement. Bancs de brume légers entre les collines. Une rose des vents dans un coin, des noms de lieux calligraphiés. Format 16:9, aucun personnage.',
+		'Écran de chargement : on zoome sur l’endroit où se trouve le groupe. Les positions des lieux comptent (voir la composition).',
+	),
+	img(
 		'img-route-brume',
 		'La route dans la brume',
 		'Chemin de terre boueux qui monte une colline sous la pluie fine, la nuit. Brume épaisse au ras du sol, arbres tordus de chaque côté. Au sommet, la fenêtre jaune d’une auberge perce le brouillard. Dans la brume, au ras du sol près du chemin, si on regarde bien, deux petits yeux ronds d’un bleu lumineux observent.',
@@ -571,6 +577,8 @@ export const LIGHTS: Record<string, Light[]> = {
  * Après génération, les lumières sont recalées sur l'image réelle si besoin.
  */
 export const COMPOSITIONS: Record<string, string> = {
+	'img-carte':
+		'Les lieux à ces places précises (le zoom vise chacun) : la route entre par le coin en bas à gauche ; l’auberge au chaudron sur sa colline, au tiers gauche, un peu sous la mi-hauteur ; le village aux toits rouges au centre, un peu sous la mi-hauteur, avec la rivière ; la lisière de la forêt juste au-dessus et à droite du centre ; la grande forêt sombre couvre le quart supérieur droit ; le petit temple blanc dans une clairière tout en haut à droite.',
 	'img-couverture': 'L’auberge au centre, un peu sous la mi-hauteur ; la forêt noire et la petite lueur bleue au fond à droite ; les quatre aventuriers de dos au premier plan, en bas à gauche. Haut de l’image dégagé (ciel) pour le titre.',
 	'img-route-brume': 'Une seule petite fenêtre jaune allumée, tout en haut de la colline, au tiers droit de l’image et dans son tiers supérieur. La route monte vers elle depuis le bas à gauche. Brume basse au premier plan.',
 	'img-auberge-porte': 'La porte de chêne au centre ; une lanterne allumée accrochée juste au-dessus de la porte, au centre, un peu au-dessus de la mi-hauteur. L’enseigne du chaudron fêlé en haut, légèrement à droite. Brume au sol.',

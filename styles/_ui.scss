@@ -325,7 +325,7 @@
 	width: 100vw;
 	height: 100vh;
 	pointer-events: none;
-	animation: fade-in 0.18s ease;
+	animation: fade-in var(--fade, 0.18s) ease;
 	transition: opacity 0.6s ease;
 
 	&.is-done {

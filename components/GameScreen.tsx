@@ -406,6 +406,10 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 
 	const sheetHero = panel && typeof panel === 'object' ? party.find((c) => c.id === panel.sheet) : undefined;
 	const stageImage = combat && combatDef?.enemy.image ? combatDef.enemy.image : scene.media?.image;
+	// L'écran de chargement : la carte du monde, et la position du groupe dessus (sa zone).
+	const mapUrl = campaign.map ? media[campaign.map.image] : undefined;
+	const mapAt = campaign.map?.zones[scene.zone ?? ''];
+	const mapFocus: [number, number] = mapAt ? [mapAt[0] / 100, mapAt[1] / 100] : [0.5, 0.5];
 
 	const partyPanel = (
 		<PartyPanel
@@ -683,16 +687,32 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			) : null}
 
 			{diving ? (
-				<DiveTransition
-					image={media[stageImage!]}
-					ms={1400}
-					night={false}
-					onDone={() => {
-						setStarted(true);
-						// On laisse l'éclat de lumière s'effacer sur la scène avant de retirer le shader.
-						window.setTimeout(() => setDiving(false), 600);
-					}}
-				/>
+				// La carte du monde apparaît en fondu, on zoome sur l'endroit où est le groupe, puis elle se fond dans la scène.
+				// Sans carte (pas encore illustrée) : on plonge simplement dans l'image de la scène.
+				mapUrl ? (
+					<DiveTransition
+						image={mapUrl}
+						to={media[stageImage!]}
+						ms={3000}
+						fadeIn={600}
+						focus={mapFocus}
+						onDone={() => {
+							setStarted(true);
+							window.setTimeout(() => setDiving(false), 600);
+						}}
+					/>
+				) : (
+					<DiveTransition
+						image={media[stageImage!]}
+						ms={1400}
+						night={false}
+						onDone={() => {
+							setStarted(true);
+							// On laisse l'éclat de lumière s'effacer sur la scène avant de retirer le shader.
+							window.setTimeout(() => setDiving(false), 600);
+						}}
+					/>
+				)
 			) : null}
 			{!started && !diving ? (
 				<div className="overlay">

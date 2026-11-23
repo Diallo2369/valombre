@@ -35,5 +35,18 @@ export const BRUMES_DE_VALOMBRE: Campaign = {
 	scenes,
 	media: MEDIA,
 	lights: LIGHTS,
+	// La carte de l'écran de chargement, et où se trouve chaque zone dessus (en % de l'image ; voir COMPOSITIONS).
+	map: {
+		image: 'img-carte',
+		zones: {
+			route: [14, 82],
+			auberge: [30, 60],
+			abords: [30, 60],
+			village: [50, 58],
+			lisiere: [60, 40],
+			foret: [74, 28],
+			sanctuaire: [86, 14],
+		},
+	},
 	style: COMMON_STYLE,
 };
