@@ -168,7 +168,7 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 			leavingRef.current = false;
 			setLeaving(false);
 			setBlocked(false);
-		}, 1000);
+		}, 560);
 		if (withSound) start();
 		else {
 			// Sans le son pour cette visite seulement : le bouton « Remettre la musique » reste là.

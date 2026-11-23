@@ -275,10 +275,10 @@
 /* On franchit l'écran d'entrée : le bouton grossit comme si on fonçait dedans, le noir s'ouvre sur la page. */
 .intro-gate.is-leaving {
 	pointer-events: none;
-	animation: gate-open 1s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+	animation: gate-open 0.55s ease-out forwards;
 
 	.intro-gate__card {
-		animation: gate-dive 1s cubic-bezier(0.6, 0, 0.8, 0.3) forwards;
+		animation: gate-dive 0.55s cubic-bezier(0.6, 0, 0.8, 0.3) forwards;
 	}
 }
 
@@ -300,7 +300,7 @@
 
 @keyframes gate-open {
 	0%,
-	35% {
+	10% {
 		background: rgb(0 0 0 / 100%);
 	}
 	100% {
