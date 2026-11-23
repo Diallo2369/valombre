@@ -70,7 +70,7 @@ export type AbilityId =
 	| 'berceuse'
 	| 'air-guerison'
 	| 'chant'
-	| 'delivrance';
+	| 'ronde';
 
 /** Qui l'action vise : une créature, plusieurs, toutes ; un compagnon ; le groupe ; personne. */
 export type AbilityTarget = 'foe' | 'foes' | 'all' | 'ally' | 'party' | 'none';
@@ -107,6 +107,8 @@ export interface Ability {
 	lifesteal?: number;
 	/** Bondit jusqu'à la cible (sur une case libre collée à elle) avant de frapper (Bond sauvage). */
 	leap?: boolean;
+	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
+	barrier?: boolean;
 	/** Repousse d'une case les créatures touchées, loin du héros (Déflagration runique). */
 	push?: boolean;
 	/** Œil pour œil (passif) : chaque créature qui le frappe au contact reçoit `damage` PV, avec `stunChance` d'être assommée. */
@@ -440,18 +442,20 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		icon: '🎶',
 		target: 'party',
 		heal: 2,
-		spell: true,
-		every: 4,
-		text: 'Tout le groupe récupère 2 PV.',
-	}),
-	delivrance: A({
-		id: 'delivrance',
-		name: 'Chant de délivrance',
-		icon: '🕊️',
-		target: 'party',
 		cleanse: true,
 		spell: true,
-		text: 'Une mélodie claire qui chasse les maux : poison, brûlure et froid quittent tout le groupe.',
+		every: 4,
+		text: 'Tout le groupe récupère 2 PV, et la mélodie claire chasse les maux : poison, brûlure et froid s’en vont.',
+	}),
+	ronde: A({
+		id: 'ronde', range: 4,
+		name: 'Ronde enchantée',
+		icon: '💫',
+		target: 'foe',
+		barrier: true,
+		spell: true,
+		every: 4,
+		text: 'Tu joues un air de danse : des notes dorées tournent autour d’une créature et des 6 cases voisines, de plus en plus vite, jusqu’à former un mur. Jusqu’à ton prochain tour, rien ne le traverse : ni les pas, ni les coups, ni les sorts. Ceux qui sont dedans y restent, ceux de dehors sont à l’abri.',
 	}),
 };
 
@@ -552,7 +556,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		pvBonus: 0,
 		armor: 0,
 		move: 3,
-		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'delivrance'],
+		abilities: ['air-guerison', 'bouclier-lune', 'berceuse', 'chant', 'ronde'],
 		power: { name: 'Chant de courage', text: 'Hors combat : tout le groupe récupère 2 PV. Rechargé au repos.' },
 		kit: ['Luth de voyage', 'Dague', 'Carnet de chansons'],
 	},

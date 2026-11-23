@@ -1452,6 +1452,11 @@
 		stroke-width: 4;
 	}
 
+	/* Sous une Ronde enchantée : rien n'y entre, rien n'en sort. */
+	&.is-ronde {
+		fill: rgb(255 210 122 / 14%);
+	}
+
 	/* Une case où va tomber un sort de zone préparé par une créature : on a encore un tour pour s'en écarter. */
 	&.is-danger {
 		fill: rgb(255 90 50 / 28%);
@@ -1491,6 +1496,33 @@
 	&--spell {
 		stroke: #c58cff;
 		stroke-dasharray: 4 9;
+	}
+}
+
+/* La Ronde enchantée : un anneau de notes dorées qui tourne. */
+.ronde {
+	animation: ronde-spin 6s linear infinite;
+	pointer-events: none;
+
+	&__ring {
+		fill: none;
+		stroke: #ffd27a;
+		stroke-width: 4;
+		stroke-dasharray: 3 12;
+		stroke-linecap: round;
+		filter: drop-shadow(0 0 6px #ffc76b);
+	}
+
+	&__note {
+		fill: #fff1b8;
+		font: 900 26px serif;
+		filter: drop-shadow(0 0 5px #ffc76b);
+	}
+}
+
+@keyframes ronde-spin {
+	to {
+		rotate: 360deg;
 	}
 }
 
@@ -2119,6 +2151,7 @@
 @media (prefers-reduced-motion: reduce) {
 	.hex.is-move,
 	.hex.is-danger,
+	.ronde,
 	.intent,
 	.token.is-target .token__img,
 	.token.is-aggro .token__img,

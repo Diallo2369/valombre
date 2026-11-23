@@ -268,6 +268,8 @@ export function CombatPanel(props: Props) {
 				if (e.kind === 'hit') pending[e.foeId] = (pending[e.foeId] ?? 0) + e.amount;
 				if (!acted) beats.push({ kind: 'wait', ms: 1800 });
 				acted = true;
+			} else if (e.kind === 'foe-blocked') {
+				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, ms: 2000, text: `🎶 ${cap(e.name)} se cogne contre la Ronde enchantée : rien ne passe !` });
 			} else if (e.kind === 'intervene') {
 				beats.push({ kind: 'say', tone: 'hero', ms: 2200, text: `🛡️ ${nameOf(e.heroId)} se jette devant ${nameOf(e.allyId)} : les coups seront pour lui !` });
 			} else if (e.kind === 'foe-charge') {
@@ -556,6 +558,8 @@ export function CombatPanel(props: Props) {
 	) : null;
 	/** Les cases où va tomber un sort de zone préparé (on peut encore s'en écarter). */
 	const danger = new Set(combat.foes.filter((f) => f.hp > 0 && f.charging?.zone).flatMap((f) => f.charging!.zone!.map(hexKey)));
+	/** Les cases sous une Ronde enchantée. */
+	const inRonde = new Set((combat.barriers ?? []).flatMap((b) => b.zone.map(hexKey)));
 
 	const side = (
 		<>
@@ -767,7 +771,7 @@ export function CombatPanel(props: Props) {
 										<polygon
 											key={k}
 											points={hexPoints(h)}
-											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}${danger.has(k) ? ' is-danger' : ''}`}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${drag?.over === k ? ' is-drop' : ''}${danger.has(k) ? ' is-danger' : ''}${inRonde.has(k) ? ' is-ronde' : ''}`}
 											data-hex={k}
 											onClick={canMove ? () => moveTo(h) : undefined}
 											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && moveTo(h) : undefined}
@@ -778,6 +782,21 @@ export function CombatPanel(props: Props) {
 									);
 								}),
 							)}
+							{(combat.barriers ?? []).map((b) => {
+								// La Ronde enchantée : un anneau de notes dorées qui tourne autour de sa zone.
+								const o = center(b.zone[0]);
+								const R = HEX_W * 1.55;
+								return (
+									<g key={b.heroId} className="ronde" style={{ transformOrigin: `${o.x}px ${o.y}px` }}>
+										<circle cx={o.x} cy={o.y} r={R} className="ronde__ring" />
+										{Array.from({ length: 12 }, (_, i) => (
+											<text key={i} x={o.x + Math.cos((i * Math.PI) / 6) * R} y={o.y + Math.sin((i * Math.PI) / 6) * R} className="ronde__note" textAnchor="middle" dominantBaseline="middle">
+												{i % 3 ? '♪' : '♫'}
+											</text>
+										))}
+									</g>
+								);
+							})}
 							{intents.map((i) => {
 								const a = posOf(i.foeId);
 								const b = combat.pos[i.heroId];

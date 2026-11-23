@@ -972,17 +972,41 @@ const ABILITY_FX: Record<string, Fx> = {
 		c.allies.forEach((a, i) => {
 			e.burst(a, 8, { speed: 40, life: 900, delay: 300 + i * 80, size: 5, color: '#8fe0a0', ay: -160, neon: true });
 			rising(e, a, ['+'], '#8fe0a0', 3, 300 + i * 80, 22);
+			// Les maux (fumée sombre) s'envolent.
+			e.burst(a, 5, { speed: 60, life: 800, delay: 380 + i * 80, size: 8, sizeEnd: 3, color: '#9a72c0', ay: -200, neon: true });
 		});
 		return 300;
 	},
-	delivrance: (e, c) => {
-		rising(e, c.from, ['♪', '♫'], '#ffe28a', 5, 0, 20);
-		c.allies.forEach((a, i) => {
-			// Le mal (fumée sombre) s'envole, une lumière dorée le remplace.
-			e.burst(a, 8, { speed: 60, life: 800, delay: 250 + i * 80, size: 9, sizeEnd: 3, color: '#9a72c0', ay: -200, neon: true });
-			e.burst(a, 4, { speed: 120, life: 700, delay: 400 + i * 80, size: 9, sizeEnd: 4, color: '#ffe28a', shape: 'star', vr: 5, neon: true });
+	ronde: (e, c) => {
+		// Un air de danse : des notes dorées tournent autour de la créature, de plus en plus vite, et se referment en mur.
+		const to = c.foes[0] ?? c.from;
+		const t = projectile(e, c.from, to, { color: '#ffe28a', head: 'glyph', glyph: '♫', speed: 650, size: 8, wobble: 14, arc: 30 });
+		const R = 105;
+		e.draw({
+			life: 1100,
+			delay: t,
+			draw(ctx, k) {
+				const close = ease.out(Math.min(1, k * 1.6));
+				const spin = k * k * Math.PI * 6;
+				const fade = k < 0.8 ? 1 : (1 - k) / 0.2;
+				ctx.globalAlpha = fade;
+				ctx.font = '900 22px serif';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				for (let i = 0; i < 12; i += 1) {
+					const a = spin + (i * Math.PI) / 6;
+					const r = R * (1.6 - 0.6 * close);
+					ctx.shadowColor = '#ffc76b';
+					ctx.shadowBlur = 14;
+					ctx.fillStyle = i % 2 ? '#fff1b8' : '#ffd27a';
+					ctx.fillText(i % 3 ? '♪' : '♫', to.x + Math.cos(a) * r, to.y + Math.sin(a) * r * 0.8);
+				}
+				ctx.beginPath();
+				ctx.ellipse(to.x, to.y, R, R * 0.8, 0, 0, Math.PI * 2);
+				glowStroke(ctx, '#ffd27a', 3 + 4 * close, 2.5);
+			},
 		});
-		return 300;
+		return t + 500;
 	},
 };
 
@@ -1021,7 +1045,7 @@ const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
 	'air-guerison': { word: 'AAAH !', fill: '#a8ffb4' },
 	berceuse: { word: 'ZZZ…', fill: '#cfe0ff' },
 	chant: { word: 'LA LA LAAA !', fill: '#b8f0c4' },
-	delivrance: { word: 'POUF !', fill: '#ffe28a' },
+	ronde: { word: 'TRA-LA-LA !', fill: '#ffe28a' },
 };
 
 /**
@@ -1100,7 +1124,7 @@ export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 	const fx = ABILITY_FX[ability];
 	let t: number;
-	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'delivrance', 'tourbillon', 'deflagration'].includes(ability))) {
+	if (!fx || (!c.foes.length && !c.allies.length && !['chant', 'tourbillon', 'deflagration'].includes(ability))) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
 		t = 120;
 	} else t = fx(eng, c);

@@ -468,6 +468,8 @@ export interface CombatState {
 	intents: Intent[];
 	/** Guerriers qui se sont déjà interposés (Intervention) pendant ce tour des monstres. */
 	reclaimed: string[];
+	/** Ronde enchantée du barde : une barrière de notes autour de ces cases, jusqu'à son prochain tour. Rien ne la traverse. */
+	barriers?: { heroId: string; zone: Hex[] }[];
 }
 
 /** Ce qu'une créature s'apprête à faire : aller frapper tel héros. */
@@ -568,6 +570,8 @@ export type GameEvent =
 	| { kind: 'foe-fizzle'; foeId: string; name: string; spell: string; why: 'muet' | 'assomme' }
 	/** Le guerrier s'interpose devant un compagnon visé (Intervention, pendant le tour des monstres). */
 	| { kind: 'intervene'; heroId: string; allyId: string }
+	/** La Ronde enchantée arrête le coup (ou le sort) : la cible est de l'autre côté. */
+	| { kind: 'foe-blocked'; foeId: string; name: string; heroId: string }
 	/** Œil pour œil : le guerrier renvoie le coup (et parfois assomme la créature). */
 	| { kind: 'riposte'; heroId: string; foeId: string; name: string; amount: number; stunned: boolean; dead: boolean }
 	/** Une créature passe son tour (sonnée, au filet, endormie). */
@@ -587,7 +591,7 @@ export type GameEvent =
 	/** Ordre de jeu tiré au début du combat. */
 	| { kind: 'initiative'; order: { id: string; name: string; die: number; bonus: number; total: number }[] }
 	/** Actions de soutien : protéger un compagnon, soigner, bouclier, délivrer des maux. */
-	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse'; targetId?: string; amount?: number }
+	| { kind: 'support'; heroId: string; what: 'protect' | 'heal' | 'shield' | 'cleanse' | 'barrier'; targetId?: string; amount?: number }
 	/** Début du tour d'un héros (bandeau « Au tour de… »). */
 	| { kind: 'turn'; heroId: string };
 

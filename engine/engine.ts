@@ -550,6 +550,30 @@ function foesOf(def: CombatDef, partySize: number): FoeState[] {
 	});
 }
 
+/* ---- La Ronde enchantée : une barrière que rien ne traverse ---- */
+
+/** De quel côté des rondes est cette case (la liste des rondes qui l'entourent ; vide : dehors). */
+function sideOf(combat: CombatState, h: Hex): string {
+	return (combat.barriers ?? [])
+		.map((b, i) => (b.zone.some((z) => sameHex(z, h)) ? String(i) : ''))
+		.filter(Boolean)
+		.join('|');
+}
+
+/** Deux cases du même côté des rondes : on peut aller de l'une à l'autre, et se frapper. */
+export function sameSide(combat: CombatState, a: Hex, b: Hex): boolean {
+	return !combat.barriers?.length || sideOf(combat, a) === sideOf(combat, b);
+}
+
+/** Cases interdites à qui se trouve là (l'autre côté des rondes), en plus des cases occupées. */
+function blockedFor(combat: CombatState, id: string): Set<string> {
+	const set = occupied(combat, id);
+	if (!combat.barriers?.length) return set;
+	const here = combat.pos[id];
+	for (let r = 0; r < BOARD.rows; r += 1) for (let c = 0; c < BOARD.cols; c += 1) if (!sameSide(combat, here, { c, r })) set.add(hexKey({ c, r }));
+	return set;
+}
+
 /** Cases occupées (les créatures vaincues libèrent la leur ; les héros épuisés restent couchés là). */
 function occupied(combat: CombatState, except?: string): Set<string> {
 	const set = new Set<string>();
@@ -640,7 +664,8 @@ export function interveners(combat: CombatState | null, party: Character[], inte
 			c.id !== intent.heroId &&
 			!combat.heroes[c.id]?.stunned &&
 			!combat.reclaimed.includes(c.id) &&
-			distance(combat.pos[c.id], target) <= 2,
+			distance(combat.pos[c.id], target) <= 2 &&
+			sameSide(combat, combat.pos[c.id], target),
 	);
 }
 
@@ -668,9 +693,11 @@ function computeIntents(game: Game, combat: CombatState): Intent[] {
 			out.push({ foeId: foe.id, heroId: taunter.id, why: 'taunt' });
 			continue;
 		}
-		const reach = active.filter((c) => distance(at, combat.pos[c.id]) <= foe.move + foe.range);
+		// Ceux qu'elle peut atteindre : à portée ce tour-ci, et pas derrière une Ronde enchantée.
+		const side = active.filter((c) => sameSide(combat, at, combat.pos[c.id]));
+		const reach = side.filter((c) => distance(at, combat.pos[c.id]) <= foe.move + foe.range);
 		const angry = (list: Character[]) => list.filter((c) => threatOf(foe, c.id) > 0).sort((a, b) => threatOf(foe, b.id) - threatOf(foe, a.id) || distance(at, combat.pos[a.id]) - distance(at, combat.pos[b.id]))[0];
-		const top = angry(reach) ?? angry(active);
+		const top = angry(reach) ?? angry(side) ?? angry(active);
 		if (top) out.push({ foeId: foe.id, heroId: top.id, why: 'threat' });
 		else {
 			const near = nearestHero(active, combat, at);
@@ -725,7 +752,7 @@ function maybePrepare(game: Game, foe: FoeState, events: GameEvent[]) {
 	const sp = foe.spell!;
 	const at = combat.pos[foe.id];
 	const aim = activeHeroes(game.party)
-		.filter((c) => distance(at, combat.pos[c.id]) <= sp.range)
+		.filter((c) => distance(at, combat.pos[c.id]) <= sp.range && sameSide(combat, at, combat.pos[c.id]))
 		.sort((a, b) => threatOf(foe, b.id) - threatOf(foe, a.id))[0];
 	if (sp.kind === 'rally' ? livingFoes(combat).length > 1 : aim) prepareSpell(game, foe, sp.kind === 'rally' ? '' : aim!.id, events);
 }
@@ -762,9 +789,12 @@ function castSpell(game: Game, foe: FoeState, events: GameEvent[]) {
 		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name} : les autres frapperont plus fort !`);
 	} else if (sp.kind === 'blast') {
 		const zone = new Set((ch.zone ?? []).map(hexKey));
-		const hit = active.filter((c) => zone.has(hexKey(combat.pos[c.id])));
+		const hit = active.filter((c) => zone.has(hexKey(combat.pos[c.id])) && sameSide(combat, combat.pos[foe.id], combat.pos[c.id]));
 		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name}${hit.length ? '' : ' : tout le monde s’est écarté à temps !'}`);
 		for (const c of hit) foeAttack(game, foe, c, events, { damage: sp.damage, spell: sp.name, afflict: sp.afflict, guardable: false });
+	} else if (target && !sameSide(combat, combat.pos[foe.id], combat.pos[target.id])) {
+		events.push({ kind: 'foe-blocked', foeId: foe.id, name: foe.name, heroId: target.id });
+		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name}… qui s’écrase sur la Ronde enchantée !`);
 	} else if (!target || !inReach(target)) {
 		log(game.state, 'combat', `${capitalize(foe.name)} lance ${sp.name}… mais sa cible est hors de portée !`);
 	} else if (sp.kind === 'sleep') {
@@ -806,7 +836,7 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 		const target = active.find((c) => c.id === intent?.heroId) ?? nearestHero(active, combat, combat.pos[foe.id]);
 		if (!target) break;
 		const from = combat.pos[foe.id];
-		const to = approach(from, combat.pos[target.id], foe.range, foe.move, occupied(combat, foe.id));
+		const to = approach(from, combat.pos[target.id], foe.range, foe.move, blockedFor(combat, foe.id));
 		if (!sameHex(from, to)) {
 			combat.pos[foe.id] = to;
 			events.push({ kind: 'foe-move', foeId: foe.id, from, to });
@@ -819,7 +849,16 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 			wearOff(foe);
 			continue;
 		}
-		const near = (h: Character) => h.pv > 0 && distance(combat.pos[foe.id], combat.pos[h.id]) <= 1;
+		// La Ronde enchantée les sépare : elle tape sur le mur de notes.
+		if (!sameSide(combat, to, combat.pos[target.id])) {
+			events.push({ kind: 'foe-blocked', foeId: foe.id, name: foe.name, heroId: target.id });
+			log(game.state, 'combat', `${capitalize(foe.name)} se cogne contre la Ronde enchantée : rien ne passe !`);
+			if (taunted) delete foe.enraged;
+			maybePrepare(game, foe, events);
+			wearOff(foe);
+			continue;
+		}
+		const near = (h: Character) => h.pv > 0 && distance(combat.pos[foe.id], combat.pos[h.id]) <= 1 && sameSide(combat, combat.pos[foe.id], combat.pos[h.id]);
 		// Plusieurs attaques (le Loup) : la même cible, ou s'il est tombé, le héros le plus proche à sa portée.
 		let aim: Character | undefined = target;
 		for (let n = 0; n < (foe.attacks ?? 1) && aim && foe.hp > 0; n += 1) {
@@ -829,7 +868,7 @@ function resolveEnemies(game: Game, events: GameEvent[]) {
 			const rage = first && taunted && Boolean(foe.enraged);
 			const struck = foeAttack(game, foe, aim, events, { taunted: first && taunted, rage });
 			for (const h of swept) if (foe.hp > 0 && h.pv > 0 && h.id !== struck) foeAttack(game, foe, h, events, { cleave: true });
-			if (aim.pv <= 0) aim = activeHeroes(game.party).filter((h) => distance(combat.pos[foe.id], combat.pos[h.id]) <= foe.range).sort((a, b) => distance(combat.pos[foe.id], combat.pos[a.id]) - distance(combat.pos[foe.id], combat.pos[b.id]))[0];
+			if (aim.pv <= 0) aim = activeHeroes(game.party).filter((h) => distance(combat.pos[foe.id], combat.pos[h.id]) <= foe.range && sameSide(combat, combat.pos[foe.id], combat.pos[h.id])).sort((a, b) => distance(combat.pos[foe.id], combat.pos[a.id]) - distance(combat.pos[foe.id], combat.pos[b.id]))[0];
 		}
 		if (taunted) delete foe.enraged;
 		delete foe.rallied;
@@ -972,6 +1011,11 @@ function advanceCombat(game: Game, def: CombatDef, events: GameEvent[]): 'hero' 
 		if (!hero || hero.pv <= 0) continue;
 		// Début de son tour : la protection qu'il donnait s'arrête, son mal le ronge.
 		for (const h of Object.values(combat.heroes)) if (h.protectedBy === id) delete h.protectedBy;
+		// Sa Ronde enchantée s'arrête.
+		if (combat.barriers?.some((b) => b.heroId === id)) {
+			combat.barriers = combat.barriers.filter((b) => b.heroId !== id);
+			if (!combat.barriers.length) delete combat.barriers;
+		}
 		const hs = combat.heroes[id];
 		if (hs?.stunned) {
 			delete hs.stunned;
@@ -1028,12 +1072,14 @@ export function passiveAbilities(hero: Character): Ability[] {
 export function targetsFor(combat: CombatState, party: Character[], hero: Character, ab: Ability): { foes: FoeState[]; allies: Character[] } {
 	const here = combat.pos[hero.id];
 	const range = ab.range ?? Infinity;
+	// Rien ne traverse une Ronde enchantée (sauf la Ronde elle-même, qui se pose où elle veut).
+	const across = (h: Hex) => ab.barrier || sameSide(combat, here, h);
 	const foes = ['foe', 'foes', 'all'].includes(ab.target)
-		? livingFoes(combat).filter((f) => distance(here, combat.pos[f.id]) <= range && (!ab.leap || Boolean(landing(combat, hero, f))))
+		? livingFoes(combat).filter((f) => distance(here, combat.pos[f.id]) <= range && across(combat.pos[f.id]) && (!ab.leap || Boolean(landing(combat, hero, f))))
 		: [];
 	const allies =
 		ab.target === 'ally'
-			? activeHeroes(party).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range))
+			? activeHeroes(party).filter((c) => (c.id === hero.id ? Boolean(ab.self) : distance(here, combat.pos[c.id]) <= range && across(combat.pos[c.id])))
 			: [];
 	return { foes: foes.sort((a, b) => distance(here, combat.pos[a.id]) - distance(here, combat.pos[b.id])), allies };
 }
@@ -1042,7 +1088,7 @@ export function targetsFor(combat: CombatState, party: Character[], hero: Charac
 function landing(combat: CombatState, hero: Character, foe: FoeState): Hex | undefined {
 	const here = combat.pos[hero.id];
 	if (distance(here, combat.pos[foe.id]) <= 1) return here;
-	const taken = occupied(combat, hero.id);
+	const taken = blockedFor(combat, hero.id);
 	return neighbors(combat.pos[foe.id])
 		.filter((h) => !taken.has(hexKey(h)))
 		.sort((a, b) => distance(here, a) - distance(here, b))[0];
@@ -1051,7 +1097,7 @@ function landing(combat: CombatState, hero: Character, foe: FoeState): Hex | und
 /** Déflagration : la case d'à côté qui l'éloigne le plus du héros, si elle est libre. */
 function pushAway(combat: CombatState, from: Hex, foe: FoeState): Hex | undefined {
 	const at = combat.pos[foe.id];
-	const taken = occupied(combat, foe.id);
+	const taken = blockedFor(combat, foe.id);
 	const best = neighbors(at)
 		.filter((h) => !taken.has(hexKey(h)) && distance(from, h) > distance(from, at))
 		.sort((a, b) => distance(from, b) - distance(from, a))[0];
@@ -1069,7 +1115,7 @@ export function canUse(combat: CombatState, party: Character[], hero: Character,
 /** Cases où le héros peut aller ce tour-ci. */
 export function moveOptions(combat: CombatState, hero: Character): Hex[] {
 	if (combat.phase !== 'hero' || combat.moved) return [];
-	return reachable(combat.pos[hero.id], CLASSES[hero.classId].move, occupied(combat, hero.id));
+	return reachable(combat.pos[hero.id], CLASSES[hero.classId].move, blockedFor(combat, hero.id));
 }
 
 /** Les anciennes parties (combat d'avant le plateau) : on relance proprement le combat en cours. */
@@ -1092,16 +1138,17 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const f = inRange.foes.find((x) => x.id === action.targets?.[0]) ?? (inRange.foes.length === 1 ? inRange.foes[0] : undefined);
 		if (!f) throw new Error('Cible hors de portée');
 		foes = [f];
-		if (ab.area) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1));
+		const mine = (o: FoeState) => ab.barrier || sameSide(combat, combat.pos[hero.id], combat.pos[o.id]);
+		if (ab.area) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && mine(o) && distance(combat.pos[o.id], combat.pos[f.id]) <= 1));
 		// Cône : celles juste derrière la première (collées à elle, à 2 cases du héros).
-		if (ab.cone) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && distance(combat.pos[o.id], combat.pos[f.id]) <= 1 && distance(combat.pos[o.id], combat.pos[hero.id]) === 2));
+		if (ab.cone) foes.push(...livingFoes(combat).filter((o) => o.id !== f.id && mine(o) && distance(combat.pos[o.id], combat.pos[f.id]) <= 1 && distance(combat.pos[o.id], combat.pos[hero.id]) === 2));
 		const chain = ab.chain;
 		if (chain) {
 			// L'éclair rebondit chaque fois sur la créature la plus proche de la précédente (dans l'ordre : c'est celui de l'effet).
 			for (let i = 0; i < chain.jumps; i += 1) {
 				const last = foes[foes.length - 1];
 				const next = livingFoes(combat)
-					.filter((o) => !foes.includes(o) && distance(combat.pos[o.id], combat.pos[last.id]) <= chain.reach)
+					.filter((o) => !foes.includes(o) && mine(o) && distance(combat.pos[o.id], combat.pos[last.id]) <= chain.reach)
 					.sort((a, b) => distance(combat.pos[a.id], combat.pos[last.id]) - distance(combat.pos[b.id], combat.pos[last.id]))[0];
 				if (!next) break;
 				foes.push(next);
@@ -1220,11 +1267,18 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 			events.push({ kind: 'foe-status', foeId: foe.id, heroId: hero.id, what: 'provoque' });
 		}
 	}
-	if (!ab.damage && foes.length) {
+	if (!ab.damage && !ab.barrier && foes.length) {
 		const what = ab.stun?.kind === 'filet' ? 'prend au filet' : ab.stun?.kind === 'sommeil' ? 'endort' : ab.blind ? 'aveugle' : ab.taunt ? 'nargue' : 'vise';
 		log(work.state, 'combat', `${hero.name} (${how}) ${what} ${names(foes)} !`);
 	}
 
+	if (ab.barrier && foes[0]) {
+		const at = combat.pos[foes[0].id];
+		const zone = [at, ...neighbors(at)];
+		combat.barriers = [...(combat.barriers ?? []).filter((b) => b.heroId !== hero.id), { heroId: hero.id, zone }];
+		events.push({ kind: 'support', heroId: hero.id, what: 'barrier', targetId: foes[0].id });
+		log(work.state, 'combat', `${hero.name} joue la Ronde enchantée : un mur de notes tourne autour de ${foes[0].name}. Rien ne passe jusqu’à son prochain tour !`);
+	}
 	if (ab.protect && ally) {
 		heroState(combat, ally.id).protectedBy = hero.id;
 		events.push({ kind: 'support', heroId: hero.id, what: 'protect', targetId: ally.id });
@@ -1248,7 +1302,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	} else if (ab.heal) {
 		let healed = 0;
 		for (const c of work.party) {
-			const gain = c.pv > 0 ? Math.min(ab.heal, c.pvMax - c.pv) : 0;
+			const gain = c.pv > 0 && sameSide(combat, combat.pos[hero.id], combat.pos[c.id]) ? Math.min(ab.heal, c.pvMax - c.pv) : 0;
 			c.pv += gain;
 			healed += gain;
 		}
@@ -1258,7 +1312,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		log(work.state, 'combat', `${hero.name} entonne le ${ab.name} : +${ab.heal} PV pour tout le groupe.`);
 	}
 	if (ab.cleanse) {
-		const healed = work.party.filter((c) => combat.heroes[c.id]?.afflict);
+		const healed = work.party.filter((c) => combat.heroes[c.id]?.afflict && sameSide(combat, combat.pos[hero.id], combat.pos[c.id]));
 		for (const c of healed) delete combat.heroes[c.id].afflict;
 		events.push({ kind: 'sfx', id: 'sfx-soin' });
 		events.push({ kind: 'support', heroId: hero.id, what: 'cleanse' });
