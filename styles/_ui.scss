@@ -272,29 +272,19 @@
 	}
 }
 
-/* On franchit l'écran d'entrée : le bouton grossit comme si on fonçait dedans, le noir s'ouvre sur la page. */
+/* On franchit l'écran d'entrée : le bouton s'efface et le noir s'ouvre sur la page. */
 .intro-gate.is-leaving {
 	pointer-events: none;
 	animation: gate-open 0.55s ease-out forwards;
 
 	.intro-gate__card {
-		animation: gate-dive 0.55s cubic-bezier(0.6, 0, 0.8, 0.3) forwards;
+		animation: gate-dive 0.3s ease-out forwards;
 	}
 }
 
 @keyframes gate-dive {
-	0% {
-		scale: 1;
-		opacity: 1;
-		filter: blur(0);
-	}
-	70% {
-		opacity: 1;
-	}
-	100% {
-		scale: 14;
+	to {
 		opacity: 0;
-		filter: blur(6px);
 	}
 }
 

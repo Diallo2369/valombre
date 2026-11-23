@@ -30,7 +30,7 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 	const [off, setOff] = useState(false);
 	/** Le navigateur a bloqué le son : on affiche l'écran d'entrée. */
 	const [blocked, setBlocked] = useState(false);
-	/** On franchit l'écran d'entrée : il s'agrandit comme si on avançait dedans, puis disparaît. */
+	/** On franchit l'écran d'entrée : il s'efface, puis disparaît. */
 	const [leaving, setLeaving] = useState(false);
 	const leavingRef = useRef(false);
 	const gate = useRef<HTMLDivElement>(null);
@@ -162,7 +162,7 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 
 	const enter = (withSound: boolean) => {
 		if (leavingRef.current) return;
-		// On avance dans l'écran d'entrée (il grossit et s'ouvre sur la page), puis il disparaît.
+		// L'écran d'entrée s'efface et s'ouvre sur la page, puis il disparaît.
 		leavingRef.current = true;
 		setLeaving(true);
 		window.setTimeout(() => {
