@@ -642,157 +642,160 @@ export function CombatPanel(props: Props) {
 			</ol>
 
 			{/* ---------- Le plateau ---------- */}
-			<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
-				{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
-				<div className="board__table">
-					<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
-						<defs>
-							<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-								<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
-							</marker>
-							<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-								<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
-							</marker>
-						</defs>
-						{Array.from({ length: BOARD.rows }, (_, r) =>
-							Array.from({ length: BOARD.cols }, (_, c) => {
-								const h = { c, r };
-								const k = hexKey(h);
-								const canMove = moveSet.has(k);
-								const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
+			{/* Le texte d'action est posé hors du plateau penché : en 3D, les jetons et les effets passeraient devant lui. */}
+			<div className="board-wrap">
+				<div className="board" style={{ aspectRatio: `${BOARD_W} / ${BOARD_H}` }}>
+					{/* La table, légèrement penchée (les jetons restent debout) ; les effets animés sont posés dessus. */}
+					<div className="board__table">
+						<svg className="board__grid" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden={moves.length ? undefined : true}>
+							<defs>
+								<marker id="arrow-foe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+									<path d="M0,0 L10,5 L0,10 z" fill="#ff7a5c" />
+								</marker>
+								<marker id="arrow-aggro" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+									<path d="M0,0 L10,5 L0,10 z" fill="#f6c27f" />
+								</marker>
+							</defs>
+							{Array.from({ length: BOARD.rows }, (_, r) =>
+								Array.from({ length: BOARD.cols }, (_, c) => {
+									const h = { c, r };
+									const k = hexKey(h);
+									const canMove = moveSet.has(k);
+									const zone = r <= 1 ? ' is-foe-zone' : r >= BOARD.rows - 2 ? ' is-hero-zone' : '';
+									return (
+										<polygon
+											key={k}
+											points={hexPoints(h)}
+											className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
+											onClick={canMove ? () => props.onMove(h) : undefined}
+											onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
+											tabIndex={canMove ? 0 : undefined}
+											role={canMove ? 'button' : undefined}
+											aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+										/>
+									);
+								}),
+							)}
+							{intents.map((i) => {
+								const a = posOf(i.foeId);
+								const b = combat.pos[i.heroId];
+								if (!a || !b) return null;
+								const p = center(a);
+								const q = center(b);
+								// On s'arrête au bord du jeton visé.
+								const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+								const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
+								const aggro = i.why !== 'near';
 								return (
-									<polygon
-										key={k}
-										points={hexPoints(h)}
-										className={`hex${zone}${canMove ? ' is-move' : ''}${rangeSet.has(k) ? ' is-range' : ''}`}
-										onClick={canMove ? () => props.onMove(h) : undefined}
-										onKeyDown={canMove ? (e) => (e.key === 'Enter' || e.key === ' ') && props.onMove(h) : undefined}
-										tabIndex={canMove ? 0 : undefined}
-										role={canMove ? 'button' : undefined}
-										aria-label={canMove ? `Aller sur cette case (${distance(combat.pos[actor.id], h)} case${distance(combat.pos[actor.id], h) > 1 ? 's' : ''})` : undefined}
+									<line
+										key={i.foeId}
+										className={`intent${aggro ? ' intent--aggro' : ''}`}
+										x1={p.x}
+										y1={p.y}
+										x2={end.x}
+										y2={end.y}
+										markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
 									/>
 								);
-							}),
-						)}
-						{intents.map((i) => {
-							const a = posOf(i.foeId);
-							const b = combat.pos[i.heroId];
-							if (!a || !b) return null;
-							const p = center(a);
-							const q = center(b);
-							// On s'arrête au bord du jeton visé.
-							const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
-							const end = { x: q.x - ((q.x - p.x) / len) * 42, y: q.y - ((q.y - p.y) / len) * 42 };
-							const aggro = i.why !== 'near';
+							})}
+						</svg>
+
+						{combat.foes.map((f) => {
+							const hit = landed ? hits.get(f.id) : undefined;
+							const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
+							const targetable = targets.foes.some((t) => t.id === f.id);
+							const acting = say?.foeId === f.id;
+							const hp = f.hp + (dmgLeft[f.id] ?? 0);
 							return (
-								<line
-									key={i.foeId}
-									className={`intent${aggro ? ' intent--aggro' : ''}`}
-									x1={p.x}
-									y1={p.y}
-									x2={end.x}
-									y2={end.y}
-									markerEnd={`url(#${aggro ? 'arrow-aggro' : 'arrow-foe'})`}
-								/>
+								<button
+									key={`${f.id}-${hit ? seq : 0}`}
+									type="button"
+									className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
+									style={place(posOf(f.id))}
+									disabled={!targetable}
+									onClick={() => ability && fire(ability, [f.id])}
+									aria-label={`${f.name} : ${heartsText(Math.max(0, hp))}${targetable ? ' — viser' : ''}`}
+									title={f.name}
+								>
+									<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
+									<span className="token__icons" aria-hidden="true">
+										{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
+										{f.poison ? '🧪' : ''}
+										{f.blind ? '🔆' : ''}
+										{f.taunt ? '😜' : ''}
+									</span>
+									<Hearts foe={f} hp={hp} small />
+									{hit ? <HeartPop count={Math.ceil(hit.amount / 2)} /> : null}
+									<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
+									{hit ? (
+										<span className="token__burst" aria-hidden="true">
+											{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
+										</span>
+									) : status?.failed ? (
+										<span className="token__burst token__burst--miss" aria-hidden="true">
+											Raté !
+										</span>
+									) : status ? (
+										<span className="token__burst token__burst--status" aria-hidden="true">
+											{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
+										</span>
+									) : null}
+								</button>
 							);
 						})}
-					</svg>
 
-					{combat.foes.map((f) => {
-						const hit = landed ? hits.get(f.id) : undefined;
-						const status = landed ? statuses.find((s) => s.foeId === f.id) : undefined;
-						const targetable = targets.foes.some((t) => t.id === f.id);
-						const acting = say?.foeId === f.id;
-						const hp = f.hp + (dmgLeft[f.id] ?? 0);
-						return (
-							<button
-								key={`${f.id}-${hit ? seq : 0}`}
-								type="button"
-								className={`token token--foe${hp <= 0 ? ' is-down' : ''}${hit?.crit ? ' is-crit' : ''}${hit ? ' is-hit' : ''}${hit?.spell ? ' is-spell' : ''}${acting ? ' is-acting' : ''}${targetable ? ' is-target' : ''}`}
-								style={place(posOf(f.id))}
-								disabled={!targetable}
-								onClick={() => ability && fire(ability, [f.id])}
-								aria-label={`${f.name} : ${heartsText(Math.max(0, hp))}${targetable ? ' — viser' : ''}`}
-								title={f.name}
-							>
-								<MediaView className="token__img" media={media} image={f.image} alt="" placeholder={f.name.replace(/^(le|la|les|l’)\s*/i, '')} />
-								<span className="token__icons" aria-hidden="true">
-									{f.stunned && f.stunKind ? STUN_ICON[f.stunKind] : ''}
-									{f.poison ? '🧪' : ''}
-									{f.blind ? '🔆' : ''}
-									{f.taunt ? '😜' : ''}
-								</span>
-								<Hearts foe={f} hp={hp} small />
-								{hit ? <HeartPop count={Math.ceil(hit.amount / 2)} /> : null}
-								<span className="token__name">{f.name.replace(/^(le|la|les)\s/i, '')}</span>
-								{hit ? (
-									<span className="token__burst" aria-hidden="true">
-										{hit.crit ? 'Critique ! ' : ''}−{heartsText(hit.amount)}
+						{party.map((c) => {
+							const st = combat.heroes[c.id];
+							const pv = c.pv + (dmgLeft[c.id] ?? 0);
+							const targetable = targets.allies.some((a) => a.id === c.id);
+							const isTurn = c.id === actor.id && phase === 'hero' && !busy;
+							return (
+								<button
+									key={`${c.id}-${landed && (support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
+									type="button"
+									className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
+									style={place(combat.pos[c.id])}
+									disabled={ability ? !targetable : false}
+									aria-pressed={!ability ? shown.id === c.id : undefined}
+									onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
+									aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ' — voir ses compétences'}`}
+									title={`${c.name} (${className(c)})`}
+								>
+									<HeroPortrait className="token__img" character={c} media={media} />
+									<span className="token__icons" aria-hidden="true">
+										{st?.protectedBy ? '🛡️' : ''}
+										{st?.shield ? '🌕' : ''}
+										{st?.fury ? '🔥' : ''}
+										{st?.afflict ? '🤒' : ''}
 									</span>
-								) : status?.failed ? (
-									<span className="token__burst token__burst--miss" aria-hidden="true">
-										Raté !
+									<span className="token__pv" aria-hidden="true">
+										<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
 									</span>
-								) : status ? (
-									<span className="token__burst token__burst--status" aria-hidden="true">
-										{status.what === 'provoque' ? '😜 Provoquée !' : status.what === 'poison' ? '🧪' : status.what === 'aveugle' ? '🔆 Aveuglée' : `${STUN_ICON[status.what]}`}
-									</span>
-								) : null}
-							</button>
-						);
-					})}
+									<span className="token__name">{c.name}</span>
+									{hurtId === c.id && say?.amount ? <HeartPop count={Math.min(4, say.amount)} /> : null}
+									{hurtId === c.id && say?.amount ? (
+										<span className="token__burst token__burst--hurt" aria-hidden="true">
+											−{say.amount} PV
+										</span>
+									) : !landed ? null : missedBy === c.id && !statuses.some((x) => x.failed) ? (
+										<span className="token__burst token__burst--miss" aria-hidden="true">
+											Raté !
+										</span>
+									) : support?.what === 'heal' ? (
+										<span className="token__burst token__burst--heal" aria-hidden="true">
+											+{support.amount} PV
+										</span>
+									) : support?.targetId === c.id ? (
+										<span className="token__burst token__burst--heal" aria-hidden="true">
+											{support.what === 'shield' ? '🌕' : '🛡️'}
+										</span>
+									) : null}
+								</button>
+							);
+						})}
 
-					{party.map((c) => {
-						const st = combat.heroes[c.id];
-						const pv = c.pv + (dmgLeft[c.id] ?? 0);
-						const targetable = targets.allies.some((a) => a.id === c.id);
-						const isTurn = c.id === actor.id && phase === 'hero' && !busy;
-						return (
-							<button
-								key={`${c.id}-${landed && (support?.what === 'heal' || support?.targetId === c.id || missedBy === c.id) ? seq : 0}`}
-								type="button"
-								className={`token token--hero${isTurn ? ' is-turn' : ''}${!ability && shown.id === c.id && shown.id !== actor.id ? ' is-viewed' : ''}${hurtId === c.id ? ' is-hurt' : ''}${pv <= 0 ? ' is-out' : ''}${targetable ? ' is-target' : ''}${aggroHeroes.has(c.id) ? ' is-aggro' : ''}`}
-								style={place(combat.pos[c.id])}
-								disabled={ability ? !targetable : false}
-								aria-pressed={!ability ? shown.id === c.id : undefined}
-								onClick={() => (ability ? fire(ability, [c.id]) : props.onView(c.id === actor.id ? null : c.id))}
-								aria-label={`${c.name}, ${className(c)} : ${pv} PV sur ${c.pvMax}${targetable ? ' — choisir' : ' — voir ses compétences'}`}
-								title={`${c.name} (${className(c)})`}
-							>
-								<HeroPortrait className="token__img" character={c} media={media} />
-								<span className="token__icons" aria-hidden="true">
-									{st?.protectedBy ? '🛡️' : ''}
-									{st?.shield ? '🌕' : ''}
-									{st?.fury ? '🔥' : ''}
-									{st?.afflict ? '🤒' : ''}
-								</span>
-								<span className="token__pv" aria-hidden="true">
-									<span style={{ width: `${(Math.max(0, pv) / c.pvMax) * 100}%` }} />
-								</span>
-								<span className="token__name">{c.name}</span>
-								{hurtId === c.id && say?.amount ? <HeartPop count={Math.min(4, say.amount)} /> : null}
-								{hurtId === c.id && say?.amount ? (
-									<span className="token__burst token__burst--hurt" aria-hidden="true">
-										−{say.amount} PV
-									</span>
-								) : !landed ? null : missedBy === c.id && !statuses.some((x) => x.failed) ? (
-									<span className="token__burst token__burst--miss" aria-hidden="true">
-										Raté !
-									</span>
-								) : support?.what === 'heal' ? (
-									<span className="token__burst token__burst--heal" aria-hidden="true">
-										+{support.amount} PV
-									</span>
-								) : support?.targetId === c.id ? (
-									<span className="token__burst token__burst--heal" aria-hidden="true">
-										{support.what === 'shield' ? '🌕' : '🛡️'}
-									</span>
-								) : null}
-							</button>
-						);
-					})}
-
-					{props.fx === 'full' ? <canvas ref={fxCanvas} className="board__fx" aria-hidden="true" /> : null}
+						{props.fx === 'full' ? <canvas ref={fxCanvas} className="board__fx" aria-hidden="true" /> : null}
+					</div>
 				</div>
 
 				{say ? (

@@ -1303,12 +1303,18 @@
 
 
 /* ================= Le plateau de combat ================= */
+/* Le plateau et son texte d'action, posé par-dessus. */
+.board-wrap {
+	position: relative;
+	width: min(100%, 760px);
+	justify-self: center;
+}
+
 .board {
 	--tilt: 16deg;
 	position: relative;
 	perspective: 1400px;
-	width: min(100%, 760px);
-	justify-self: center;
+	width: 100%;
 	border-radius: var(--radius-l);
 	background:
 		radial-gradient(ellipse at 50% 0%, rgb(232 87 74 / 14%), transparent 55%),
@@ -1344,13 +1350,13 @@
 		transform: translateZ(14px);
 	}
 
-	/* La phrase d'action, posée au milieu du plateau, entre les deux camps. */
+	/* La phrase d'action, posée au milieu du plateau, entre les deux camps (hors de la table penchée). */
 	&__say {
 		position: absolute;
 		left: 50%;
 		top: 50%;
 		translate: -50% -50%;
-		z-index: 5;
+		z-index: 10;
 		width: min(92%, 560px);
 		margin: 0;
 		padding: 10px 16px;
