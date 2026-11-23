@@ -52,7 +52,6 @@ export type AbilityId =
 	| 'tourbillon'
 	| 'fureur-ours'
 	| 'revers-sauvage'
-	| 'ambidextrie'
 	| 'folie'
 	| 'coeur-battant'
 	// Rôdeur
@@ -116,12 +115,14 @@ export interface Ability {
 	harder?: number;
 	/** Dégâts si ça touche, en PV. */
 	damage?: number;
-	/** Second coup, de l'autre main (Ambidextrie), en PV. */
+	/** Second coup, de l'autre main (les deux haches du Cœur-sauvage), en PV. */
 	offhand?: number;
 	/** PV que le héros récupère si ça touche (Fureur de l'ours). */
 	lifesteal?: number;
 	/** Mélodie apaisante : chaque héros du groupe reprend `amount` PV au début de ses `turns` prochains tours. */
 	regen?: { amount: number; turns: number };
+	/** Double attaque : si elle achève une créature, la prochaine attaque à une seule cible est un critique assuré. */
+	executeCrit?: boolean;
 	/** Multiplie la menace des dégâts (Revers sauvage : les créatures touchées enragent contre lui). */
 	threatMul?: number;
 	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
@@ -256,7 +257,8 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 3,
 		offhand: 2,
-		text: 'Une hache, puis l’autre : 3 PV + 2 PV.',
+		executeCrit: true,
+		text: 'Une hache, puis l’autre : 3 PV + 2 PV. Si elle achève la créature, ta prochaine attaque sur une seule cible est un coup critique assuré !',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,
@@ -303,14 +305,6 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		offhand: 2,
 		every: 3,
 		text: 'Les deux haches tournoient : toutes les créatures collées à toi perdent 2 PV + 2 PV.',
-	}),
-	ambidextrie: A({
-		id: 'ambidextrie',
-		name: 'Ambidextrie',
-		icon: '✋',
-		passive: true,
-		target: 'none',
-		text: 'Une hache dans chaque main : chaque attaque frappe deux fois, et la main gauche tape presque aussi fort que la droite.',
 	}),
 	'coeur-battant': A({
 		id: 'coeur-battant',
@@ -624,7 +618,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 		armor: 0,
 		threat: 1.7,
 		move: 4,
-		abilities: ['double-attaque', 'revers-sauvage', 'fureur-ours', 'tourbillon', 'moquerie', 'ambidextrie', 'folie', 'coeur-battant'],
+		abilities: ['double-attaque', 'revers-sauvage', 'fureur-ours', 'tourbillon', 'moquerie', 'folie', 'coeur-battant'],
 		power: { name: 'Ambidextre', text: 'Une hache dans chaque main : beaucoup de dégâts, mais rien qu’une fourrure sur le dos. Il faut frapper vite, avant d’être touché.' },
 		kit: ['Deux haches de guerre', 'Manteau de fourrure', 'Pot de peinture de guerre'],
 	},

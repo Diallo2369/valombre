@@ -1264,12 +1264,15 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const hs = heroState(combat, hero.id);
 		const fury = Boolean(hs.fury);
 		if (fury) delete hs.fury;
+		// Exécution (Double attaque) : la prochaine attaque à une seule cible est un critique assuré.
+		const executed = Boolean(hs.executed) && ab.target === 'foe';
+		if (executed) delete hs.executed;
 		const hits: string[] = [];
 		for (const foe of foes) {
 			let main = ab.damage;
 			if (ab.brumeBonus && def.enemy.brume) main *= 2;
 			// Œil de lynx : une flèche sur 5 est un coup critique.
-			const crit = Boolean(ab.crit) || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
+			const crit = Boolean(ab.crit) || executed || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
 			// Critique : dégâts doublés (les deux mains). Folie vengeresse : +50 % (arrondi au-dessus), sans être un critique.
 			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
@@ -1280,6 +1283,11 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 		events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 		log(work.state, 'combat', `${hero.name} (${how})${fury ? ', en pleine folie vengeresse,' : ''} touche : ${hits.join(' · ')}.`);
+		if (ab.executeCrit && foes.some((f) => f.hp <= 0)) {
+			hs.executed = true;
+			events.push({ kind: 'proc', heroId: hero.id, name: 'Exécution', icon: '💀' });
+			log(work.state, 'combat', `${hero.name} achève sa cible : sa prochaine attaque sera un coup critique !`);
+		}
 		// Fureur de l'ours (soin fixe) et Cœur battant (1 chance sur 3 par créature touchée aux haches) : un seul soin affiché.
 		const beats = hasAbility(hero, 'coeur-battant') && !ab.spell ? Array.from({ length: hits.length }, () => Math.random() < 1 / 3).filter(Boolean).length : 0;
 		if (ab.lifesteal || beats) {

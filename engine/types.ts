@@ -441,6 +441,8 @@ export interface HeroCombatState {
 	fury?: boolean;
 	/** Assommé par un gros coup : il passe son prochain tour. */
 	stunned?: boolean;
+	/** Il vient d'achever une créature (Double attaque) : sa prochaine attaque à une seule cible est un critique. */
+	executed?: boolean;
 	/** Mélodie apaisante : PV repris au début de ses prochains tours. */
 	regen?: { amount: number; turns: number };
 	/** Cri de rage : jusqu'à son prochain tour, il pare les coups (cette chance, 0-1). */
