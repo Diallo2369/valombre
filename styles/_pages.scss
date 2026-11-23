@@ -148,17 +148,6 @@ $home-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 	}
 }
 
-/* La transition qui fait entrer dans la pièce (shader), au-dessus de tout. */
-.room-transition {
-	position: fixed;
-	inset: 0;
-	z-index: 100;
-	width: 100vw;
-	height: 100vh;
-	pointer-events: none;
-	animation: fade-in 0.18s ease;
-}
-
 /* Sur l'accueil, l'en-tête du site arrive lui aussi en fondu, avec l'image. */
 body:has(.home) .site-header {
 	animation: home-fade 0.9s $home-ease 0.5s both;

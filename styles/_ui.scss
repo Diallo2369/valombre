@@ -317,6 +317,22 @@
 	}
 }
 
+/* La plongée dans une image (shader, voir fx/DiveTransition) : au-dessus de tout, elle s'efface à la fin. */
+.dive-transition {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	width: 100vw;
+	height: 100vh;
+	pointer-events: none;
+	animation: fade-in 0.18s ease;
+	transition: opacity 0.6s ease;
+
+	&.is-done {
+		opacity: 0;
+	}
+}
+
 .site-music {
 	position: fixed;
 	right: 16px;

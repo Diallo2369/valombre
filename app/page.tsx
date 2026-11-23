@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { COMMON_MEDIA, PORTAL_LIGHTS } from '@/campaigns';
 import { LightLayer } from '@/components/LightLayer';
-import { RoomLink } from '@/components/home/RoomLink';
 import { LegendTitle } from '@/components/home/LegendTitle';
 import { MediaView } from '@/components/MediaView';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -34,12 +34,12 @@ export default function HomePage() {
 							Le conteur raconte, les personnages parlent, et c’est toute la famille qui décide.
 						</p>
 						<div className="home__cta">
-							<RoomLink className="btn" href="/inscription" image={media['img-portail']}>
+							<Link className="btn" href="/inscription">
 								Créer notre table
-							</RoomLink>
-							<RoomLink className="btn btn--ghost" href="/connexion" image={media['img-portail']}>
+							</Link>
+							<Link className="btn btn--ghost" href="/connexion">
 								J’ai déjà un compte
-							</RoomLink>
+							</Link>
 						</div>
 					</div>
 				</section>

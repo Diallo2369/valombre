@@ -28,6 +28,7 @@ import { SoundMenu } from './SoundMenu';
 import { STORY_START_EVENT } from './SiteMusic';
 import { CombatPanel } from './CombatPanel';
 import { LightLayer } from './LightLayer';
+import { DiveTransition } from './fx/DiveTransition';
 import { MediaView } from './MediaView';
 import { PartyPanel } from './PartyPanel';
 import { RollDialog, type RollRequest } from './RollDialog';
@@ -87,6 +88,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const [pending, setPending] = useState<PendingRoll | null>(null);
 	const [panel, setPanel] = useState<Panel>(null);
 	const [started, setStarted] = useState(false);
+	/** « Commencer l'aventure » : on plonge dans l'image de la scène (shader), puis l'histoire démarre. */
+	const [diving, setDiving] = useState(false);
 	const [speaking, setSpeaking] = useState<number | null>(null);
 	/**
 	 * Jonctions entre scènes : le texte se dévoile réplique par réplique, au rythme de la voix ;
@@ -679,7 +682,19 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 				</Drawer>
 			) : null}
 
-			{!started ? (
+			{diving ? (
+				<DiveTransition
+					image={media[stageImage!]}
+					ms={1400}
+					night={false}
+					onDone={() => {
+						setStarted(true);
+						// On laisse l'éclat de lumière s'effacer sur la scène avant de retirer le shader.
+						window.setTimeout(() => setDiving(false), 600);
+					}}
+				/>
+			) : null}
+			{!started && !diving ? (
 				<div className="overlay">
 					<div className="start card">
 						<p className="start__eyebrow">{campaign.title}</p>
@@ -691,11 +706,13 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 						<button
 							type="button"
 							className="btn"
+							disabled={diving}
 							onClick={() => {
 								audio.current?.resume();
 								// Le thème du site s'efface : l'histoire commence.
 								window.dispatchEvent(new Event(STORY_START_EVENT));
-								setStarted(true);
+								if (stageImage && media[stageImage]) setDiving(true);
+								else setStarted(true);
 							}}
 						>
 							{state.turn > 1 ? 'Reprendre l’aventure' : 'Commencer l’aventure'}
