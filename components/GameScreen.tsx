@@ -687,18 +687,18 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			) : null}
 
 			{diving ? (
-				// La carte du monde apparaît en fondu, on zoome sur l'endroit où est le groupe, puis elle se fond dans la scène.
+				// Travelling dans la carte vers l'endroit où est le groupe, puis fondu sur la scène.
 				// Sans carte (pas encore illustrée) : on plonge simplement dans l'image de la scène.
 				mapUrl ? (
 					<DiveTransition
 						image={mapUrl}
-						to={media[stageImage!]}
-						ms={3000}
+						plain
+						ms={2400}
 						fadeIn={0}
 						focus={mapFocus}
 						onDone={() => {
 							setStarted(true);
-							window.setTimeout(() => setDiving(false), 600);
+							window.setTimeout(() => setDiving(false), 800);
 						}}
 					/>
 				) : (
