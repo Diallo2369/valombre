@@ -121,8 +121,8 @@ export interface Ability {
 	lifesteal?: number;
 	/** Mélodie apaisante : chaque héros du groupe reprend `amount` PV au début de ses `turns` prochains tours. */
 	regen?: { amount: number; turns: number };
-	/** Double attaque : si elle achève une créature, la prochaine attaque à une seule cible est un critique assuré. */
-	executeCrit?: boolean;
+	/** Exécution : si elle achève sa cible, elle peut être relancée aussitôt, dans le même tour (sans bouger). */
+	chainOnKill?: boolean;
 	/** Multiplie la menace des dégâts (Revers sauvage : les créatures touchées enragent contre lui). */
 	threatMul?: number;
 	/** Ronde enchantée : une barrière autour de la créature visée et des 6 cases voisines, jusqu'au prochain tour du héros. */
@@ -257,8 +257,8 @@ export const ABILITIES: Record<AbilityId, Ability> = {
 		stat: 'agilite',
 		damage: 3,
 		offhand: 2,
-		executeCrit: true,
-		text: 'Une hache, puis l’autre : 3 PV + 2 PV. Si elle achève la créature, ta prochaine attaque est un coup critique assuré (sur la première créature touchée).',
+		chainOnKill: true,
+		text: 'Une hache, puis l’autre : 3 PV + 2 PV. Si elle achève la créature, tu peux la relancer aussitôt sur une autre créature collée à toi, et encore, tant que tu achèves !',
 	}),
 	moquerie: A({
 		id: 'moquerie', range: 4,

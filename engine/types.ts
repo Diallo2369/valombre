@@ -441,8 +441,6 @@ export interface HeroCombatState {
 	fury?: boolean;
 	/** Assommé par un gros coup : il passe son prochain tour. */
 	stunned?: boolean;
-	/** Il vient d'achever une créature (Double attaque) : sa prochaine attaque à une seule cible est un critique. */
-	executed?: boolean;
 	/** Mélodie apaisante : PV repris au début de ses prochains tours. */
 	regen?: { amount: number; turns: number };
 	/** Cri de rage : jusqu'à son prochain tour, il pare les coups (cette chance, 0-1). */
@@ -478,6 +476,8 @@ export interface CombatState {
 	intents: Intent[];
 	/** Guerriers qui se sont déjà interposés (Intervention) pendant ce tour des monstres. */
 	reclaimed: string[];
+	/** Exécution : la Double attaque a achevé sa cible, le héros peut la relancer aussitôt (sans bouger : seulement sur ce qui est collé à lui). */
+	frenzy?: { heroId: string; ability: string };
 	/** Écho : le héros relance gratuitement ce sort, sur la cible de son choix (son tour continue). */
 	echo?: { heroId: string; ability: string };
 	/** Ronde enchantée du barde : une barrière de notes autour de ces cases, jusqu'à son prochain tour. Rien ne la traverse. */

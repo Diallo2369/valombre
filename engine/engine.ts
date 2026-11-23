@@ -1153,6 +1153,8 @@ function pushAway(combat: CombatState, from: Hex, foe: FoeState): Hex | undefine
 
 /** Une action peut-elle être lancée maintenant (quelqu'un à portée) ? */
 export function canUse(combat: CombatState, party: Character[], hero: Character, ab: Ability): boolean {
+	// Exécution : seule la Double attaque peut repartir.
+	if (combat.frenzy?.heroId === hero.id) return ab.id === combat.frenzy.ability && targetsFor(combat, party, hero, ab).foes.length > 0;
 	// Écho : seul le sort qui résonne peut repartir (gratuitement, même s'il attend son délai).
 	if (combat.echo?.heroId === hero.id) {
 		if (ab.id !== combat.echo.ability) return false;
@@ -1264,15 +1266,12 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		const hs = heroState(combat, hero.id);
 		const fury = Boolean(hs.fury);
 		if (fury) delete hs.fury;
-		// Exécution (Double attaque) : la prochaine attaque est un critique assuré, sur la première créature touchée seulement.
-		const executed = Boolean(hs.executed);
-		if (executed) delete hs.executed;
 		const hits: string[] = [];
-		for (const [i, foe] of foes.entries()) {
+		for (const foe of foes) {
 			let main = ab.damage;
 			if (ab.brumeBonus && def.enemy.brume) main *= 2;
 			// Œil de lynx : une flèche sur 5 est un coup critique.
-			const crit = Boolean(ab.crit) || (executed && i === 0) || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
+			const crit = Boolean(ab.crit) || (Boolean(ab.arrow) && hasAbility(hero, 'oeil-de-lynx') && Math.random() < 0.2);
 			// Critique : dégâts doublés (les deux mains). Folie vengeresse : +50 % (arrondi au-dessus), sans être un critique.
 			const amount = Math.min(Math.ceil((main + (ab.offhand ?? 0)) * (crit ? 2 : 1) * (fury ? 1.5 : 1)), foe.hp);
 			foe.hp -= amount;
@@ -1283,11 +1282,6 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 		}
 		events.push({ kind: 'sfx', id: ab.spell ? 'sfx-coeur-brise' : 'sfx-coup' });
 		log(work.state, 'combat', `${hero.name} (${how})${fury ? ', en pleine folie vengeresse,' : ''} touche : ${hits.join(' · ')}.`);
-		if (ab.executeCrit && foes.some((f) => f.hp <= 0)) {
-			hs.executed = true;
-			events.push({ kind: 'proc', heroId: hero.id, name: 'Exécution', icon: '💀' });
-			log(work.state, 'combat', `${hero.name} achève sa cible : sa prochaine attaque sera un coup critique !`);
-		}
 		// Fureur de l'ours (soin fixe) et Cœur battant (1 chance sur 3 par créature touchée aux haches) : un seul soin affiché.
 		const beats = hasAbility(hero, 'coeur-battant') && !ab.spell ? Array.from({ length: hits.length }, () => Math.random() < 1 / 3).filter(Boolean).length : 0;
 		if (ab.lifesteal || beats) {
@@ -1529,6 +1523,9 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		if (combat.echo) {
 			delete combat.echo;
 			log(work.state, 'combat', `${hero.name} laisse l’écho s’éteindre.`);
+		} else if (combat.frenzy) {
+			delete combat.frenzy;
+			log(work.state, 'combat', `${hero.name} reprend son souffle.`);
 		} else log(work.state, 'combat', `${hero.name} attend son heure.`);
 		return afterHero();
 	}
@@ -1565,9 +1562,25 @@ export function combatTurn(campaign: Campaign, game: Game, action: CombatAction)
 		// Le second lancer de l'Écho : gratuit, sans dé, sur la cible choisie ; il ne résonne pas à son tour.
 		const echoing = combat.echo?.heroId === hero.id;
 		if (echoing && combat.echo!.ability !== ab.id) throw new Error('L’écho ne relance que le même sort');
+		const frenzy = combat.frenzy?.heroId === hero.id ? combat.frenzy : undefined;
+		if (frenzy && frenzy.ability !== ab.id) throw new Error('Seule la Double attaque peut repartir');
+		const before = livingFoes(combat).length;
 		resolveAbility(work, def, hero, ab, echoing ? { ...action, roll: null } : action, events, echoing);
 		delete combat.echo;
+		delete combat.frenzy;
 		if (echoing || !livingFoes(combat).length) return afterHero();
+		// Exécution : elle a achevé sa cible, le héros peut frapper encore (son tour continue), sur ce qui est collé à lui.
+		if (ab.chainOnKill && livingFoes(combat).length < before && hero.pv > 0) {
+			combat.frenzy = { heroId: hero.id, ability: ab.id };
+			// Pas de déplacement entre deux coups : il enchaîne ce qui est collé à lui, là où il est.
+			combat.moved = true;
+			if (canUse(combat, work.party, hero, ab)) {
+				events.push({ kind: 'proc', heroId: hero.id, name: 'Exécution', icon: '💀' });
+				log(work.state, 'combat', `Exécution ! ${hero.name} achève sa cible et peut frapper encore.`);
+				return { ...work, events };
+			}
+			delete combat.frenzy;
+		}
 		// Écho (mage, barde) : 1 chance sur 4 que le sort résonne. Un sort qui vise : le héros choisit la nouvelle cible
 		// (son tour continue) ; un sort sans cible (chant, mélodie) repart tout seul.
 		if (ab.spell && hasAbility(hero, 'echo') && hero.pv > 0 && Math.random() < 0.25) {

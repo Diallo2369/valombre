@@ -479,9 +479,12 @@ export function CombatPanel(props: Props) {
 	const busy = beat !== null;
 	/** Écho : le héros relance son sort, gratuitement, sur la cible de son choix. */
 	const echo = combat.echo?.heroId === actor.id && combat.phase === 'hero' ? combat.echo.ability : null;
+	/** Exécution : il a achevé sa cible, il peut relancer sa Double attaque. */
+	const frenzy = combat.frenzy?.heroId === actor.id && combat.phase === 'hero' ? combat.frenzy : null;
+	const again = echo ?? frenzy?.ability ?? null;
 	useEffect(() => {
-		if (echo && !busy) setSelected(echo as AbilityId);
-	}, [echo, busy]);
+		if (again && !busy) setSelected(again as AbilityId);
+	}, [again, busy]);
 	const phase = combat.phase;
 	const say = beat?.kind === 'say' ? beat : null;
 	const ability = selected ? availableAbilities(combat, actor).find((a) => a.id === selected) : undefined;
@@ -659,7 +662,6 @@ export function CombatPanel(props: Props) {
 							<span>👣 {mine && combat.moved ? 'déjà déplacé' : `${cls.move} cases`}</span>
 							{hs?.shield ? <span>🌕 bouclier {hs.shield}</span> : null}
 							{hs?.fury ? <span className="is-hot">🔥 folie vengeresse : prochaine attaque +50 % !</span> : null}
-							{hs?.executed ? <span className="is-hot">💀 exécution : prochain coup critique (première cible) !</span> : null}
 							{hs?.stunned ? <span className="is-bad">💫 assommé·e : passe son prochain tour</span> : null}
 							{hs?.afflict ? <span className="is-bad">🤒 {hs.afflict.name}</span> : null}
 							{hs?.protectedBy ? <span>🛡️ défendu par {heroById(hs.protectedBy)?.name}</span> : null}
@@ -713,6 +715,8 @@ export function CombatPanel(props: Props) {
 									: `Les monstres jouent.`
 								: ability && echo === ability.id
 								? `🔁 Écho ! ${ability.name} résonne : relance-le gratuitement, sans dé, sur la cible de ton choix.`
+								: ability && frenzy
+								? `💀 Exécution ! Frappe encore une créature collée à toi (sans bouger) : achève-la, et tu pourras recommencer.`
 								: ability
 								? ability.target === 'ally'
 									? `Touche sur le plateau le compagnon à aider (il brille).`
@@ -734,9 +738,9 @@ export function CombatPanel(props: Props) {
 									{ability.icon} {ability.name} : {picks.length === 1 ? 'sur cette créature' : `sur ces ${picks.length} créatures`}
 								</button>
 							) : null}
-							{echo ? (
+							{echo || frenzy ? (
 								<button type="button" className="btn btn--ghost" onClick={props.onWait}>
-									Laisser l’écho s’éteindre
+									{echo ? 'Laisser l’écho s’éteindre' : 'Arrêter là (finir son tour)'}
 								</button>
 							) : (
 								<button
@@ -1012,7 +1016,6 @@ export function CombatPanel(props: Props) {
 										{st?.protectedBy ? '🛡️' : ''}
 										{st?.shield ? '🌕' : ''}
 										{st?.fury ? '🔥' : ''}
-										{st?.executed ? '💀' : ''}
 										{st?.stunned ? '💫' : ''}
 										{st?.guarding ? '📢' : ''}
 										{st?.afflict ? '🤒' : ''}
