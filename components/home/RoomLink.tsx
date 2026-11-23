@@ -22,16 +22,18 @@ uniform sampler2D img;
 uniform vec2 ratio;
 uniform vec2 focus;
 uniform float t;
+/* 1 : « réduire les animations » (pas de zoom ni de flou de mouvement, seulement la lumière et la nuit). */
+uniform float calm;
 
 vec2 cover(vec2 q) { return (q - 0.5) * ratio + 0.5; }
 
 void main() {
 	float k = t * t;
-	float zoom = 1.0 + 3.0 * k;
+	float zoom = 1.0 + 3.0 * k * (1.0 - calm);
 	vec2 q = focus + (uv - focus) / zoom;
 	// Flou de mouvement vers le point visé : plusieurs échantillons le long du rayon.
 	vec3 col = vec3(0.0);
-	float blur = 0.22 * t;
+	float blur = 0.22 * t * (1.0 - calm);
 	for (int i = 0; i < 12; i++) {
 		float s = float(i) / 11.0;
 		vec2 at = focus + (q - focus) * (1.0 - blur * s);
@@ -95,6 +97,7 @@ function RoomTransition({ image, ms, onDone }: { image: string; ms: number; onDo
 			gl.uniform2fv(gl.getUniformLocation(prog, 'ratio'), r > screen ? [screen / r, 1] : [1, r / screen]);
 			// On vise le milieu de la table, un peu vers les bougies.
 			gl.uniform2fv(gl.getUniformLocation(prog, 'focus'), [0.6, 0.45]);
+			gl.uniform1f(gl.getUniformLocation(prog, 'calm'), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0);
 			const ut = gl.getUniformLocation(prog, 't');
 			const start = performance.now();
 			const frame = (now: number) => {
@@ -119,7 +122,8 @@ function RoomTransition({ image, ms, onDone }: { image: string; ms: number; onDo
 
 /**
  * Un lien de la page d'accueil qui « fait entrer dans la pièce » : au clic, la transition se joue,
- * puis on navigue. Ctrl/Cmd-clic, clic du milieu et « réduire les animations » : lien normal, sans effet.
+ * puis on navigue. Ctrl/Cmd-clic et clic du milieu : lien normal. Avec « réduire les animations », la transition
+ * garde la lumière et le fondu vers la nuit, sans zoom.
  */
 export function RoomLink({ href, image, className, children, ms = 1300 }: { href: string; image?: string; className?: string; children: ReactNode; ms?: number }) {
 	const router = useRouter();
@@ -131,7 +135,6 @@ export function RoomLink({ href, image, className, children, ms = 1300 }: { href
 				className={className}
 				onClick={(e) => {
 					if (!image || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-					if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 					e.preventDefault();
 					setGoing(true);
 				}}

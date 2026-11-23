@@ -1,7 +1,6 @@
 /**
  * Le titre qui s'écrit à la plume : le contour des lettres se trace, puis elles se remplissent et s'illuminent.
  * Le texte reste lisible par les lecteurs d'écran (le dessin est décoratif).
- * Avec « réduire les animations », le titre s'affiche directement (voir .written-title dans _pages.scss).
  */
 export function WrittenTitle({ text, className }: { text: string; className?: string }) {
 	return (

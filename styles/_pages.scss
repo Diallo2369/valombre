@@ -34,8 +34,8 @@
 		stroke-dasharray: 1400;
 		stroke-dashoffset: 1400;
 		animation:
-			title-write 2.2s cubic-bezier(0.55, 0.1, 0.35, 1) 0.4s forwards,
-			title-fill 1s ease 2.2s forwards;
+			title-write 2.2s cubic-bezier(0.55, 0.1, 0.35, 1) 0.6s forwards,
+			title-fill 1s ease 2.4s forwards;
 	}
 }
 
@@ -67,6 +67,26 @@
 	}
 }
 
+@keyframes home-unblur {
+	from {
+		filter: blur(22px) brightness(0.35);
+		scale: 1.06;
+	}
+}
+
+/* Sans glissement ni zoom : seulement l'apparition et le défloutage. */
+@keyframes home-fade {
+	from {
+		opacity: 0;
+	}
+}
+
+@keyframes home-unblur-still {
+	from {
+		filter: blur(22px) brightness(0.35);
+	}
+}
+
 /* La transition qui fait entrer dans la pièce (shader), au-dessus de tout. */
 .room-transition {
 	position: fixed;
@@ -78,18 +98,16 @@
 	animation: fade-in 0.18s ease;
 }
 
+/* « Réduire les animations » : on garde les effets doux (flou, fondus, écriture du titre), sans mouvement. */
 @media (prefers-reduced-motion: reduce) {
-	.written-title__text {
-		animation: none;
-		fill-opacity: 1;
-		stroke-dashoffset: 0;
-		stroke-opacity: 0.35;
+	.home__bg {
+		animation-name: home-unblur-still;
 	}
 
 	.home__eyebrow,
 	.home__lead,
 	.home__cta {
-		animation: none;
+		animation-name: home-fade;
 	}
 }
 
@@ -114,6 +132,8 @@
 		inset: 0;
 		overflow: hidden;
 		container-type: size;
+		/* Le défloutage : l'image arrive floue et sombre, puis la pièce se dévoile. */
+		animation: home-unblur 2.4s cubic-bezier(0.3, 0.6, 0.3, 1) 0.1s both;
 
 		&::after {
 			content: '';
