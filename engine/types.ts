@@ -162,6 +162,8 @@ export interface CombatDef {
 	/**
 	 * Plusieurs créatures, chacune avec ses cœurs (sinon une seule : `enemy`).
 	 * `enemy` garde alors le nom du groupe, la difficulté, l'attaque racontée et les valeurs par défaut.
+	 * La liste est écrite pour une table de 6 : avec moins de héros, on n'en garde que les premières
+	 * (4 sur 6 à 4 héros, 2 sur 6 à 2 héros) ; mettre les plus importantes en tête.
 	 */
 	foes?: FoeDef[];
 	victory: Outcome;

@@ -495,27 +495,38 @@ const heroState = (combat: CombatState, id: string) => (combat.heroes[id] ??= { 
 const epuise = (c: Character) => (c.gender === 'm' ? 'épuisé' : c.gender === 'f' ? 'épuisée' : 'épuisé·e');
 
 /**
- * Les créatures du combat : un groupe (`foes`) ou une seule (`enemy`).
- * Les cœurs et les dégâts sont écrits pour 4 héros, et suivent la taille du groupe :
- * chaque héros de plus, c'est un coup de plus par tour, donc des PV en plus pour les créatures ;
- * et plus de héros à abattre, donc des coups plus forts.
+ * Les créatures du combat, adaptées à la taille du groupe (valeurs écrites pour 4 héros).
+ * - Une créature seule (`enemy`) : plus de héros, c'est plus de coups à encaisser par tour
+ *   et plus de cibles à abattre ; ses PV et la force de ses coups montent.
+ * - Une bande (`foes`, écrite pour une table de 6) : plus de héros, plus de créatures.
+ *   On garde les premières de la liste ; leurs PV sont ajustés pour que le total suive la même règle.
  */
 export function foeScale(partySize: number) {
 	return { hp: (partySize * partySize + 4 * partySize) / 32, damage: 0.1 + partySize * 0.225 };
 }
 
+/** Nombre de créatures d'une bande écrite pour 6 héros, pour un groupe de `partySize`. */
+const bandSize = (listed: number, partySize: number) => Math.min(listed, Math.max(2, Math.round((listed * partySize) / 6)));
+
 function foesOf(def: CombatDef, partySize: number): FoeState[] {
 	const { hp: scale, damage: hit } = foeScale(partySize);
-	const list = def.foes?.length ? def.foes : [{ name: def.enemy.name, hearts: def.enemy.hearts }];
+	const band = Boolean(def.foes && def.foes.length > 1);
+	const all = def.foes?.length ? def.foes : [{ name: def.enemy.name, hearts: def.enemy.hearts }];
+	const list = band ? all.slice(0, bandSize(all.length, partySize)) : all;
+	// Bande : PV totaux = ceux de la bande à 4 héros × la règle de taille ; ses coups ne grossissent pas (le nombre suffit).
+	const hearts = (n: number) => all.slice(0, n).reduce((a, f) => a + f.hearts, 0);
+	const hpMul = band ? (scale * hearts(bandSize(all.length, 4))) / hearts(list.length) : scale;
+	const dmgMul = band ? 1 : hit;
 	return list.map((f, i) => {
 		const afflict = 'afflict' in f && f.afflict ? f.afflict : def.enemy.afflict;
+		const hp = Math.max(2, Math.round(f.hearts * 2 * hpMul));
 		return {
 			id: `f${i + 1}`,
 			name: f.name,
-			hp: Math.max(2, Math.round(f.hearts * 2 * scale)),
-			maxHp: Math.max(2, Math.round(f.hearts * 2 * scale)),
+			hp,
+			maxHp: hp,
 			image: ('image' in f && f.image) || def.enemy.image,
-			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * hit)),
+			damage: Math.max(1, Math.round((('damage' in f && f.damage) || def.enemy.damage) * dmgMul)),
 			move: ('move' in f && f.move) || def.enemy.move || 2,
 			range: ('range' in f && f.range) || def.enemy.range || 1,
 			...(afflict ? { afflict } : {}),
