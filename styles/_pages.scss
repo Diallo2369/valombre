@@ -14,6 +14,85 @@
 	}
 }
 
+/* Le titre écrit à la plume : le contour se trace, puis les lettres se remplissent et s'illuminent. */
+.written-title {
+	&__svg {
+		display: block;
+		width: 100%;
+		height: auto;
+		overflow: visible;
+	}
+
+	&__text {
+		font-family: var(--font-title);
+		font-size: 170px;
+		font-weight: 700;
+		fill: var(--parchment-100);
+		fill-opacity: 0;
+		stroke: var(--ember-300);
+		stroke-width: 2.5px;
+		stroke-dasharray: 1400;
+		stroke-dashoffset: 1400;
+		animation:
+			title-write 2.2s cubic-bezier(0.55, 0.1, 0.35, 1) 0.4s forwards,
+			title-fill 1s ease 2.2s forwards;
+	}
+}
+
+@keyframes title-write {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes title-fill {
+	0% {
+		fill-opacity: 0;
+		filter: drop-shadow(0 0 0 rgb(246 194 127 / 0%));
+	}
+	50% {
+		filter: drop-shadow(0 0 18px rgb(246 194 127 / 80%));
+	}
+	100% {
+		fill-opacity: 1;
+		stroke-opacity: 0.35;
+		filter: drop-shadow(0 0 6px rgb(246 194 127 / 35%));
+	}
+}
+
+@keyframes home-rise {
+	from {
+		opacity: 0;
+		translate: 0 18px;
+	}
+}
+
+/* La transition qui fait entrer dans la pièce (shader), au-dessus de tout. */
+.room-transition {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	width: 100vw;
+	height: 100vh;
+	pointer-events: none;
+	animation: fade-in 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.written-title__text {
+		animation: none;
+		fill-opacity: 1;
+		stroke-dashoffset: 0;
+		stroke-opacity: 0.35;
+	}
+
+	.home__eyebrow,
+	.home__lead,
+	.home__cta {
+		animation: none;
+	}
+}
+
 @keyframes fade-in {
 	from {
 		opacity: 0;
@@ -82,15 +161,34 @@
 	}
 
 	&__title {
-		font-size: clamp(3rem, 10vw, 6.5rem);
+		width: min(100%, 620px);
 		margin: 0.1em 0 0.2em;
-		text-shadow: 0 4px 30px rgb(0 0 0 / 60%);
+		filter: drop-shadow(0 4px 24px rgb(0 0 0 / 60%));
 	}
 
 	&__lead {
 		max-width: 640px;
 		font-size: 1.25rem;
 		color: var(--parchment-200);
+	}
+
+	/* Après le titre écrit, le reste apparaît l'un après l'autre. */
+	&__eyebrow,
+	&__lead,
+	&__cta {
+		animation: home-rise 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+	}
+
+	&__eyebrow {
+		animation-delay: 0.2s;
+	}
+
+	&__lead {
+		animation-delay: 2.4s;
+	}
+
+	&__cta {
+		animation-delay: 2.9s;
 	}
 
 	&__cta {
@@ -120,8 +218,21 @@
 .auth-page {
 	display: grid;
 	place-items: center;
+	gap: 20px;
 	padding-top: 40px;
 	padding-bottom: 80px;
+
+	/* Pour revenir à l'accueil sans créer de compte. */
+	&__back {
+		color: var(--parchment-300);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+
+		&:hover,
+		&:focus-visible {
+			color: var(--parchment-100);
+		}
+	}
 }
 
 .auth {

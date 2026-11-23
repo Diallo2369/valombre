@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { COMMON_MEDIA, PORTAL_LIGHTS } from '@/campaigns';
 import { LightLayer } from '@/components/LightLayer';
+import { RoomLink } from '@/components/home/RoomLink';
+import { WrittenTitle } from '@/components/home/WrittenTitle';
 import { MediaView } from '@/components/MediaView';
 import { SiteHeader } from '@/components/SiteHeader';
 import { currentUser } from '@/lib/auth';
@@ -26,19 +27,19 @@ export default function HomePage() {
 					</div>
 					<div className="home__content container">
 						<p className="home__eyebrow">Jeu de rôle familial</p>
-						<h1 className="home__title">Valombre</h1>
+						<WrittenTitle className="home__title" text="Valombre" />
 						<p className="home__lead">
 							Une vallée noyée de brume, une auberge au coin du feu, des héros tirés aux dés.
 							<br />
 							Le conteur raconte, les personnages parlent, et c’est toute la famille qui décide.
 						</p>
 						<div className="home__cta">
-							<Link className="btn" href="/inscription">
+							<RoomLink className="btn" href="/inscription" image={media['img-portail']}>
 								Créer notre table
-							</Link>
-							<Link className="btn btn--ghost" href="/connexion">
+							</RoomLink>
+							<RoomLink className="btn btn--ghost" href="/connexion" image={media['img-portail']}>
 								J’ai déjà un compte
-							</Link>
+							</RoomLink>
 						</div>
 					</div>
 				</section>

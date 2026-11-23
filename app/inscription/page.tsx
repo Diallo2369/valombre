@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AuthForm } from '@/components/AuthForm';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -12,6 +13,9 @@ export default function SignupPage() {
 			<SiteHeader user={null} />
 			<main className="container auth-page">
 				<AuthForm mode="signup" />
+				<Link className="auth-page__back" href="/">
+					← Retour à l’accueil
+				</Link>
 			</main>
 		</>
 	);
