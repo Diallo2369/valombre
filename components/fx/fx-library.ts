@@ -522,6 +522,89 @@ function poisonCloud(eng: FxEngine, at: P, delay = 0, k = 1) {
 	return delay + 330;
 }
 
+/**
+ * L'éclair qui relie l'attaquant à sa cible, façon jeu de cartes : un zigzag épais qui crépite
+ * (il se redessine plusieurs fois), un halo lumineux, un cœur blanc, deux petites fourches,
+ * et une boule de lumière au point d'arrivée.
+ */
+export function zap(eng: FxEngine, from: P, to: P, color: string, delay = 0, life = 340, width = 9) {
+	const a = angleTo(from, to);
+	const len = dist(from, to);
+	const nx = -Math.sin(a);
+	const ny = Math.cos(a);
+	let path: P[] = [];
+	let forks: P[][] = [];
+	let shape = -1;
+	const build = () => {
+		const n = Math.max(4, Math.round(len / 34));
+		path = Array.from({ length: n + 1 }, (_, i) => {
+			const u = i / n;
+			// Pointes fortes au milieu, nulles aux deux bouts.
+			const off = i === 0 || i === n ? 0 : (i % 2 ? 1 : -1) * (10 + Math.random() * 16) * Math.sin(Math.PI * u);
+			return { x: from.x + (to.x - from.x) * u + nx * off, y: from.y + (to.y - from.y) * u + ny * off };
+		});
+		forks = [0.35, 0.65].map((u) => {
+			const p = path[Math.round(u * (path.length - 1))];
+			const side = Math.random() < 0.5 ? -1 : 1;
+			const fa = a + side * (0.6 + Math.random() * 0.4);
+			return [p, { x: p.x + Math.cos(fa) * 22 + nx * side * 6, y: p.y + Math.sin(fa) * 22 + ny * side * 6 }, { x: p.x + Math.cos(fa) * 40, y: p.y + Math.sin(fa) * 40 }];
+		});
+	};
+	const line = (ctx: CanvasRenderingContext2D, pts: P[]) => {
+		ctx.beginPath();
+		pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+	};
+	eng.draw({
+		life,
+		delay,
+		draw(ctx, t) {
+			// Il crépite : un nouveau tracé tous les 1/7 de sa vie.
+			const k = Math.floor(t * 7);
+			if (k !== shape) {
+				shape = k;
+				build();
+			}
+			const w = width * (t < 0.15 ? t / 0.15 : 1 - Math.max(0, t - 0.6) / 0.4);
+			if (w < 0.4) return;
+			// Le halo, en lumière.
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.lineCap = 'round';
+			ctx.lineJoin = 'round';
+			ctx.shadowColor = color;
+			ctx.shadowBlur = 26;
+			ctx.globalAlpha = 0.55;
+			ctx.strokeStyle = color;
+			ctx.lineWidth = w * 2.6;
+			line(ctx, path);
+			ctx.stroke();
+			ctx.shadowBlur = 0;
+			ctx.globalAlpha = 1;
+			// Le trait : cerné, couleur, cœur blanc ; les fourches plus fines.
+			ctx.globalCompositeOperation = 'source-over';
+			for (const f of forks) {
+				line(ctx, f);
+				inkStroke(ctx, color, w * 0.45, 1.6);
+			}
+			line(ctx, path);
+			inkStroke(ctx, color, w, 2.5);
+			ctx.strokeStyle = '#ffffff';
+			ctx.lineWidth = w * 0.35;
+			ctx.stroke();
+			// La boule de lumière à l'arrivée.
+			ctx.globalCompositeOperation = 'lighter';
+			const r = 26 + 10 * Math.sin(t * 40);
+			const g = ctx.createRadialGradient(to.x, to.y, 0, to.x, to.y, r);
+			g.addColorStop(0, '#ffffff');
+			g.addColorStop(0.35, color);
+			g.addColorStop(1, 'rgba(0,0,0,0)');
+			ctx.fillStyle = g;
+			ctx.beginPath();
+			ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
+			ctx.fill();
+		},
+	});
+}
+
 /* ---------------- Les compétences ---------------- */
 
 const STEEL = ['#fff6dc', '#ffc76b', '#ff8a3c'];
@@ -706,30 +789,10 @@ const ABILITY_FX: Record<string, Fx> = {
 
 	/* Mage */
 	'trait-lumiere': (e, c) => {
+		// L'éclair jaune, du bâton jusqu'à la cible.
 		const to = c.success ? c.foes[0] : beside(c.from, c.foes[0]);
-		e.draw({
-			life: 460,
-			draw(ctx, t) {
-				const w = 20 * Math.sin(Math.PI * Math.min(1, t * 1.3));
-				if (w < 0.5) return;
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.beginPath();
-				ctx.moveTo(c.from.x, c.from.y);
-				// Un rayon qui zigzague un peu, comme un trait de BD.
-				for (let i = 1; i < 6; i += 1) {
-					const q = lerp(c.from, to, i / 6);
-					const n = (i % 2 ? 1 : -1) * 7;
-					const a = angleTo(c.from, to);
-					ctx.lineTo(q.x - Math.sin(a) * n, q.y + Math.cos(a) * n);
-				}
-				ctx.lineTo(to.x, to.y);
-				inkStroke(ctx, '#9cc2ff', w, 3.5);
-				ctx.strokeStyle = '#ffffff';
-				ctx.lineWidth = w * 0.35;
-				ctx.stroke();
-			},
-		});
-		if (c.success) impact(e, to, ['#ffffff', '#9cc2ff', '#d6e6ff'], 1.1, 120);
+		zap(e, c.from, to, '#ffe14a', 0, 420, 11);
+		if (c.success) impact(e, to, ['#ffffff', '#ffe14a', '#ffb347'], 1.2, 120);
 		else puff(e, to, 120);
 		return 120;
 	},
@@ -823,6 +886,15 @@ const ABILITY_FX: Record<string, Fx> = {
 };
 
 /* ---------------- Le côté bande dessinée ---------------- */
+
+/** Couleur de l'éclair qui relie le mage ou le barde à sa cible (les sorts seulement). */
+const LINK: Record<string, string> = {
+	etincelle: '#ff9a3c',
+	'pluie-etoiles': '#fff1a8',
+	lueur: '#ffffff',
+	'note-percante': '#d78cff',
+	berceuse: '#9cc8ff',
+};
 
 /** Onomatopée et couleur de bulle de chaque compétence. */
 const WORDS: Record<string, { word: string; fill: string; melee?: boolean }> = {
@@ -929,6 +1001,9 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 		impact(eng, c.foes[0] ?? c.allies[0] ?? c.from, STEEL, 0.8);
 		t = 120;
 	} else t = fx(eng, c);
+	// Sorts : un éclair relie le héros à chaque cible, au moment où ça touche.
+	const link = LINK[ability];
+	if (c.success && link) for (const [i, f] of c.foes.slice(0, 3).entries()) zap(eng, c.from, f, link, Math.max(0, t - 60) + i * 60, 260, 6);
 	const w = WORDS[ability];
 	if (!c.success && c.foes[0]) kapow(eng, c.foes[0], 'RATÉ !', '#c9ced8', t, 0.75);
 	if (!c.success || !w) return eng.real(t);
