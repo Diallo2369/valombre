@@ -841,7 +841,7 @@ function resolveAbility(work: Game, def: CombatDef, hero: Character, ab: Ability
 	}
 	if (ab.spell) events.push({ kind: 'sfx', id: 'sfx-sort' });
 	const success = !ab.stat || Boolean(action.roll?.success);
-	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && (ab.crit || Boolean(heroState(combat, hero.id).fury)), roll: action.roll });
+	events.push({ kind: 'ability', heroId: hero.id, ability: ab.id, foeIds: foes.map((f) => f.id), allyId: ally?.id, success, crit: success && Boolean(ab.damage) && (ab.crit || Boolean(heroState(combat, hero.id).fury)) });
 	const how = action.roll ? `${ab.name} : ${action.roll.die} + ${action.roll.stat} = ${action.roll.total}` : ab.name;
 	const names = (list: FoeState[]) => list.map((f) => f.name).join(', ');
 

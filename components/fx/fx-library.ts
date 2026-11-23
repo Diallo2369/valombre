@@ -3,7 +3,7 @@
  * réglées par compétence. Chaque effet renvoie le moment (ms) où il touche sa cible : c'est là que les
  * cœurs tombent et que le jeton tremble.
  */
-import { ease, lerp, star, type FxEngine, type P } from './fx-engine';
+import { ease, inkFill, inkStroke, INK, lerp, starPath, type FxEngine, type P } from './fx-engine';
 
 export interface FxCall {
 	from: P;
@@ -28,66 +28,123 @@ const beside = (from: P, to: P): P => {
 
 /* ---------------- Les briques ---------------- */
 
-/** L'impact : un éclair, une onde, une gerbe d'étincelles. */
-export function impact(eng: FxEngine, at: P, colors: string[], power = 1, delay = 0) {
-	const main = colors[1] ?? colors[0];
-	// Un éclair blanc bref, puis un halo coloré qui gonfle.
-	eng.add({ x: at.x, y: at.y, life: 200, delay, size: 46 * power, sizeEnd: 80 * power, color: '#ffffff' });
-	eng.add({ x: at.x, y: at.y, life: 420, delay, size: 60 * power, sizeEnd: 115 * power, color: main, alpha: 0.85 });
-	// Deux ondes : une rapide et fine, une lente et épaisse.
-	eng.add({ x: at.x, y: at.y, life: 320, delay, size: 10, sizeEnd: 95 * power, color: '#ffffff', shape: 'ring' });
-	eng.add({ x: at.x, y: at.y, life: 560, delay: delay + 40, size: 20, sizeEnd: 125 * power, color: main, shape: 'ring' });
-	// Étincelles qui fusent, et éclats qui retombent.
-	eng.burst(at, Math.round(28 * power), { speed: 560 * power, life: 480, delay, size: 4.5, color: colors, shape: 'spark', drag: 2.2 });
-	eng.burst(at, Math.round(12 * power), { speed: 260 * power, life: 750, delay, size: 5, sizeEnd: 1, color: colors, ay: 700, drag: 0.8 });
-}
-
-/** Le coup tombe à côté : un petit nuage gris. */
-function puff(eng: FxEngine, at: P, delay = 0) {
-	eng.burst(at, 10, { speed: 90, life: 600, delay, size: 9, sizeEnd: 18, color: 'rgba(200,205,215,0.35)', drag: 3 });
-}
-
-/** Une entaille en arc de cercle, qui balaie la cible. */
-export function slash(eng: FxEngine, at: P, color: string, angle: number, delay = 0, k = 1, life = 320) {
-	const R = 66 * k;
-	const c = { x: at.x - Math.cos(angle) * R * 0.45, y: at.y - Math.sin(angle) * R * 0.45 };
-	const a0 = angle - 1.25;
-	const a1 = angle + 1.25;
+/** Une explosion en étoile, plate et cernée de noir, qui surgit puis se replie (case de BD). */
+function burstStar(eng: FxEngine, at: P, fill: string, inner: string, r: number, delay = 0, life = 300) {
+	const spikes = Array.from({ length: 12 }, (_, i) => (i % 2 ? 0.5 : 1) * (0.85 + Math.random() * 0.3));
+	const rot = Math.random() * Math.PI;
 	eng.draw({
 		life,
 		delay,
 		draw(ctx, t) {
-			const head = ease.out(Math.min(1, t * 1.7));
-			const tail = Math.max(0, (t - 0.3) / 0.7);
-			const N = 20;
-			ctx.lineCap = 'round';
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 22;
-			for (const [w, col] of [
-				[22 * k, color],
-				[13 * k, color],
-				[4.5 * k, '#ffffff'],
+			// Surgit en dépassant, puis se replie : en BD, on rétrécit au lieu de s'effacer.
+			const k = t < 0.35 ? ease.out(t / 0.35) * 1.15 : 1.15 * (1 - ease.in((t - 0.35) / 0.65));
+			if (k <= 0.02) return;
+			ctx.globalCompositeOperation = 'source-over';
+			for (const [col, m, line] of [
+				[fill, 1, 4],
+				[inner, 0.55, 3],
 			] as const) {
-				ctx.strokeStyle = col;
-				for (let i = 0; i < N; i += 1) {
-					const u1 = tail + ((head - tail) * i) / N;
-					const u2 = tail + ((head - tail) * (i + 1)) / N;
-					const b1 = a0 + (a1 - a0) * u1;
-					const b2 = a0 + (a1 - a0) * u2;
-					ctx.globalAlpha = (w > 15 * k ? 0.35 : 1) * (1 - t * 0.6);
-					ctx.lineWidth = w * Math.sin((Math.PI * (i + 0.5)) / N);
+				ctx.beginPath();
+				spikes.forEach((sp, i) => {
+					const a = rot + (i / spikes.length) * Math.PI * 2;
+					ctx.lineTo(at.x + Math.cos(a) * r * k * m * sp, at.y + Math.sin(a) * r * k * m * sp);
+				});
+				ctx.closePath();
+				inkFill(ctx, col, line);
+			}
+		},
+	});
+}
+
+/** L'impact : un éclair bref, une explosion en étoile cernée, une onde épaisse et des éclats qui volent. */
+export function impact(eng: FxEngine, at: P, colors: string[], power = 1, delay = 0) {
+	const main = colors[1] ?? colors[0];
+	const light = colors[0];
+	// Un éclair de lumière très bref, sous le dessin.
+	eng.add({ x: at.x, y: at.y, life: 180, delay, size: 50 * power, sizeEnd: 85 * power, color: '#ffffff', alpha: 0.8 });
+	burstStar(eng, at, main, light === main ? '#ffffff' : light, 58 * power, delay, 320);
+	// Une onde blanche épaisse, cernée.
+	eng.add({ x: at.x, y: at.y, life: 380, delay: delay + 30, size: 22, sizeEnd: 105 * power, color: '#ffffff', shape: 'ring', ink: true });
+	// Des éclats pleins qui partent et retombent, quelques étoiles.
+	eng.burst(at, Math.round(10 * power), { speed: 420 * power, life: 620, delay, size: 6, sizeEnd: 2, color: colors, ay: 900, drag: 1.2, ink: true });
+	eng.burst(at, Math.round(8 * power), { speed: 520 * power, life: 380, delay, size: 6, color: colors, shape: 'spark', drag: 2.4, ink: true });
+	eng.burst(at, Math.round(3 * power), { speed: 260 * power, life: 700, delay: delay + 40, size: 9, sizeEnd: 4, color: ['#ffe28a', '#ffffff'], shape: 'star', vr: 8, ay: 500, drag: 1, ink: true });
+}
+
+/** Le coup tombe à côté : un petit nuage de poussière de dessin animé. */
+function puff(eng: FxEngine, at: P, delay = 0) {
+	const blobs = Array.from({ length: 6 }, (_, i) => {
+		const a = (i / 6) * Math.PI * 2 + Math.random() * 0.4;
+		return { dx: Math.cos(a) * 20, dy: Math.sin(a) * 12, r: 13 + Math.random() * 7 };
+	});
+	eng.draw({
+		life: 620,
+		delay,
+		draw(ctx, t) {
+			const k = t < 0.3 ? ease.out(t / 0.3) : 1 - ease.in((t - 0.3) / 0.7);
+			if (k <= 0.02) return;
+			ctx.globalCompositeOperation = 'source-over';
+			const rise = -18 * t;
+			// D'abord tous les contours, puis tous les aplats : un seul nuage, sans traits à l'intérieur.
+			for (const pass of [0, 1]) {
+				for (const b of blobs) {
 					ctx.beginPath();
-					ctx.moveTo(c.x + Math.cos(b1) * R, c.y + Math.sin(b1) * R);
-					ctx.lineTo(c.x + Math.cos(b2) * R, c.y + Math.sin(b2) * R);
-					ctx.stroke();
+					ctx.arc(at.x + b.dx * (0.6 + t), at.y + b.dy * (0.6 + t) + rise, b.r * k, 0, Math.PI * 2);
+					if (pass === 0) {
+						ctx.lineWidth = 7;
+						ctx.strokeStyle = INK;
+						ctx.stroke();
+					} else {
+						ctx.fillStyle = '#d7dbe4';
+						ctx.fill();
+					}
 				}
 			}
 		},
 	});
 }
 
-/** Un trait droit qui se dessine puis s'efface (griffes, rayons). */
-function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay = 0, life = 260) {
+/** Une entaille en arc de cercle : un croissant plein, cerné de noir, avec un filet blanc au milieu. */
+export function slash(eng: FxEngine, at: P, color: string, angle: number, delay = 0, k = 1, life = 340) {
+	const R = 70 * k;
+	const c = { x: at.x - Math.cos(angle) * R * 0.45, y: at.y - Math.sin(angle) * R * 0.45 };
+	const a0 = angle - 1.3;
+	const a1 = angle + 1.3;
+	const thick = 24 * k;
+	eng.draw({
+		life,
+		delay,
+		draw(ctx, t) {
+			const head = ease.out(Math.min(1, t * 1.8));
+			const tail = Math.max(0, (t - 0.35) / 0.65);
+			if (head - tail < 0.01) return;
+			const N = 24;
+			const pt = (u: number, r: number) => {
+				const b = a0 + (a1 - a0) * u;
+				return [c.x + Math.cos(b) * r, c.y + Math.sin(b) * r] as const;
+			};
+			// Le croissant : bord extérieur, puis bord intérieur à rebours (épais au milieu, pointu aux bouts).
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.beginPath();
+			for (let i = 0; i <= N; i += 1) ctx.lineTo(...pt(tail + ((head - tail) * i) / N, R));
+			for (let i = N; i >= 0; i -= 1) {
+				const u = i / N;
+				ctx.lineTo(...pt(tail + (head - tail) * u, R - thick * Math.sin(Math.PI * u)));
+			}
+			ctx.closePath();
+			inkFill(ctx, color, 4);
+			ctx.beginPath();
+			for (let i = 2; i <= N - 2; i += 1) ctx.lineTo(...pt(tail + ((head - tail) * i) / N, R - thick * 0.3 * Math.sin((Math.PI * i) / N)));
+			ctx.lineCap = 'round';
+			ctx.strokeStyle = '#ffffff';
+			ctx.lineWidth = 4 * k;
+			ctx.stroke();
+		},
+	});
+}
+
+/** Un trait droit, épais et cerné, qui se dessine puis s'efface (griffes, rayons). */
+function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay = 0, life = 280) {
 	eng.draw({
 		life,
 		delay,
@@ -96,17 +153,13 @@ function streak(eng: FxEngine, a: P, b: P, color: string, width: number, delay =
 			const tail = Math.max(0, (t - 0.35) / 0.65);
 			const p = lerp(a, b, tail);
 			const q = lerp(a, b, head);
-			ctx.lineCap = 'round';
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 12;
-			ctx.strokeStyle = color;
-			ctx.lineWidth = width;
+			ctx.globalCompositeOperation = 'source-over';
 			ctx.beginPath();
 			ctx.moveTo(p.x, p.y);
 			ctx.lineTo(q.x, q.y);
-			ctx.stroke();
+			inkStroke(ctx, color, width, 3.5);
 			ctx.strokeStyle = '#fff';
-			ctx.lineWidth = width * 0.35;
+			ctx.lineWidth = width * 0.3;
 			ctx.stroke();
 		},
 	});
@@ -124,12 +177,13 @@ interface ProjectileOpts {
 	trail?: string;
 }
 
-/** Un projectile qui vole d'un point à un autre (flèche, orbe, note…). Renvoie sa durée de vol. */
+/** Un projectile qui vole d'un point à un autre (flèche, orbe, note…), dessiné en BD. Renvoie sa durée de vol. */
 export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 	const { color, head = 'orb', speed = 900, arc = 0, size = 8, delay = 0, wobble = 0, trail = color } = o;
 	const life = Math.max(160, (dist(from, to) / speed) * 1000);
 	const a = angleTo(from, to);
 	let last: P = from;
+	let n = 0;
 	eng.draw({
 		life,
 		delay,
@@ -140,53 +194,85 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 			const p = { x: base.x - Math.sin(a) * side, y: base.y - lift + Math.cos(a) * side };
 			const dir = Math.atan2(p.y - last.y, p.x - last.x) || a;
 			last = p;
-			e.add({ x: p.x, y: p.y, life: 420, size: size * 1.4, sizeEnd: 1, color: trail, alpha: 0.75 });
-			if (Math.random() < 0.5) e.add({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, life: 380, size: 2.5, color: '#ffffff', shape: 'spark' });
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 16;
-			ctx.fillStyle = color;
-			ctx.strokeStyle = color;
+			// La traînée : des pastilles pleines qui rétrécissent, une sur deux.
+			n += 1;
+			if (n % 2) e.add({ x: p.x, y: p.y, life: 300, size: size * 1.1, sizeEnd: 0.5, color: trail, ink: true, outline: false });
+			ctx.globalCompositeOperation = 'source-over';
 			if (head === 'arrow') {
 				ctx.translate(p.x, p.y);
 				ctx.rotate(dir);
-				ctx.lineCap = 'round';
-				ctx.lineWidth = 3;
+				// Le trait de vitesse derrière, la hampe, l'empennage et la pointe, tout cerné.
 				ctx.beginPath();
-				ctx.moveTo(-26, 0);
-				ctx.lineTo(4, 0);
-				ctx.stroke();
-				ctx.fillStyle = '#fff';
+				ctx.moveTo(-70, 0);
+				ctx.lineTo(-38, 0);
+				inkStroke(ctx, '#ffffff', 3, 2);
 				ctx.beginPath();
-				ctx.moveTo(10, 0);
-				ctx.lineTo(0, -5);
-				ctx.lineTo(0, 5);
+				ctx.moveTo(-32, 0);
+				ctx.lineTo(6, 0);
+				inkStroke(ctx, '#c89a5a', 5, 2.5);
+				for (const sgn of [-1, 1]) {
+					ctx.beginPath();
+					ctx.moveTo(-34, 0);
+					ctx.lineTo(-24, 0);
+					ctx.lineTo(-30, sgn * 9);
+					ctx.lineTo(-40, sgn * 9);
+					ctx.closePath();
+					inkFill(ctx, color, 2.5);
+				}
+				ctx.beginPath();
+				ctx.moveTo(18, 0);
+				ctx.lineTo(2, -9);
+				ctx.lineTo(6, 0);
+				ctx.lineTo(2, 9);
 				ctx.closePath();
-				ctx.fill();
+				inkFill(ctx, '#eef2f8', 3);
 			} else if (head === 'glyph') {
-				ctx.font = `${size * 3}px serif`;
+				ctx.font = `900 ${size * 3.6}px "Arial Black", Impact, serif`;
 				ctx.textAlign = 'center';
 				ctx.textBaseline = 'middle';
+				ctx.lineJoin = 'round';
+				ctx.lineWidth = 6;
+				ctx.strokeStyle = INK;
+				ctx.strokeText(o.glyph ?? '♪', p.x, p.y);
+				ctx.fillStyle = color;
 				ctx.fillText(o.glyph ?? '♪', p.x, p.y);
 			} else if (head === 'net') {
+				// Le filet roulé en boule, qui tourne en vol.
 				ctx.translate(p.x, p.y);
-				ctx.rotate(t * 6);
-				ctx.lineWidth = 1.5;
-				for (let i = -2; i <= 2; i += 1) {
+				ctx.rotate(t * 9);
+				ctx.beginPath();
+				ctx.arc(0, 0, 15, 0, Math.PI * 2);
+				inkFill(ctx, '#d8b57a', 3.5);
+				ctx.strokeStyle = '#7a5428';
+				ctx.lineWidth = 2.5;
+				for (const r of [6, 11]) {
 					ctx.beginPath();
-					ctx.moveTo(i * 5, -12);
-					ctx.lineTo(i * 5, 12);
-					ctx.moveTo(-12, i * 5);
-					ctx.lineTo(12, i * 5);
+					ctx.ellipse(0, 0, 15, r, 0, 0, Math.PI * 2);
 					ctx.stroke();
 				}
-			} else {
-				const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 1.8);
-				g.addColorStop(0, '#ffffff');
-				g.addColorStop(0.35, color);
-				g.addColorStop(1, 'rgba(0,0,0,0)');
-				ctx.fillStyle = g;
 				ctx.beginPath();
-				ctx.arc(p.x, p.y, size * 1.8, 0, Math.PI * 2);
+				ctx.moveTo(0, -15);
+				ctx.lineTo(0, 15);
+				ctx.stroke();
+			} else {
+				// L'orbe : un halo lumineux derrière, une boule pleine cernée et un reflet.
+				const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
+				g.addColorStop(0, color);
+				g.addColorStop(1, 'rgba(0,0,0,0)');
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.fillStyle = g;
+				ctx.globalAlpha = 0.6;
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, size * 3, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, size * 1.5, 0, Math.PI * 2);
+				inkFill(ctx, color, 3.5);
+				ctx.beginPath();
+				ctx.arc(p.x - size * 0.5, p.y - size * 0.5, size * 0.45, 0, Math.PI * 2);
+				ctx.fillStyle = '#ffffff';
 				ctx.fill();
 			}
 		},
@@ -197,48 +283,48 @@ export function projectile(eng: FxEngine, from: P, to: P, o: ProjectileOpts) {
 /** Des étoiles qui tournent au-dessus d'une tête (sonné). */
 function dizzy(eng: FxEngine, at: P, delay: number, color = '#ffe28a') {
 	eng.draw({
-		life: 1100,
+		life: 1300,
 		delay,
 		draw(ctx, t) {
-			ctx.fillStyle = color;
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 10;
+			ctx.globalCompositeOperation = 'source-over';
 			ctx.globalAlpha = t < 0.8 ? 1 : (1 - t) / 0.2;
 			for (let i = 0; i < 3; i += 1) {
 				const a = t * Math.PI * 4 + (i * Math.PI * 2) / 3;
-				star(ctx, at.x + Math.cos(a) * 30, at.y - 46 + Math.sin(a) * 9, 7, a);
+				starPath(ctx, at.x + Math.cos(a) * 32, at.y - 48 + Math.sin(a) * 10, 10, a);
+				inkFill(ctx, color, 3);
 			}
 		},
 	});
 }
 
-/** Une bulle protectrice qui se gonfle autour d'un jeton. */
+/** Une bulle protectrice qui se gonfle autour d'un jeton, cernée comme un dessin. */
 function bubble(eng: FxEngine, at: P, color: string, delay = 0) {
 	eng.draw({
-		life: 900,
+		life: 950,
 		delay,
 		draw(ctx, t) {
-			const r = 50 * ease.out(Math.min(1, t * 2.2));
+			// Gonfle en dépassant, puis rebondit.
+			const g = Math.min(1, t * 2.4);
+			const r = 52 * (g < 1 ? ease.out(g) * 1.12 : 1.12 - 0.12 * ease.out(Math.min(1, (t - 0.42) * 4)));
+			ctx.globalCompositeOperation = 'source-over';
 			ctx.globalAlpha = t < 0.7 ? 1 : (1 - t) / 0.3;
-			ctx.fillStyle = color.replace(')', ' / 18%)');
-			ctx.strokeStyle = color;
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 18;
-			ctx.lineWidth = 3;
 			ctx.beginPath();
 			ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
+			ctx.fillStyle = color.replace(')', ' / 22%)');
 			ctx.fill();
-			ctx.stroke();
-			ctx.strokeStyle = '#fff';
-			ctx.lineWidth = 2;
+			inkStroke(ctx, color, 5, 2.5);
+			// Le reflet de la bulle.
 			ctx.beginPath();
-			ctx.arc(at.x, at.y, r * 0.86, t * 8, t * 8 + 0.9);
+			ctx.arc(at.x, at.y, r * 0.78, -2.5, -1.6);
+			ctx.strokeStyle = '#fff';
+			ctx.lineWidth = 5;
+			ctx.lineCap = 'round';
 			ctx.stroke();
 		},
 	});
 }
 
-/** Des symboles qui montent et s'envolent (notes, « z », « + »). */
+/** Des symboles qui montent et s'envolent (notes, « z », « + »), en lettres de BD. */
 function rising(eng: FxEngine, at: P, glyphs: string[], color: string, n: number, delay = 0, size = 18) {
 	for (let i = 0; i < n; i += 1)
 		eng.add({
@@ -246,49 +332,130 @@ function rising(eng: FxEngine, at: P, glyphs: string[], color: string, n: number
 			y: at.y + 10,
 			vx: (Math.random() - 0.5) * 40,
 			vy: -70 - Math.random() * 60,
-			life: 900,
-			delay: delay + i * 70,
-			size,
+			life: 1000,
+			delay: delay + i * 80,
+			size: size * 1.3,
 			color,
 			shape: 'glyph',
 			glyph: glyphs[i % glyphs.length],
 			vr: (Math.random() - 0.5) * 2,
+			ink: true,
 		});
 }
 
-/** Les griffes d'une créature : trois traits parallèles. */
+/** Les griffes d'une créature : trois balafres épaisses et cernées. */
 function claws(eng: FxEngine, from: P, at: P, color: string) {
 	const a = angleTo(from, at) + Math.PI / 2.6;
-	const dx = Math.cos(a) * 34;
-	const dy = Math.sin(a) * 34;
-	const nx = -Math.sin(a) * 13;
-	const ny = Math.cos(a) * 13;
+	const dx = Math.cos(a) * 38;
+	const dy = Math.sin(a) * 38;
+	const nx = -Math.sin(a) * 15;
+	const ny = Math.cos(a) * 15;
 	for (let i = -1; i <= 1; i += 1)
-		streak(eng, { x: at.x - dx + nx * i, y: at.y - dy + ny * i }, { x: at.x + dx + nx * i, y: at.y + dy + ny * i }, color, 5, (i + 1) * 45);
+		streak(eng, { x: at.x - dx + nx * i, y: at.y - dy + ny * i }, { x: at.x + dx + nx * i, y: at.y + dy + ny * i }, color, 8, (i + 1) * 45);
 	return 160;
 }
 
-/** Une morsure : deux arcs qui se referment. */
+/** Une morsure : deux mâchoires à grosses dents blanches qui se referment. */
 function bite(eng: FxEngine, at: P, color: string) {
 	eng.draw({
-		life: 340,
+		life: 380,
 		draw(ctx, t) {
 			const close = ease.in(Math.min(1, t * 1.6));
-			const gap = 34 * (1 - close) + 4;
-			ctx.strokeStyle = color;
-			ctx.shadowColor = color;
-			ctx.shadowBlur = 14;
-			ctx.lineWidth = 5;
-			ctx.globalAlpha = 1 - Math.max(0, t - 0.6) / 0.4;
-			ctx.beginPath();
-			ctx.arc(at.x, at.y - gap, 30, 0.2 * Math.PI, 0.8 * Math.PI);
-			ctx.stroke();
-			ctx.beginPath();
-			ctx.arc(at.x, at.y + gap, 30, 1.2 * Math.PI, 1.8 * Math.PI);
-			ctx.stroke();
+			const gap = 38 * (1 - close) + 6;
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.globalAlpha = 1 - Math.max(0, t - 0.65) / 0.35;
+			for (const sgn of [-1, 1]) {
+				const y = at.y + sgn * gap;
+				// Les dents, pointées vers le centre.
+				for (let i = -2; i <= 2; i += 1) {
+					const x = at.x + i * 12;
+					const yy = y - sgn * Math.abs(i) * 3;
+					ctx.beginPath();
+					ctx.moveTo(x - 6, yy);
+					ctx.lineTo(x, yy - sgn * 15);
+					ctx.lineTo(x + 6, yy);
+					ctx.closePath();
+					inkFill(ctx, '#ffffff', 2.5);
+				}
+				// La mâchoire.
+				ctx.beginPath();
+				ctx.moveTo(at.x - 36, y + sgn * 10);
+				ctx.quadraticCurveTo(at.x, y + sgn * 2 - sgn * 8, at.x + 36, y + sgn * 10);
+				inkStroke(ctx, color, 7, 3);
+			}
 		},
 	});
-	return 220;
+	return 230;
+}
+
+/**
+ * Le filet qui retombe sur la cible : des cordes épaisses qui partent d'un nœud en haut,
+ * reliées par des mailles arrondies, lestées de petits plombs. Il tombe, s'écrase un peu, puis tient.
+ */
+function net(eng: FxEngine, at: P, delay: number) {
+	const ROPE = '#d8b57a';
+	const W = 46;
+	const H = 50;
+	const legs = 7;
+	eng.draw({
+		life: 1300,
+		delay,
+		draw(ctx, t) {
+			const fall = ease.in(Math.min(1, t / 0.18));
+			const squash = t < 0.18 ? 1 : 1 - 0.22 * Math.sin(Math.min(1, (t - 0.18) / 0.22) * Math.PI);
+			const dy = (1 - fall) * -80;
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.globalAlpha = t < 0.8 ? 1 : (1 - t) / 0.2;
+			ctx.translate(at.x, at.y + dy + H * 0.45);
+			ctx.scale(1 + (1 - squash) * 0.6, squash);
+			const top = { x: 0, y: -H * 1.25 };
+			// Le bas du filet : une ligne qui ondule, sous le jeton.
+			const foot = (u: number) => ({ x: -W + 2 * W * u, y: 4 * Math.sin(u * Math.PI * 3) });
+			const along = (u: number, v: number) => {
+				// Point sur la corde u, à la hauteur v (0 : nœud du haut, 1 : bas), qui bombe vers l'extérieur.
+				const f = foot(u);
+				const bow = (u - 0.5) * 34 * Math.sin(Math.PI * v);
+				return { x: top.x + (f.x - top.x) * v + bow, y: top.y + (f.y - top.y) * v };
+			};
+			// Les cordes verticales.
+			for (let i = 0; i < legs; i += 1) {
+				const u = i / (legs - 1);
+				ctx.beginPath();
+				for (let j = 0; j <= 12; j += 1) {
+					const q = along(u, j / 12);
+					ctx.lineTo(q.x, q.y);
+				}
+				inkStroke(ctx, ROPE, 4, 2);
+			}
+			// Les mailles : des cordes en travers, en arc.
+			for (const v of [0.35, 0.6, 0.85, 1]) {
+				ctx.beginPath();
+				for (let j = 0; j <= 18; j += 1) {
+					const q = along(j / 18, v);
+					ctx.lineTo(q.x, q.y + Math.sin((j / 18) * Math.PI) * 6 * v);
+				}
+				inkStroke(ctx, ROPE, 4, 2);
+			}
+			// Les nœuds aux croisements, le gros nœud du haut et les plombs.
+			for (let i = 0; i < legs; i += 1)
+				for (const v of [0.35, 0.6, 0.85]) {
+					const u = i / (legs - 1);
+					const q = along(u, v);
+					ctx.beginPath();
+					ctx.arc(q.x, q.y + Math.sin(u * Math.PI) * 6 * v, 3.2, 0, Math.PI * 2);
+					inkFill(ctx, '#a87a3e', 1.8);
+				}
+			ctx.beginPath();
+			ctx.arc(top.x, top.y, 8, 0, Math.PI * 2);
+			inkFill(ctx, '#a87a3e', 3);
+			for (let i = 0; i < legs; i += 1) {
+				const q = along(i / (legs - 1), 1);
+				ctx.beginPath();
+				ctx.arc(q.x, q.y + 6, 5, 0, Math.PI * 2);
+				inkFill(ctx, '#6d7480', 2.5);
+			}
+		},
+	});
 }
 
 /* ---------------- Les compétences ---------------- */
@@ -350,7 +517,7 @@ const ABILITY_FX: Record<string, Fx> = {
 	},
 	moquerie: (e, c) => {
 		const to = c.foes[0] ?? c.from;
-		for (let i = 0; i < 3; i += 1) e.add({ x: c.from.x, y: c.from.y, life: 600, delay: i * 120, size: 10, sizeEnd: 70, color: '#ff9a4a', shape: 'ring' });
+		for (let i = 0; i < 3; i += 1) e.add({ x: c.from.x, y: c.from.y, life: 600, delay: i * 120, size: 10, sizeEnd: 70, color: '#ff9a4a', shape: 'ring', ink: true });
 		const t = projectile(e, c.from, to, { color: '#ff7a3c', head: 'glyph', glyph: '!', speed: 800, arc: 40, size: 9 });
 		if (c.success) rising(e, to, ['!'], '#ff6a3c', 4, t, 24);
 		else puff(e, to, t);
@@ -432,8 +599,7 @@ const ABILITY_FX: Record<string, Fx> = {
 			life: 380,
 			draw(ctx, t) {
 				const r = 60 - 36 * ease.out(t);
-				ctx.strokeStyle = '#ffe28a';
-				ctx.lineWidth = 2;
+				ctx.globalCompositeOperation = 'source-over';
 				ctx.globalAlpha = 1 - t * 0.3;
 				ctx.beginPath();
 				ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
@@ -441,7 +607,7 @@ const ABILITY_FX: Record<string, Fx> = {
 				ctx.lineTo(to.x - r + 8, to.y);
 				ctx.moveTo(to.x + r - 8, to.y);
 				ctx.lineTo(to.x + r + 8, to.y);
-				ctx.stroke();
+				inkStroke(ctx, '#ffe28a', 4, 2.5);
 			},
 		});
 		const end = c.success ? to : beside(c.from, to);
@@ -464,32 +630,7 @@ const ABILITY_FX: Record<string, Fx> = {
 			puff(e, end, t);
 			return t;
 		}
-		e.draw({
-			life: 900,
-			delay: t,
-			draw(ctx, k) {
-				const r = 50 * ease.out(Math.min(1, k * 3));
-				ctx.strokeStyle = '#e8dcb5';
-				ctx.lineWidth = 1.6;
-				ctx.globalAlpha = k < 0.7 ? 0.9 : (1 - k) / 0.3 * 0.9;
-				ctx.save();
-				ctx.beginPath();
-				ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
-				ctx.clip();
-				for (let i = -5; i <= 5; i += 1) {
-					ctx.beginPath();
-					ctx.moveTo(to.x + i * 10 - r, to.y - r);
-					ctx.lineTo(to.x + i * 10 + r, to.y + r);
-					ctx.moveTo(to.x + i * 10 + r, to.y - r);
-					ctx.lineTo(to.x + i * 10 - r, to.y + r);
-					ctx.stroke();
-				}
-				ctx.restore();
-				ctx.beginPath();
-				ctx.arc(to.x, to.y, r, 0, Math.PI * 2);
-				ctx.stroke();
-			},
-		});
+		net(e, to, t);
 		return t;
 	},
 	'fleche-empoisonnee': (e, c) => {
@@ -497,7 +638,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = shot(e, c.from, to, c, '#8cff7a', 0, ['#d6ffcc', '#6fdc5a']);
 		if (c.success)
 			for (let i = 0; i < 12; i += 1)
-				e.add({ x: to.x + (Math.random() - 0.5) * 50, y: to.y + 10, vy: -40 - Math.random() * 40, life: 900, delay: t + i * 50, size: 5, sizeEnd: 9, color: '#6fdc5a', shape: 'ring' });
+				e.add({ x: to.x + (Math.random() - 0.5) * 50, y: to.y + 10, vy: -40 - Math.random() * 40, life: 900, delay: t + i * 50, size: 5, sizeEnd: 9, color: '#6fdc5a', ink: true });
 		return t;
 	},
 
@@ -507,16 +648,20 @@ const ABILITY_FX: Record<string, Fx> = {
 		e.draw({
 			life: 460,
 			draw(ctx, t) {
-				const w = 14 * Math.sin(Math.PI * Math.min(1, t * 1.3));
-				ctx.lineCap = 'round';
-				ctx.shadowColor = '#bcd6ff';
-				ctx.shadowBlur = 24;
-				ctx.strokeStyle = '#9cc2ff';
-				ctx.lineWidth = w;
+				const w = 20 * Math.sin(Math.PI * Math.min(1, t * 1.3));
+				if (w < 0.5) return;
+				ctx.globalCompositeOperation = 'source-over';
 				ctx.beginPath();
 				ctx.moveTo(c.from.x, c.from.y);
+				// Un rayon qui zigzague un peu, comme un trait de BD.
+				for (let i = 1; i < 6; i += 1) {
+					const q = lerp(c.from, to, i / 6);
+					const n = (i % 2 ? 1 : -1) * 7;
+					const a = angleTo(c.from, to);
+					ctx.lineTo(q.x - Math.sin(a) * n, q.y + Math.cos(a) * n);
+				}
 				ctx.lineTo(to.x, to.y);
-				ctx.stroke();
+				inkStroke(ctx, '#9cc2ff', w, 3.5);
 				ctx.strokeStyle = '#ffffff';
 				ctx.lineWidth = w * 0.35;
 				ctx.stroke();
@@ -531,7 +676,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = projectile(e, c.from, to, { color: '#ffb347', speed: 1300, size: 10, wobble: 6 });
 		if (c.success) {
 			impact(e, to, ['#fff2c4', '#ffb347', '#ff6a3c'], 1.5, t);
-			e.burst(to, 24, { speed: 380, life: 650, delay: t, size: 2.5, color: ['#ffe28a', '#ff8a3c'], shape: 'spark', ay: 300, drag: 1 });
+			e.burst(to, 24, { speed: 380, life: 650, delay: t, size: 4.5, color: ['#ffe28a', '#ff8a3c'], shape: 'spark', ay: 300, drag: 1, ink: true });
 		} else puff(e, to, t);
 		return t;
 	},
@@ -541,8 +686,8 @@ const ABILITY_FX: Record<string, Fx> = {
 			for (let i = 0; i < 6; i += 1) {
 				const delay = j * 80 + i * 70;
 				const x = f.x + (Math.random() - 0.5) * 60;
-				e.add({ x, y: f.y - 170, vy: 560, life: 300, delay, size: 9, color: i % 2 ? '#ffe28a' : '#cfe0ff', shape: 'star', vr: 6 });
-				if (c.success) e.burst({ x, y: f.y }, 5, { speed: 140, life: 300, delay: delay + 300, size: 2.5, color: '#ffe28a', shape: 'spark' });
+				e.add({ x, y: f.y - 170, vy: 560, life: 300, delay, size: 13, color: i % 2 ? '#ffe28a' : '#cfe0ff', shape: 'star', vr: 6, ink: true });
+				if (c.success) e.burst({ x, y: f.y }, 5, { speed: 160, life: 320, delay: delay + 300, size: 4, color: '#ffe28a', shape: 'spark', ink: true });
 				last = Math.max(last, delay + 300);
 			}
 			if (c.success) impact(e, f, ['#ffffff', '#ffe28a', '#cfe0ff'], 0.9, j * 80 + 300);
@@ -565,15 +710,14 @@ const ABILITY_FX: Record<string, Fx> = {
 			life: 520,
 			delay: t,
 			draw(ctx, k) {
-				ctx.strokeStyle = '#fff7d6';
-				ctx.lineWidth = 3;
+				ctx.globalCompositeOperation = 'source-over';
 				ctx.globalAlpha = 1 - k;
 				for (let i = 0; i < 12; i += 1) {
 					const a = (i * Math.PI) / 6 + k;
 					ctx.beginPath();
-					ctx.moveTo(to.x + Math.cos(a) * 20, to.y + Math.sin(a) * 20);
-					ctx.lineTo(to.x + Math.cos(a) * (40 + 60 * k), to.y + Math.sin(a) * (40 + 60 * k));
-					ctx.stroke();
+					ctx.moveTo(to.x + Math.cos(a) * 22, to.y + Math.sin(a) * 22);
+					ctx.lineTo(to.x + Math.cos(a) * (42 + 60 * k), to.y + Math.sin(a) * (42 + 60 * k));
+					inkStroke(ctx, '#fff7d6', 6, 2.5);
 				}
 			},
 		});
@@ -586,7 +730,7 @@ const ABILITY_FX: Record<string, Fx> = {
 		const t = projectile(e, c.from, to, { color: '#d9a8ff', head: 'glyph', glyph: '♫', speed: 800, size: 8, wobble: 14 });
 		if (c.success) {
 			impact(e, to, ['#f3e0ff', '#c58cff'], 1, t);
-			for (let i = 0; i < 3; i += 1) e.add({ x: to.x, y: to.y, life: 500, delay: t + i * 90, size: 14, sizeEnd: 70, color: '#c58cff', shape: 'ring' });
+			for (let i = 0; i < 3; i += 1) e.add({ x: to.x, y: to.y, life: 500, delay: t + i * 90, size: 14, sizeEnd: 70, color: '#c58cff', shape: 'ring', ink: true });
 		} else puff(e, to, t);
 		return t;
 	},
@@ -600,7 +744,7 @@ const ABILITY_FX: Record<string, Fx> = {
 	chant: (e, c) => {
 		rising(e, c.from, ['♪', '♫'], '#c58cff', 6, 0, 20);
 		c.allies.forEach((a, i) => {
-			e.burst(a, 10, { speed: 40, life: 900, delay: 300 + i * 80, size: 4, color: '#8fe0a0', ay: -160 });
+			e.burst(a, 8, { speed: 40, life: 900, delay: 300 + i * 80, size: 5, color: '#8fe0a0', ay: -160, ink: true });
 			rising(e, a, ['+'], '#8fe0a0', 3, 300 + i * 80, 22);
 		});
 		return 300;
@@ -609,8 +753,8 @@ const ABILITY_FX: Record<string, Fx> = {
 		rising(e, c.from, ['♪', '♫'], '#ffe28a', 5, 0, 20);
 		c.allies.forEach((a, i) => {
 			// Le mal (fumée sombre) s'envole, une lumière dorée le remplace.
-			e.burst(a, 12, { speed: 60, life: 800, delay: 250 + i * 80, size: 8, sizeEnd: 14, color: 'rgba(150,110,190,0.6)', ay: -200 });
-			e.burst(a, 10, { speed: 120, life: 600, delay: 400 + i * 80, size: 3, color: '#ffe28a', shape: 'spark' });
+			e.burst(a, 8, { speed: 60, life: 800, delay: 250 + i * 80, size: 9, sizeEnd: 3, color: '#9a72c0', ay: -200, ink: true });
+			e.burst(a, 4, { speed: 120, life: 700, delay: 400 + i * 80, size: 9, sizeEnd: 4, color: '#ffe28a', shape: 'star', vr: 5, ink: true });
 		});
 		return 300;
 	},
@@ -676,14 +820,14 @@ export function kapow(eng: FxEngine, at: P, word: string, fill: string, delay = 
 			ctx.fillStyle = fill;
 			ctx.fill();
 			ctx.lineJoin = 'round';
-			ctx.lineWidth = 4;
-			ctx.strokeStyle = '#111';
+			ctx.lineWidth = 5;
+			ctx.strokeStyle = INK;
 			ctx.stroke();
 			ctx.font = `900 ${Math.min(26, 300 / Math.max(6, word.length))}px "Arial Black", Impact, "Helvetica Neue", sans-serif`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.lineWidth = 6;
-			ctx.strokeStyle = '#111';
+			ctx.lineWidth = 7;
+			ctx.strokeStyle = INK;
 			ctx.strokeText(word, 0, 1);
 			ctx.fillStyle = '#fff';
 			ctx.fillText(word, 0, 1);
@@ -695,20 +839,22 @@ export function kapow(eng: FxEngine, at: P, word: string, fill: string, delay = 
 export function speedLines(eng: FxEngine, at: P, delay = 0, color = '#ffffff') {
 	const lines = Array.from({ length: 12 }, () => ({ a: Math.random() * Math.PI * 2, r: 0.8 + Math.random() * 0.5 }));
 	eng.draw({
-		life: 320,
+		life: 340,
 		delay,
 		draw(ctx, t) {
-			ctx.strokeStyle = color;
-			ctx.lineCap = 'round';
-			ctx.lineWidth = 3;
-			ctx.globalAlpha = 1 - t;
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.globalAlpha = 1 - t * t;
 			for (const l of lines) {
-				const r0 = (40 + 50 * ease.out(t)) * l.r;
-				const r1 = r0 + 26 * (1 - t);
+				const r0 = (44 + 50 * ease.out(t)) * l.r;
+				const r1 = r0 + 34 * (1 - t);
+				const wd = 0.07 * (1 - t * 0.5);
+				// Un coin effilé : pointu vers l'impact, large vers l'extérieur.
 				ctx.beginPath();
 				ctx.moveTo(at.x + Math.cos(l.a) * r0, at.y + Math.sin(l.a) * r0);
-				ctx.lineTo(at.x + Math.cos(l.a) * r1, at.y + Math.sin(l.a) * r1);
-				ctx.stroke();
+				ctx.lineTo(at.x + Math.cos(l.a - wd) * r1, at.y + Math.sin(l.a - wd) * r1);
+				ctx.lineTo(at.x + Math.cos(l.a + wd) * r1, at.y + Math.sin(l.a + wd) * r1);
+				ctx.closePath();
+				inkFill(ctx, color, 2.5);
 			}
 		},
 	});
@@ -723,6 +869,7 @@ export function playAbility(eng: FxEngine, ability: string, c: FxCall) {
 		t = 120;
 	} else t = fx(eng, c);
 	const w = WORDS[ability];
+	if (!c.success && c.foes[0]) kapow(eng, c.foes[0], 'RATÉ !', '#c9ced8', t, 0.75);
 	if (!c.success || !w) return t;
 	// La bulle sur la cible principale (le danseur pour le tourbillon, le barde pour un chant),
 	// et de plus petites sur les autres cibles.
@@ -751,21 +898,22 @@ export function playFoeAttack(eng: FxEngine, foeName: string, from: P, to: P, hu
 
 /** Un coup encaissé (armure, bouclier) : étincelles grises. */
 function clang(eng: FxEngine, at: P, delay: number) {
-	eng.burst(at, 12, { speed: 220, life: 380, delay, size: 3, color: ['#e6ecf5', '#9fb0c8'], shape: 'spark', drag: 2 });
+	eng.burst(at, 10, { speed: 240, life: 420, delay, size: 5, color: ['#e6ecf5', '#9fb0c8'], shape: 'spark', drag: 2, ink: true });
+	burstStar(eng, at, '#c9d2e0', '#ffffff', 40, delay, 260);
 }
 
 /** Le poison qui ronge une créature à son tour. */
 export function playPoison(eng: FxEngine, at: P) {
 	for (let i = 0; i < 10; i += 1)
-		eng.add({ x: at.x + (Math.random() - 0.5) * 50, y: at.y + 14, vy: -50 - Math.random() * 40, life: 800, delay: i * 50, size: 5, sizeEnd: 10, color: '#6fdc5a', shape: 'ring' });
+		eng.add({ x: at.x + (Math.random() - 0.5) * 50, y: at.y + 14, vy: -50 - Math.random() * 40, life: 800, delay: i * 50, size: 5, sizeEnd: 10, color: '#6fdc5a', ink: true });
 	return 300;
 }
 
 /** Victoire : une gerbe dorée qui jaillit de chaque héros debout. */
 export function celebrate(eng: FxEngine, at: P) {
-	eng.burst(at, 26, { speed: 300, angle: -Math.PI / 2, spread: Math.PI * 0.9, life: 1300, size: 3.5, color: ['#ffe28a', '#fff6dc', '#8fe0a0', '#ffb347'], shape: 'spark', ay: 380, drag: 0.6 });
+	eng.burst(at, 20, { speed: 320, angle: -Math.PI / 2, spread: Math.PI * 0.9, life: 1300, size: 5, sizeEnd: 3, color: ['#ffe28a', '#fff6dc', '#8fe0a0', '#ffb347', '#ff7aa8'], ay: 420, drag: 0.6, ink: true });
 	for (let i = 0; i < 4; i += 1)
-		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 9, color: '#ffe28a', shape: 'star', vr: 4 });
+		eng.add({ x: at.x + (Math.random() - 0.5) * 40, y: at.y, vy: -120, life: 1100, delay: i * 120, size: 12, color: '#ffe28a', shape: 'star', vr: 4, ink: true });
 }
 
 /** Les compétences spectaculaires : l'écran tremble à l'impact, même sans coup critique. */

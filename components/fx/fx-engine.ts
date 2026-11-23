@@ -32,7 +32,13 @@ export interface Particle {
 	rot?: number;
 	vr?: number;
 	age?: number;
+	/** Style BD : aplat de couleur (pas de lumière additive), cerné de noir sauf si outline vaut false. */
+	ink?: boolean;
+	outline?: boolean;
 }
+
+/** L'encre des contours BD. */
+export const INK = '#16111c';
 
 /** Un dessin libre, animé de t = 0 à t = 1 sur sa durée. */
 export interface Draw {
@@ -153,6 +159,12 @@ export class FxEngine {
 			ctx.globalAlpha = Math.max(0, alpha);
 			ctx.fillStyle = p.color;
 			ctx.strokeStyle = p.color;
+			if (p.ink) {
+				ctx.globalCompositeOperation = 'source-over';
+				inkParticle(ctx, p, size);
+				ctx.globalCompositeOperation = 'lighter';
+				return true;
+			}
 			switch (p.shape) {
 				case 'spark': {
 					const len = Math.hypot(p.vx, p.vy) * 0.05 + size;
@@ -211,8 +223,8 @@ export class FxEngine {
 	}
 }
 
-/** Une étoile à cinq branches. */
-export function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot = 0) {
+/** Le chemin d'une étoile à cinq branches (sans la remplir). */
+export function starPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot = 0) {
 	ctx.beginPath();
 	for (let i = 0; i < 10; i += 1) {
 		const a = rot + (i * Math.PI) / 5 - Math.PI / 2;
@@ -220,7 +232,83 @@ export function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
 		ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
 	}
 	ctx.closePath();
+}
+
+/** Une étoile à cinq branches. */
+export function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot = 0) {
+	starPath(ctx, x, y, r, rot);
 	ctx.fill();
+}
+
+/** Remplit le chemin courant et le cerne de noir. */
+export function inkFill(ctx: CanvasRenderingContext2D, fill: string, line = 3.5) {
+	ctx.lineJoin = 'round';
+	ctx.fillStyle = fill;
+	ctx.fill();
+	ctx.lineWidth = line;
+	ctx.strokeStyle = INK;
+	ctx.stroke();
+}
+
+/** Trace le chemin courant en trait épais cerné : d'abord le contour noir, plus large, puis la couleur. */
+export function inkStroke(ctx: CanvasRenderingContext2D, color: string, width: number, edge = 3) {
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
+	if (edge > 0) {
+		ctx.strokeStyle = INK;
+		ctx.lineWidth = width + edge * 2;
+		ctx.stroke();
+	}
+	ctx.strokeStyle = color;
+	ctx.lineWidth = width;
+	ctx.stroke();
+}
+
+/** Une particule en style BD. */
+function inkParticle(ctx: CanvasRenderingContext2D, p: Particle, size: number) {
+	const edge = p.outline === false ? 0 : Math.max(1.5, Math.min(3.5, size * 0.35));
+	switch (p.shape) {
+		case 'spark': {
+			const len = Math.hypot(p.vx!, p.vy!) * 0.05 + size;
+			const a = Math.atan2(p.vy!, p.vx!);
+			ctx.beginPath();
+			ctx.moveTo(p.x, p.y);
+			ctx.lineTo(p.x - Math.cos(a) * len, p.y - Math.sin(a) * len);
+			inkStroke(ctx, p.color, size * 0.8, edge * 0.7);
+			break;
+		}
+		case 'star':
+			starPath(ctx, p.x, p.y, size, p.rot!);
+			if (edge) inkFill(ctx, p.color, edge);
+			else ctx.fill();
+			break;
+		case 'ring':
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+			inkStroke(ctx, p.color, Math.max(3, size * 0.12), edge ? 2.5 : 0);
+			break;
+		case 'glyph':
+			ctx.save();
+			ctx.translate(p.x, p.y);
+			ctx.rotate(p.rot!);
+			ctx.font = `900 ${size}px "Arial Black", Impact, sans-serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.lineJoin = 'round';
+			if (edge) {
+				ctx.lineWidth = Math.max(3, size * 0.22);
+				ctx.strokeStyle = INK;
+				ctx.strokeText(p.glyph ?? '♥', 0, 0);
+			}
+			ctx.fillText(p.glyph ?? '♥', 0, 0);
+			ctx.restore();
+			break;
+		default:
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, Math.max(0.5, size), 0, Math.PI * 2);
+			if (edge) inkFill(ctx, p.color, edge);
+			else ctx.fill();
+	}
 }
 
 export const ease = {

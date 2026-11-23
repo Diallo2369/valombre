@@ -415,11 +415,6 @@
 	}
 }
 
-@keyframes dice-in {
-	0% { opacity: 0; scale: 0.4; rotate: -20deg; }
-	100% { opacity: 1; scale: 1; rotate: 0deg; }
-}
-
 @keyframes hit-flash {
 	0% { filter: brightness(2.4) saturate(0.4); }
 	100% { filter: none; }
@@ -1602,39 +1597,6 @@
 
 	&.is-crit .token__img {
 		animation: foe-shake 0.6s ease-in-out, hit-flash 0.6s ease-out, squash-big 0.7s ease-out;
-	}
-
-	/* Le jet de dé automatique, au-dessus du jeton qui agit. */
-	&__dice {
-		position: absolute;
-		bottom: 112%;
-		left: 50%;
-		translate: -50% 0;
-		z-index: 6;
-		padding: 3px 10px;
-		border-radius: 999px;
-		white-space: nowrap;
-		font-size: clamp(0.75rem, 2vw, 1rem);
-		font-weight: 700;
-		background: rgb(13 17 27 / 92%);
-		border: 2px solid var(--mist-400);
-		color: var(--parchment-100);
-		box-shadow: 0 6px 16px rgb(0 0 0 / 55%);
-		pointer-events: none;
-		animation: dice-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
-
-		&.is-ok {
-			border-color: var(--moss-400);
-		}
-
-		&.is-ko {
-			border-color: #e8574a;
-		}
-
-		small {
-			font-weight: 400;
-			color: var(--parchment-300);
-		}
 	}
 
 	/* Les petits cœurs qui s'envolent du jeton touché. */
