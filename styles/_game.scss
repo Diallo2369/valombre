@@ -325,6 +325,26 @@
 	&--alt {
 		border-style: dashed;
 	}
+
+	/* Impossible à lancer maintenant (personne à portée, ou pas encore prête) : en rouge. */
+	&.is-blocked {
+		border-color: rgb(232 87 74 / 70%);
+		background: linear-gradient(180deg, rgb(120 30 30 / 45%), rgb(60 14 18 / 55%));
+		cursor: not-allowed;
+
+		&:hover {
+			transform: none;
+		}
+
+		.choice__label {
+			color: #ffb3a6;
+		}
+
+		.choice__tag {
+			background: rgb(232 87 74 / 22%);
+			color: #ffc2b8;
+		}
+	}
 }
 
 /* ---- Combat ---- */
@@ -1747,14 +1767,6 @@
 
 	&__actions {
 		grid-column: 1 / -1;
-	}
-
-	/* Les cibles possibles d'une compétence, en boutons. */
-	&__targets {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-bottom: 10px;
 	}
 
 	@media (width <= 560px) {

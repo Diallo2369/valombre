@@ -59,7 +59,7 @@ type Beat =
 	| { kind: 'intro'; ms: number }
 	/** Une compétence part : effet animé, puis impact. */
 	| { kind: 'act'; ms: number; ev: Ev<'ability'> }
-	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe' | 'win'; ms: number }
+	| { kind: 'banner'; title: string; subtitle?: string; lines?: string[]; tone: 'start' | 'hero' | 'foe' | 'win'; ms: number; voice?: string }
 	| {
 			kind: 'say';
 			text: string;
@@ -168,7 +168,7 @@ function place(h: Hex) {
  * le danseur de guerre peuvent tenter de reprendre l'aggro avant qu'ils frappent.
  */
 /** Durée de lecture confortable d'un texte (lecture à voix haute en famille). */
-const readMs = (text: string) => 1500 + text.length * 60;
+const readMs = (text: string) => 1100 + text.length * 40;
 
 /** Durée de l'élan avant un coup (ms) : le jeton grossit, puis le coup part. */
 const WINDUP = 420;
@@ -265,8 +265,8 @@ export function CombatPanel(props: Props) {
 					text: e.success ? `${hero} attire ${foe} : elle change de cible !` : `${hero} tente d’attirer ${foe}… elle ne se laisse pas distraire.`,
 				});
 			} else if (e.kind === 'enemy-turn') {
-				beats.push({ kind: 'banner', title: turnOf(e.name), subtitle: 'Attention…', tone: 'foe', ms: 2200 });
-				if (e.attack) beats.push({ kind: 'say', tone: 'foe', text: e.attack, voice: e.attack, ms: 3400 });
+				// Le bandeau annonce le tour et raconte l'attaque (lue par le Conteur) : une seule chose à lire.
+				beats.push({ kind: 'banner', title: turnOf(e.name), subtitle: e.attack ?? 'Attention…', voice: e.attack, tone: 'foe', ms: 2200 });
 			} else if (e.kind === 'foe-poison') {
 				pending[e.foeId] = (pending[e.foeId] ?? 0) + 1;
 				beats.push({ kind: 'say', tone: 'hero', foeId: e.foeId, poison: true, ms: 1900, text: `🧪 Le poison ronge ${e.name} : −1 PV${e.dead ? ', elle s’effondre !' : '.'}` });
@@ -278,15 +278,9 @@ export function CombatPanel(props: Props) {
 			} else if (e.kind === 'foe-attack') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
 				const victim = nameOf(e.heroId);
-				const why = e.taunted ? `, folle de rage contre ${victim},` : e.aura ? `, attirée par l’aura de ${victim},` : '';
-				const parts = [
-					e.guarded ? `${victim} s’interpose !` : '',
-					e.shielded ? `Le bouclier de lune encaisse ${e.shielded}.` : '',
-					e.absorbed ? `L’armure encaisse ${e.absorbed === 1 ? 'le coup' : `${e.absorbed} coups`}.` : '',
-					e.amount ? `${victim} perd ${e.amount} PV !` : !e.shielded && !e.absorbed ? `${victim} ne perd rien !` : '',
-					e.afflict ? `Et ${e.afflict} commence à le ronger…` : '',
-				].filter(Boolean);
-				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.heroId, amount: e.amount, ms: 2800, text: `${cap(e.name)}${why} frappe ${victim}. ${parts.join(' ')}` });
+				// Court : le détail se voit sur le plateau (chiffre de dégâts, bulle « CLANG ! » si l'armure encaisse).
+				const extra = e.guarded ? ` ${victim} s’interpose !` : !e.amount ? ' Aucun dégât !' : e.afflict ? ` 🔥 ${cap(e.afflict)} !` : '';
+				beats.push({ kind: 'say', tone: 'foe', foeId: e.foeId, heroId: e.heroId, amount: e.amount, ms: 2000, text: `${cap(e.name)} frappe ${victim} !${extra}` });
 			} else if (e.kind === 'affliction') {
 				pending[e.heroId] = (pending[e.heroId] ?? 0) + e.amount;
 				beats.push({ kind: 'say', tone: 'foe', heroId: e.heroId, amount: e.amount, ms: 2000, text: `🔥 ${cap(e.name)} : ${nameOf(e.heroId)} perd ${e.amount} PV.` });
@@ -352,6 +346,15 @@ export function CombatPanel(props: Props) {
 						return;
 					}
 					setCastId(null);
+					const voice = 'voice' in b ? b.voice : undefined;
+					if (voice) {
+						const url = voiceFor(voice);
+						if (url) {
+							const a = new Audio(url);
+							a.volume = voiceVolume;
+							void a.play().catch(() => {});
+						}
+					}
 					if (b.kind !== 'say') return;
 					if (b.poison && b.foeId) {
 						const id = b.foeId;
@@ -365,14 +368,6 @@ export function CombatPanel(props: Props) {
 							delete next[id];
 							return next;
 						});
-					}
-					if (b.voice) {
-						const url = voiceFor(b.voice);
-						if (url) {
-							const a = new Audio(url);
-							a.volume = voiceVolume;
-							void a.play().catch(() => {});
-						}
 					}
 					if (b.heroId) {
 						const id = b.heroId;
@@ -393,9 +388,9 @@ export function CombatPanel(props: Props) {
 							timers.current.push(
 								window.setTimeout(() => {
 									timers.current.push(window.setTimeout(hurt, playFoeAttack(eng, foe.name, from, to, amount > 0)));
-								}, WINDUP + 120),
+								}, 120),
 							);
-						} else timers.current.push(window.setTimeout(hurt, 700));
+						} else timers.current.push(window.setTimeout(hurt, 300));
 					}
 				}, t),
 			);
@@ -608,8 +603,8 @@ export function CombatPanel(props: Props) {
 									: `Les monstres jouent.`
 								: ability
 								? ability.target === 'ally'
-									? `Touche le compagnon à aider (il brille), ou choisis-le ci-dessous.`
-									: `Touche la créature à viser (elle brille), ou choisis-la ci-dessous.`
+									? `Touche sur le plateau le compagnon à aider (il brille).`
+									: `Touche sur le plateau la créature à viser (elle brille).`
 								: !combat.moved
 									? `Tu peux d’abord te déplacer : touche une case lumineuse. Puis choisis ton action.`
 									: `Choisis ton action.`}
@@ -618,20 +613,6 @@ export function CombatPanel(props: Props) {
 
 					{ability && mine ? (
 						<div className="hero-card__actions">
-							{/* Les cibles possibles, aussi en boutons : on peut viser sans passer par le plateau. */}
-							<div className="hero-card__targets" role="group" aria-label={ability.target === 'ally' ? 'Compagnon à aider' : 'Créature à viser'}>
-								{ability.target === 'ally'
-									? targets.allies.map((c) => (
-											<button key={c.id} type="button" className="btn btn--small" onClick={() => fire(ability, [c.id])}>
-												{c.id === actor.id ? `${c.name} (toi)` : c.name} · {c.pv}/{c.pvMax} PV
-											</button>
-										))
-									: targets.foes.map((f) => (
-											<button key={f.id} type="button" className="btn btn--small" onClick={() => fire(ability, [f.id])}>
-												{cap(f.name)} · {Math.max(0, f.hp)} PV
-											</button>
-										))}
-							</div>
 							<button type="button" className="btn btn--ghost" onClick={() => setSelected(null)}>
 								← Choisir une autre action
 							</button>
@@ -646,7 +627,7 @@ export function CombatPanel(props: Props) {
 									<button
 										key={a.id}
 										type="button"
-										className={`choice${a.every ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}`}
+										className={`choice${a.every ? ' choice--power' : ''}${!a.damage ? ' choice--alt' : ''}${mine && !ok ? ' is-blocked' : ''}`}
 										disabled={busy || !ok}
 										onClick={() => pickAbility(a)}
 									>
