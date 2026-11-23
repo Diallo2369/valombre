@@ -1,9 +1,20 @@
-import type { MediaAsset, StyleGuide } from '@/engine/types';
+import type { Light, MediaAsset, StyleGuide } from '@/engine/types';
 
 /**
  * Médias partagés par toutes les campagnes : interface, dés, portraits de classe.
  * Fichiers attendus dans public/medias/commun/<id>.<ext>
  */
+
+/**
+ * Lumières vivantes de l'image d'accueil (img-portail, 16:9), calées sur l'illustration :
+ * les deux bougies près de la fenêtre, la lanterne à gauche, et la neige qui tombe derrière la fenêtre.
+ */
+export const PORTAL_LIGHTS: Light[] = [
+	{ kind: 'neige', area: { x: 68, y: 0, w: 32, h: 27 }, intensity: 1 },
+	{ kind: 'bougie', x: 92.8, y: 24.4, size: 0.06 },
+	{ kind: 'bougie', x: 96.8, y: 36.3, size: 0.045, intensity: 0.85 },
+	{ kind: 'lanterne', x: 8.3, y: 46.7, size: 0.16 },
+];
 
 export const COMMON_STYLE: StyleGuide = {
 	image:

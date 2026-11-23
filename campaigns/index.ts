@@ -1,7 +1,7 @@
 import type { Campaign, MediaAsset } from '@/engine/types';
 import { BRUMES_DE_VALOMBRE } from './brumes-de-valombre';
 import { LANTERNE_D_AUBE } from './la-lanterne-d-aube';
-import { COMMON_MEDIA, COMMON_STYLE, VOICE_DIRECTION } from './commun/media';
+import { COMMON_MEDIA, COMMON_STYLE, PORTAL_LIGHTS, VOICE_DIRECTION } from './commun/media';
 
 /**
  * Registre des campagnes. Pour en ajouter une : créer son dossier, l'importer ici.
@@ -15,7 +15,7 @@ export function getCampaign(id: string): Campaign | undefined {
 	return CAMPAIGN_BY_ID[id];
 }
 
-export { COMMON_MEDIA, COMMON_STYLE, VOICE_DIRECTION };
+export { COMMON_MEDIA, COMMON_STYLE, PORTAL_LIGHTS, VOICE_DIRECTION };
 
 /** Dossier public d'une collection de médias (une campagne ou « commun »). */
 export function mediaFolder(collection: string) {

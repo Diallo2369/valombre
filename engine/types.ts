@@ -290,13 +290,15 @@ export interface MediaAsset {
 export interface Light {
 	/** « pluie » : des gouttes qui tombent sur toute l'image (intensity : densité, x : vent en degrés). */
 	/** « yeux » : une paire d'yeux qui clignent et se déplacent parfois ; « flaque » : des ronds dans l'eau (size : largeur de la flaque). */
-	kind: 'feu' | 'lanterne' | 'bougie' | 'magie' | 'brume' | 'eclair' | 'pluie' | 'yeux' | 'flaque';
+	kind: 'feu' | 'lanterne' | 'bougie' | 'magie' | 'brume' | 'eclair' | 'pluie' | 'yeux' | 'flaque' | 'neige';
 	x?: number;
 	y?: number;
 	size?: number;
 	intensity?: number;
 	/** Couleur « r,g,b » (sinon celle du type). */
 	color?: string;
+	/** « neige » : la zone où tombent les flocons (en % de l'image), par exemple une fenêtre. */
+	area?: { x: number; y: number; w: number; h: number };
 }
 
 export interface StyleGuide {

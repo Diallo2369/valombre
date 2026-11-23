@@ -9,7 +9,7 @@ export const STORY_START_EVENT = 'valombre:histoire';
 /** Événement envoyé quand les réglages changent (volume de la musique). */
 export const PREFS_EVENT = 'valombre:prefs';
 
-const FADE_IN_MS = 2500;
+const FADE_IN_MS = 700;
 const PAUSE_KEY = 'valombre:musique-coupee';
 const FADE_OUT_MS = 3500;
 
@@ -54,22 +54,30 @@ export function SiteMusic({ urls }: { urls: string[] }) {
 		raf.current = requestAnimationFrame(step);
 	};
 
+	/** Crée le lecteur et lance le téléchargement tout de suite : au premier clic, la musique est déjà prête. */
+	const prepare = () => {
+		if (audio.current || !urls.length) return;
+		const el = new Audio(urls[index.current % urls.length]);
+		el.preload = 'auto';
+		el.loop = urls.length === 1;
+		el.volume = 0;
+		// Plusieurs versions : on passe à la suivante à la fin de chacune.
+		el.onended = () => {
+			index.current += 1;
+			el.src = urls[index.current % urls.length];
+			void el.play().catch(() => {});
+		};
+		el.load();
+		audio.current = el;
+	};
+
 	const start = () => {
 		if (!urls.length || silenced.current || paused.current || volume() === 0) return;
 		if (audio.current && !audio.current.paused) return;
-		if (!audio.current) {
-			const el = new Audio(urls[index.current % urls.length]);
-			el.loop = urls.length === 1;
-			el.volume = 0;
-			// Plusieurs versions : on passe à la suivante à la fin de chacune.
-			el.onended = () => {
-				index.current += 1;
-				el.src = urls[index.current % urls.length];
-				void el.play().catch(() => {});
-			};
-			audio.current = el;
-		}
-		void audio.current
+		prepare();
+		const el = audio.current;
+		if (!el) return;
+		void el
 			.play()
 			// Le clic sur « Commencer l'aventure » peut arriver pendant le démarrage : on ne remonte pas le son.
 			.then(() => {

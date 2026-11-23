@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { COMMON_MEDIA } from '@/campaigns';
+import { COMMON_MEDIA, PORTAL_LIGHTS } from '@/campaigns';
+import { LightLayer } from '@/components/LightLayer';
 import { MediaView } from '@/components/MediaView';
 import { SiteHeader } from '@/components/SiteHeader';
 import { currentUser } from '@/lib/auth';
@@ -16,7 +17,13 @@ export default function HomePage() {
 			<SiteHeader user={null} />
 			<main className="home">
 				<section className="home__hero">
-					<MediaView className="home__bg" media={media} image="img-portail" alt="" />
+					<div className="home__bg">
+						{/* L'image et ses lumières (bougies, lanterne, neige) dans une boîte au format de l'image, qui couvre le bandeau. */}
+						<div className="home__art">
+							<MediaView className="home__img" media={media} image="img-portail" alt="" />
+							<LightLayer lights={PORTAL_LIGHTS} />
+						</div>
+					</div>
 					<div className="home__content container">
 						<p className="home__eyebrow">Jeu de rôle familial</p>
 						<h1 className="home__title">Valombre</h1>
