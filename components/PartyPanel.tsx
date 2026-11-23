@@ -12,18 +12,16 @@ interface Props {
 	/** Héros dont on regarde les compétences en combat. */
 	viewedId?: string;
 	spokesId?: string;
-	/** En combat sur grand écran : le groupe en rangée sous le plateau. */
-	row?: boolean;
 	/** Ce que fait le clic sur un héros (« Fiche de », ou en combat « Compétences de »). */
 	openLabel?: string;
 	onOpenSheet: (id: string) => void;
 	onBardSong: (id: string) => void;
 }
 
-/** Colonne du groupe : PV, pouvoir, porte-parole, accès à la fiche. */
-export function PartyPanel({ party, media, activeId, viewedId, spokesId, row = false, openLabel = 'Fiche de', onOpenSheet, onBardSong }: Props) {
+/** Le groupe (dans le volet « Le groupe ») : PV, pouvoir, porte-parole, accès à la fiche. */
+export function PartyPanel({ party, media, activeId, viewedId, spokesId, openLabel = 'Fiche de', onOpenSheet, onBardSong }: Props) {
 	return (
-		<ul className={`party${row ? ' party--row' : ''}`} aria-label="Le groupe">
+		<ul className="party" aria-label="Le groupe">
 			{party.map((c) => {
 				const cls = CLASSES[c.classId];
 				const ratio = c.pvMax ? c.pv / c.pvMax : 0;

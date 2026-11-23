@@ -59,7 +59,7 @@ type PendingRoll =
 	| { kind: 'talk'; request: RollRequest }
 	| { kind: 'flee'; request: RollRequest };
 
-type Panel = null | 'journal' | 'sac' | 'reglages' | { sheet: string };
+type Panel = null | 'groupe' | 'journal' | 'sac' | 'reglages' | { sheet: string };
 
 
 let toastSeq = 0;
@@ -246,6 +246,27 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 		return () => window.clearTimeout(t);
 	}, [started, settling, playerState, revealed, lines]);
 	const allRevealed = revealed >= lines.length;
+
+	// Sur grand écran, le récit défile dans sa colonne : on suit la réplique lue (ou la dernière arrivée), puis les choix.
+	const storyRef = useRef<HTMLElement>(null);
+	const barRef = useRef<HTMLElement>(null);
+	useEffect(() => {
+		const box = storyRef.current;
+		if (!wide || !box) return;
+		const items = box.querySelectorAll<HTMLElement>('.story__line');
+		const target = speaking !== null ? items[speaking] : undefined;
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (target) target.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+		else box.scrollTo({ top: box.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
+	}, [wide, speaking, revealed, lines.length]);
+	// La hauteur de la barre du haut (elle passe sur deux lignes sur un écran étroit) : les colonnes prennent le reste.
+	useEffect(() => {
+		const bar = barRef.current;
+		if (!bar) return;
+		const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--game-bar', `${bar.offsetHeight}px`));
+		ro.observe(bar);
+		return () => ro.disconnect();
+	}, []);
 	const fighting = Boolean(allRevealed && !scene.ending && combat && combatDef && actor);
 	const sideCombat = fighting && wide;
 	const showAll = () => {
@@ -395,6 +416,8 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	const mapAt = campaign.map?.zones[scene.zone ?? ''];
 	const mapFocus: [number, number] = mapAt ? [mapAt[0] / 100, mapAt[1] / 100] : [0.5, 0.5];
 
+	/** Héros blessés (moins de la moitié de leurs PV) ou épuisés : un point rouge sur le bouton du groupe. */
+	const hurtCount = party.filter((c) => c.pv < c.pvMax / 2).length;
 	const partyPanel = (
 		<PartyPanel
 			party={party}
@@ -402,9 +425,14 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			activeId={actor?.id}
 			viewedId={fighting ? viewId ?? undefined : undefined}
 			spokesId={prefs.spokesperson && !combat ? spokes?.id : undefined}
-			row={sideCombat}
 			openLabel={fighting ? 'Compétences de' : 'Fiche de'}
-			onOpenSheet={(id) => (fighting ? setViewId(id === actor?.id ? null : id) : setPanel({ sheet: id }))}
+			onOpenSheet={(id) => {
+				// En combat : on regarde ses compétences sur la carte du héros (le volet se ferme). Sinon : sa fiche.
+				if (fighting) {
+					setViewId(id === actor?.id ? null : id);
+					setPanel(null);
+				} else setPanel({ sheet: id });
+			}}
 			onBardSong={(id) => apply(bardSong(game, id))}
 		/>
 	);
@@ -412,7 +440,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 	/* ---------------- Rendu ---------------- */
 	return (
 		<div className="game">
-			<header className="game__bar">
+			<header className="game__bar" ref={barRef}>
 				<Link href={sandbox ? '/atelier/test' : '/portail'} className="game__back">
 					{sandbox ? '← Tests' : '← Portail'}
 				</Link>
@@ -423,7 +451,19 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 						{chapter ? `Chapitre ${chapter.n} · ${chapter.title}` : adventureName}
 					</span>
 				</div>
+				<p className={`game__save is-${save}`} role="status">
+					{save === 'saving' ? 'Sauvegarde…' : save === 'saved' ? '✓ Sauvegardé' : save === 'error' ? '⚠ Sauvegarde impossible' : save === 'stale' ? '⚠ Aventure recommencée : rechargez la page.' : ''}
+				</p>
 				<nav className="game__tools" aria-label="Outils de jeu">
+					<button
+						type="button"
+						className="btn btn--small btn--ghost game__party-btn"
+						onClick={() => setPanel('groupe')}
+						aria-label={`Le groupe${hurtCount ? ` (${hurtCount} blessé${hurtCount > 1 ? 's' : ''})` : ''}`}
+					>
+						👥 Le groupe
+						{hurtCount ? <span className="game__party-dot" aria-hidden="true" /> : null}
+					</button>
 					<button type="button" className="btn btn--small btn--ghost" onClick={() => { playSfx('sfx-page'); setPanel('journal'); }}>
 						📜 Journal
 					</button>
@@ -442,88 +482,10 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 				</nav>
 			</header>
 
-			<div className={`game__layout${sideCombat ? ' game__layout--fight' : ''}`}>
-				<main className="game__main" ref={mainRef} tabIndex={-1} aria-labelledby="scene-title">
-					<div className="game__stage">
-						<MediaView
-							className="game__media"
-							media={media}
-							image={stageImage}
-							video={combat ? undefined : scene.media?.video}
-							alt={scene.title}
-							placeholder={scene.title}
-						/>
-						<LightLayer key={stageImage} lights={(stageImage && campaign.lights?.[stageImage]) || NO_LIGHTS} />
-						<h1 id="scene-title" className="game__scene-title">
-							{scene.title}
-						</h1>
-					</div>
-
-					<section className="story" aria-live="polite">
-						{lines.map((l, i) => {
-							const npc = campaign.npcs[l.who];
-							const isNarr = l.who === 'narrateur';
-							return (
-								<div
-									key={`${state.turn}-${i}`}
-									className={['story__line', isNarr ? 'story__line--narr' : 'story__line--npc', l.result ? 'story__line--result' : '', speaking === i ? 'is-speaking' : '', isFresh(i) ? '' : 'is-heard']
-										.filter(Boolean)
-										.join(' ')}
-									style={npc && !isNarr ? ({ '--npc': npc.color } as React.CSSProperties) : undefined}
-								>
-									{!isNarr && npc ? (
-										<MediaView className="story__portrait" media={media} image={npc.portrait} alt="" />
-									) : null}
-									<div className="story__body">
-										{!isNarr && npc ? <span className="story__who">{npc.name}</span> : null}
-										<p className="story__text">{l.text}</p>
-									</div>
-									{voiceItems[i]?.url || (prefs.voice.browserFallback && speechSupported()) ? (
-										<button
-											type="button"
-											className="story__replay"
-											onClick={() => speakScene(i)}
-											title="Relire à partir d’ici"
-											aria-label={`Relire à partir de la réplique ${i + 1}`}
-										>
-											▶
-										</button>
-									) : null}
-								</div>
-							);
-						})}
-						<div className="story__tools" role="group" aria-label="Lecture à voix haute">
-							{playerState === 'idle' ? (
-								<button type="button" className="btn btn--small btn--ghost" onClick={() => speakScene()} disabled={!canSpeak}>
-									🔊 {canSpeak ? 'Relire' : 'Pas encore de voix pour cette scène'}
-								</button>
-							) : (
-								<>
-									<button type="button" className="btn btn--small" onClick={() => player.current?.toggle()} aria-keyshortcuts="Space">
-										{playerState === 'paused' ? '▶ Reprendre' : '⏸ Pause'}
-									</button>
-									<button type="button" className="btn btn--small btn--ghost" onClick={() => player.current?.next()}>
-										⏭ Réplique suivante
-									</button>
-									<button type="button" className="btn btn--small btn--ghost" onClick={() => player.current?.stop()}>
-										⏹ Arrêter
-									</button>
-									<span className="story__hint">Barre d’espace : pause</span>
-								</>
-							)}
-						</div>
-					</section>
-
-					{/* Les choix (ou le combat, ou la fin) n'arrivent qu'une fois le récit dévoilé. */}
-					{!allRevealed ? null : scene.ending ? (
-						<section className="ending card">
-							<h2>{scene.ending.title}</h2>
-							<p>{scene.ending.text}</p>
-							<Link className="btn" href="/portail">
-								Retour au portail
-							</Link>
-						</section>
-					) : combat && combatDef && actor ? (
+			<div className={`game__layout${fighting ? ' game__layout--fight' : ''}`}>
+				{/* À gauche, collé à l'écran : l'image de la scène, ou le plateau en combat. */}
+				<div className="game__visual">
+					{fighting && combat && combatDef && actor ? (
 						<CombatPanel
 							def={finale?.def ?? combatDef}
 							combat={finale?.combat ?? combat}
@@ -572,6 +534,99 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							introTo={combatDef.enemy.image ? media[combatDef.enemy.image] : undefined}
 						/>
 					) : (
+						<div className="game__stage">
+							{/* L'image remplit la colonne (recadrée comme une couverture) : le cadre 16:9 garde les lumières calées. */}
+							<div className="game__frame">
+								<MediaView
+									className="game__media"
+									media={media}
+									image={stageImage}
+									video={combat ? undefined : scene.media?.video}
+									alt={scene.title}
+									placeholder={scene.title}
+								/>
+								<LightLayer key={stageImage} lights={(stageImage && campaign.lights?.[stageImage]) || NO_LIGHTS} />
+							</div>
+							<h1 id="scene-title" className="game__scene-title">
+								{scene.title}
+							</h1>
+						</div>
+					)}
+				</div>
+
+				{/* À droite : la boîte de dialogue (le récit, puis les choix). */}
+				<main className="game__dialog" ref={mainRef} tabIndex={-1} aria-labelledby="scene-title">
+					{fighting ? (
+						<h1 id="scene-title" className="visually-hidden">
+							{scene.title}
+						</h1>
+					) : (
+						<section className="story" aria-live="polite" ref={storyRef}>
+							{lines.map((l, i) => {
+								const npc = campaign.npcs[l.who];
+								const isNarr = l.who === 'narrateur';
+								return (
+									<div
+										key={`${state.turn}-${i}`}
+										className={['story__line', isNarr ? 'story__line--narr' : 'story__line--npc', l.result ? 'story__line--result' : '', speaking === i ? 'is-speaking' : '', isFresh(i) ? '' : 'is-heard']
+											.filter(Boolean)
+											.join(' ')}
+										style={npc && !isNarr ? ({ '--npc': npc.color } as React.CSSProperties) : undefined}
+									>
+										{!isNarr && npc ? (
+											<MediaView className="story__portrait" media={media} image={npc.portrait} alt="" />
+										) : null}
+										<div className="story__body">
+											{!isNarr && npc ? <span className="story__who">{npc.name}</span> : null}
+											<p className="story__text">{l.text}</p>
+										</div>
+										{voiceItems[i]?.url || (prefs.voice.browserFallback && speechSupported()) ? (
+											<button
+												type="button"
+												className="story__replay"
+												onClick={() => speakScene(i)}
+												title="Relire à partir d’ici"
+												aria-label={`Relire à partir de la réplique ${i + 1}`}
+											>
+												▶
+											</button>
+										) : null}
+									</div>
+								);
+							})}
+							<div className="story__tools" role="group" aria-label="Lecture à voix haute">
+								{playerState === 'idle' ? (
+									<button type="button" className="btn btn--small btn--ghost" onClick={() => speakScene()} disabled={!canSpeak}>
+										🔊 {canSpeak ? 'Relire' : 'Pas encore de voix pour cette scène'}
+									</button>
+								) : (
+									<>
+										<button type="button" className="btn btn--small" onClick={() => player.current?.toggle()} aria-keyshortcuts="Space">
+											{playerState === 'paused' ? '▶ Reprendre' : '⏸ Pause'}
+										</button>
+										<button type="button" className="btn btn--small btn--ghost" onClick={() => player.current?.next()}>
+											⏭ Réplique suivante
+										</button>
+										<button type="button" className="btn btn--small btn--ghost" onClick={() => player.current?.stop()}>
+											⏹ Arrêter
+										</button>
+										<span className="story__hint">Barre d’espace : pause</span>
+									</>
+								)}
+							</div>
+						</section>
+					)}
+					{sideCombat ? <div className="game__combat-side" ref={setCombatSide} /> : null}
+					{/* Les choix (ou le combat, ou la fin) n'arrivent qu'une fois le récit dévoilé. */}
+					{!allRevealed ? null : scene.ending ? (
+						<section className="ending card">
+							<h2>{scene.ending.title}</h2>
+							<p>{scene.ending.text}</p>
+							<Link className="btn" href="/portail">
+								Retour au portail
+							</Link>
+						</section>
+					) : fighting ? null : (
 						<section className="decide" aria-labelledby="decide-title">
 							<h2 id="decide-title" className="decide__title">
 								{/* On s'adresse à la table, sans nommer personne : « vous » à plusieurs, « toi » seul. */}
@@ -604,22 +659,7 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 							)}
 						</section>
 					)}
-
-					{sideCombat ? partyPanel : null}
 				</main>
-
-				<aside className="game__side" aria-label={sideCombat ? 'Compétences' : 'Le groupe'}>
-					{sideCombat ? <div className="game__combat-side" ref={setCombatSide} /> : partyPanel}
-					<p className="game__gold">
-						🪙 {state.gold} · 🎒 {Object.values(state.bag).reduce((a, b) => a + b, 0)} objet(s)
-					</p>
-					<p className={`game__save is-${save}`} role="status">
-						{save === 'saving' ? 'Sauvegarde…' : save === 'saved' ? '✓ Partie sauvegardée' : save === 'error' ? '⚠ Sauvegarde impossible' : save === 'stale' ? '⚠ Cette aventure a été recommencée : rechargez la page.' : ''}
-					</p>
-					{activeHeroes(party).length < party.length ? (
-						<p className="game__hint">Un héros épuisé ne peut plus agir en combat. Une potion, un chant ou un repos le remettra sur pied.</p>
-					) : null}
-				</aside>
 			</div>
 
 			<div className="toasts" aria-live="polite">
@@ -649,6 +689,19 @@ export function GameScreen({ adventureId, adventureName, campaign, initial, medi
 			{panel === 'sac' ? (
 				<Drawer title="Le sac du groupe" onClose={() => setPanel(null)}>
 					<BagContent campaign={campaign} state={state} party={party} onUse={(itemId, target) => apply(consumeItem(campaign, game, itemId, target))} />
+				</Drawer>
+			) : null}
+			{panel === 'groupe' ? (
+				<Drawer title="Le groupe" onClose={() => setPanel(null)}>
+					<div className="game__party">
+						{partyPanel}
+						<p className="game__gold">
+							🪙 {state.gold} · 🎒 {Object.values(state.bag).reduce((a, b) => a + b, 0)} objet(s)
+						</p>
+						{activeHeroes(party).length < party.length ? (
+							<p className="game__hint">Un héros épuisé ne peut plus agir en combat. Une potion, un chant ou un repos le remettra sur pied.</p>
+						) : null}
+					</div>
 				</Drawer>
 			) : null}
 			{panel === 'reglages' ? (

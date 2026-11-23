@@ -55,32 +55,81 @@
 		gap: 6px;
 	}
 
+	/*
+	 * Toute la largeur, coupée en deux (grand écran) : à gauche l'image de la scène (ou le plateau en combat),
+	 * à droite la boîte de dialogue. Chaque colonne prend la hauteur de l'écran sous la barre : le récit défile
+	 * dans sa colonne, les choix restent en bas. Sur un écran plus étroit : l'image, puis le dialogue, l'un sous l'autre.
+	 */
 	&__layout {
+		--layout-h: calc(100dvh - var(--game-bar, 64px));
+
 		display: grid;
-		gap: 24px;
-		padding: 20px var(--gutter) 80px;
-		max-width: 1400px;
-		margin: 0 auto;
+		gap: 20px;
+		padding: 16px var(--gutter) 64px;
 
 		@media (min-width: $bp-l) {
-			grid-template-columns: minmax(0, 1fr) 320px;
-			align-items: start;
-		}
-
-		/* En combat : le plateau garde sa taille, la carte des compétences prend toute la largeur restante. */
-		&--fight {
-			max-width: none;
-
-			@media (min-width: $bp-l) {
-				grid-template-columns: minmax(0, 800px) minmax(320px, 1fr);
-			}
+			grid-template-columns: minmax(0, 11fr) minmax(380px, 9fr);
+			gap: 24px;
+			height: var(--layout-h);
+			padding-bottom: 16px;
+			overflow: hidden;
 		}
 	}
 
-	&__main {
+	&__visual {
+		min-width: 0;
+
+		@media (min-width: $bp-l) {
+			height: 100%;
+			min-height: 0;
+		}
+	}
+
+	/* En combat, le plateau défile dans sa colonne s'il est plus haut que l'écran. */
+	&__layout--fight &__visual {
+		@media (min-width: $bp-l) {
+			overflow-y: auto;
+			overscroll-behavior: contain;
+		}
+	}
+
+	&__dialog {
 		display: grid;
+		align-content: start;
 		gap: 20px;
+		min-width: 0;
 		outline: none;
+
+		@media (min-width: $bp-l) {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			min-height: 0;
+
+			/* Le récit défile ; les choix restent visibles en bas. */
+			.story {
+				flex: 1 1 auto;
+				min-height: 0;
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				padding-right: 6px;
+				scrollbar-gutter: stable;
+			}
+
+			.decide,
+			.ending {
+				flex: 0 0 auto;
+				max-height: 58%;
+				overflow-y: auto;
+			}
+
+			.game__combat-side {
+				flex: 1 1 auto;
+				min-height: 0;
+				overflow-y: auto;
+				overscroll-behavior: contain;
+			}
+		}
 	}
 
 	&__stage {
@@ -88,12 +137,33 @@
 		border-radius: var(--radius-l);
 		overflow: hidden;
 		box-shadow: var(--shadow-l);
+		/* Le cadre 16:9 de l'image se dimensionne sur la scène (comme une couverture). */
+		container-type: size;
+		aspect-ratio: 16 / 9;
+		width: 100%;
+
+		@media (min-width: $bp-l) {
+			aspect-ratio: auto;
+			height: 100%;
+		}
 	}
 
-	&__media {
+	/* L'image et ses lumières, en 16:9 : la scène la recadre en la couvrant entièrement, les lumières restent calées. */
+	&__frame {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		translate: -50% -50%;
+		width: max(100cqw, calc(100cqh * 16 / 9));
 		aspect-ratio: 16 / 9;
-		max-height: 56vh;
+	}
+
+	/* (Deux classes : passe devant le « position: relative » de .media-view.) */
+	&__frame > &__media {
+		position: absolute;
+		inset: 0;
 		width: 100%;
+		height: 100%;
 	}
 
 	&__stage .light-layer {
@@ -117,21 +187,32 @@
 		text-shadow: 0 2px 10px rgb(0 0 0 / 70%);
 	}
 
-	&__side {
+	&__party {
 		display: grid;
 		gap: 12px;
+	}
 
-		@media (min-width: $bp-l) {
-			position: sticky;
-			top: 80px;
-		}
+	/* Le bouton du groupe : un point rouge quand un héros est blessé ou épuisé. */
+	&__party-btn {
+		position: relative;
+	}
+
+	&__party-dot {
+		position: absolute;
+		top: -3px;
+		right: -3px;
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
+		background: var(--blood-400);
+		box-shadow: 0 0 0 2px rgb(13 17 27), 0 0 8px var(--blood-400);
 	}
 
 	&__gold,
 	&__hint,
 	&__save {
 		margin: 0;
-		font-size: 0.9rem;
+		font-size: 0.85rem;
 		color: var(--mist-400);
 	}
 
@@ -587,15 +668,6 @@
 	margin: 0;
 	display: grid;
 	gap: 10px;
-
-	@media (min-width: $bp-m) and (max-width: $bp-l - 1px) {
-		grid-template-columns: repeat(2, 1fr);
-	}
-
-	/* En combat sur grand écran : le groupe en rangée sous le plateau. */
-	&--row {
-		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-	}
 
 	&__hero {
 		display: grid;
